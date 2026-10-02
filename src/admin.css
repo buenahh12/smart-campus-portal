@@ -64,3 +64,89 @@ body:has(.student-portal-shell) .siibot-wrap { z-index: 130; }
 @media (prefers-reduced-motion: reduce) {
 	.admin-dashboard,.student-portal-shell,.student-card { animation: none; }
 }
+
+/* Student timetable, performance, and branded footer */
+.schedule-heading-tools { display: flex; align-items: center; gap: 10px; }
+.schedule-clock { color: #668574; font-size: 9px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.schedule-manage-button,.schedule-save-button { min-height: 34px; padding: 0 12px; border: 1px solid #b8dfc6; border-radius: 8px; color: #087c3e; background: #f4fff7; font-size: 9px; font-weight: 800; white-space: nowrap; transition: transform .16s ease, background .16s ease, box-shadow .16s ease; }
+.schedule-manage-button:hover,.schedule-save-button:hover { transform: translateY(-1px); background: #e6fff0; box-shadow: 0 5px 12px rgba(24,82,48,.1); }
+.schedule-status-line { min-height: 34px; display: flex; align-items: center; gap: 6px; margin-top: 11px; padding: 8px 10px; border-radius: 7px; color: #4e765f; background: #f3faf5; font-size: 9px; }
+.schedule-status-line b { color: #17472f; }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: #10b95c; box-shadow: 0 0 0 3px #ddf8e6; }
+.schedule-week-picker { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin: 13px 0 10px; }
+.schedule-week-picker button { min-width: 0; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 5px; border: 1px solid #e0eee4; border-radius: 7px; color: #587565; background: #fff; font-size: 9px; font-weight: 700; transition: border-color .16s ease, color .16s ease, background .16s ease; }
+.schedule-week-picker button small { min-width: 16px; height: 16px; display: grid; place-items: center; border-radius: 50%; color: #668574; background: #edf4ef; font-size: 8px; }
+.schedule-week-picker button.active { border-color: #8fd6a7; color: #087c3e; background: #eafff1; }
+.schedule-week-picker button.active small { color: white; background: #10a950; }
+.schedule-week-picker .day-short { display: none; }
+.schedule-editor { margin: 12px 0 8px; padding: 14px; border: 1px solid #d5eadc; border-radius: 10px; background: #f8fffa; }
+.schedule-editor-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.schedule-editor-heading .kicker { margin: 0 0 4px; font-size: 8px; }
+.schedule-editor-heading h3 { margin: 0; color: #17472f; font-size: 13px; }
+.schedule-editor-heading > span { color: #668574; font-size: 8px; text-align: right; }
+.schedule-steps { display: grid; gap: 4px; margin: 0 0 13px; padding-left: 20px; color: #587565; font-size: 9px; line-height: 1.5; }
+.schedule-form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.schedule-form-grid label { min-width: 0; display: grid; gap: 5px; color: #355f46; font-size: 9px; font-weight: 700; }
+.schedule-form-grid label > span { color: #82988a; font-weight: 400; }
+.schedule-form-grid input,.schedule-form-grid select { width: 100%; min-width: 0; height: 36px; padding: 0 9px; border: 1px solid #cfe5d6; border-radius: 7px; outline: none; color: #17472f; background: white; font: inherit; font-size: 10px; }
+.schedule-form-grid input:focus,.schedule-form-grid select:focus { border-color: #42b874; box-shadow: 0 0 0 3px rgba(16,185,92,.12); }
+.schedule-optional { margin-top: 11px; color: #087c3e; font-size: 9px; }
+.schedule-optional summary { width: fit-content; cursor: pointer; font-weight: 700; }
+.schedule-optional .schedule-form-grid { margin-top: 10px; }
+.schedule-feedback { margin: 10px 0 0; font-size: 9px; line-height: 1.5; }
+.schedule-feedback.error { color: #a33131; }
+.schedule-feedback.success { color: #087c3e; }
+.schedule-save-button { margin-top: 11px; color: white; border-color: #0b9850; background: #0b9850; }
+.schedule-save-button:hover { color: white; background: #087c3e; }
+.class-timeline { margin-top: 8px; }
+.class-item { padding: 2px 7px; border-radius: 8px; }
+.class-item.is-current { background: #f0fff4; }
+.class-item.is-current .class-marker::before { background: #087c3e; box-shadow: 0 0 0 3px #d6f6e0; }
+.class-item > button.class-remove-button { padding: 6px 8px; color: #7b645b; border-color: #eadeda; background: #fff; }
+.class-item > button.class-remove-button:hover { color: #a33131; border-color: #e7c7c1; background: #fff8f6; }
+.schedule-empty { display: grid; gap: 6px; padding: 16px 10px 6px; color: #668574; font-size: 9px; line-height: 1.5; }
+.schedule-empty b { color: #17472f; font-size: 10px; }
+.schedule-empty button { justify-self: start; margin-top: 3px; padding: 7px 10px; border: 1px solid #b8dfc6; border-radius: 7px; color: #087c3e; background: #f4fff7; font-size: 9px; font-weight: 800; }
+.performance-card > .performance-intro { margin: 12px 0; color: #668574; font-size: 10px; line-height: 1.55; }
+.performance-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.performance-metrics article { min-width: 0; display: grid; gap: 6px; padding: 12px; border: 1px solid #e0eee4; border-radius: 9px; background: #f8fffa; }
+.performance-metrics article > span { color: #668574; font-size: 8px; font-weight: 700; }
+.performance-metrics article > b { color: #087c3e; font-size: 21px; line-height: 1; font-variant-numeric: tabular-nums; }
+.performance-metrics article > small { color: #789183; font-size: 8px; line-height: 1.4; }
+.performance-note { margin: 11px 0 0; color: #789183; font-size: 8px; line-height: 1.5; }
+.student-portal-footer { align-items: center; margin-top: 22px; padding: 14px 18px; border: 1px solid #d4eadd; border-radius: 13px; background: rgba(248,255,250,.96); box-shadow: 0 8px 22px rgba(30,95,58,.045); }
+.student-portal-footer .footer-brand { min-width: 0; }
+.student-portal-footer .footer-brand .brand-mark { flex-basis: 38px; width: 38px; height: 38px; }
+.student-portal-footer .footer-brand b { font-size: 9px; }
+.student-portal-footer .footer-brand small { font-size: 7px; }
+.student-footer-account { display: flex; align-items: center; gap: 18px; }
+.student-footer-account > div { display: grid; gap: 4px; text-align: right; }
+.student-footer-account > div b { max-width: 260px; overflow: hidden; color: #17472f; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.student-footer-account > div span { color: #668574; font-size: 8px; }
+.student-portal-footer .student-footer-account button { min-height: 34px; display: flex; align-items: center; gap: 7px; padding: 0 11px; border: 1px solid #d2e6d9; border-radius: 8px; color: #17613c; background: white; font-size: 9px; transition: border-color .16s ease, background .16s ease, transform .16s ease; }
+.student-portal-footer .student-footer-account button:hover { transform: translateY(-1px); border-color: #9dd9b2; background: #f1fff5; }
+@media (max-width: 760px) {
+	.schedule-heading-tools { align-items: flex-end; flex-direction: column; gap: 6px; }
+	.schedule-week-picker { gap: 4px; }
+	.schedule-week-picker button { flex-direction: column; gap: 3px; padding: 6px 2px; }
+	.schedule-week-picker .day-full { display: none; }
+	.schedule-week-picker .day-short { display: inline; }
+	.schedule-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.class-item { grid-template-columns: 58px 12px minmax(0,1fr) auto; }
+	.class-item > button.class-remove-button { grid-column: auto; justify-self: end; margin: 0; }
+	.performance-metrics { gap: 6px; }
+	.performance-metrics article { padding: 9px 7px; }
+	.student-portal-footer { align-items: flex-start; flex-direction: column; padding: 13px; }
+	.student-footer-account { width: 100%; justify-content: space-between; gap: 10px; }
+	.student-footer-account > div { text-align: left; }
+}
+@media (max-width: 420px) {
+	.schedule-clock { font-size: 8px; }
+	.schedule-manage-button { font-size: 8px; padding: 0 8px; }
+	.schedule-editor { padding: 11px; }
+	.schedule-editor-heading { align-items: flex-start; flex-direction: column; }
+	.schedule-editor-heading > span { text-align: left; }
+	.schedule-form-grid { grid-template-columns: 1fr 1fr; }
+	.class-item { grid-template-columns: 52px 10px minmax(0,1fr); gap: 7px; }
+	.class-item > button.class-remove-button { grid-column: 3; justify-self: start; margin: -4px 0 8px; }
+}

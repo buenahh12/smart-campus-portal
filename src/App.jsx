@@ -5,6 +5,7 @@ import {
   loginAsAdmin,
   loginWithGoogle,
   logoutUser,
+  requestPasswordReset,
 } from "./firebase";
 
 function Icon({ name, size = 20 }) {
@@ -57,6 +58,10 @@ function Icon({ name, size = 20 }) {
 
 function LoginModal({ onClose, onCreate, onAdmin, onSignedIn = () => {} }) {
   const [signingIn, setSigningIn] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [resetMode, setResetMode] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetSent, setResetSent] = useState(false);
   const [error, setError] = useState("");
   const [authenticatedUser, setAuthenticatedUser] = useState(null);
 
@@ -78,6 +83,25 @@ function LoginModal({ onClose, onCreate, onAdmin, onSignedIn = () => {} }) {
       );
     } finally {
       setSigningIn(false);
+    }
+  };
+
+  const handlePasswordReset = async (event) => {
+    event.preventDefault();
+    setError("");
+    setResetSent(false);
+    setResettingPassword(true);
+    try {
+      await requestPasswordReset(resetEmail);
+      setResetSent(true);
+    } catch (resetError) {
+      setError(resetError.code === "auth/invalid-email"
+        ? "Enter a valid email address."
+        : resetError.code === "auth/too-many-requests"
+          ? "Too many attempts. Please wait a while and try again."
+          : resetError.message || "The password reset email could not be sent.");
+    } finally {
+      setResettingPassword(false);
     }
   };
 
@@ -124,43 +148,34 @@ function LoginModal({ onClose, onCreate, onAdmin, onSignedIn = () => {} }) {
           <Icon name="building" size={26} />
         </div>
         <p className="kicker">SECURE ACCESS</p>
-        <h2 id="login-title">Access Campus Portal</h2>
-        <p className="modal-copy">
-          Sign in to access personalized routes, saved locations, and campus
-          services.
-        </p>
-        <button
-          className="google-button"
-          onClick={handleGoogleSignIn}
-          disabled={signingIn}
-        >
-          {signingIn
-            ? "Opening Google sign-in..."
-            : "Sign in with Google Account"}
-        </button>
-        <button className="create-account-link" onClick={onCreate}>
-          Create a new campus account
-        </button>
-        <button className="staff-access-link" onClick={onAdmin}>Staff / administrator access</button>
-        {error && (
-          <p className="auth-error" role="alert">
-            {error}
-          </p>
+        <h2 id="login-title">{resetMode ? "Reset your password" : "Access Campus Portal"}</h2>
+        {resetMode ? (
+          <>
+            <p className="modal-copy">Enter the email address on your campus account. Firebase will email you a secure link to reset your password.</p>
+            <form className="password-reset-form" onSubmit={handlePasswordReset}>
+              <input type="email" value={resetEmail} onChange={(event) => { setResetEmail(event.target.value); setResetSent(false); }} placeholder="Email address" autoComplete="email" aria-label="Account email address" required />
+              {error && <p className="auth-error" role="alert">{error}</p>}
+              {resetSent && <p className="auth-success" role="status">If an account exists for that address, a password reset email has been sent. Check your Gmail inbox and spam folder.</p>}
+              <button className="visitor-button" type="submit" disabled={resettingPassword}>{resettingPassword ? "Sending reset email..." : "Send reset email"}</button>
+            </form>
+            <button className="create-account-link" onClick={() => { setResetMode(false); setError(""); setResetSent(false); }}>Back to sign in</button>
+          </>
+        ) : (
+          <>
+            <p className="modal-copy">Sign in to access personalized routes, saved locations, and campus services.</p>
+            <button className="google-button" onClick={handleGoogleSignIn} disabled={signingIn}>
+              {signingIn ? "Opening Google sign-in..." : "Sign in with Google Account"}
+            </button>
+            <button className="create-account-link" onClick={onCreate}>Create a new campus account</button>
+            <button className="staff-access-link" onClick={() => { setResetMode(true); setError(""); setResetSent(false); }}>Forgot password?</button>
+            <button className="staff-access-link" onClick={onAdmin}>Staff / administrator access</button>
+            {error && <p className="auth-error" role="alert">{error}</p>}
+            <div className="divider"><span>OR</span></div>
+            <button className="visitor-button" onClick={onClose}>Continue as Visitor <Icon name="arrow" size={18} /></button>
+            <p className="visitor-note"><Icon name="shield" size={15} /> Visitors have access to public floor plans and emergency exit routes.</p>
+            <p className="terms">By continuing, you agree to the campus portal&apos;s <a href="#terms">Terms</a> and <a href="#privacy">Privacy Policy</a>.</p>
+          </>
         )}
-        <div className="divider">
-          <span>OR</span>
-        </div>
-        <button className="visitor-button" onClick={onClose}>
-          Continue as Visitor <Icon name="arrow" size={18} />
-        </button>
-        <p className="visitor-note">
-          <Icon name="shield" size={15} /> Visitors have access to public floor
-          plans and emergency exit routes.
-        </p>
-        <p className="terms">
-          By continuing, you agree to the campus portal's{" "}
-          <a href="#terms">Terms</a> and <a href="#privacy">Privacy Policy</a>.
-        </p>
       </div>
     </div>
   );
@@ -245,50 +260,161 @@ function CreateAccountModal({ onClose, onCreated }) {
   );
 }
 
+const scheduleWeekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function readSavedSchedule(uid) {
+  try {
+    const value = JSON.parse(localStorage.getItem(`campus-schedule:${uid}`) || "[]");
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
+function timeToMinutes(value) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function displayClassTime(value) {
+  return new Date(`2000-01-01T${value}:00`).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
 function AccountPanel({ user, onClose, onSignOut }) {
   const [month, setMonth] = useState(() => new Date());
   const [online, setOnline] = useState(navigator.onLine);
+  const [now, setNow] = useState(() => new Date());
+  const [savedClasses, setSavedClasses] = useState(() => readSavedSchedule(user.uid));
+  const [scheduleEditorOpen, setScheduleEditorOpen] = useState(() => readSavedSchedule(user.uid).length === 0);
+  const [selectedScheduleDay, setSelectedScheduleDay] = useState(() => new Date().getDay());
+  const [scheduleError, setScheduleError] = useState("");
+  const [scheduleNotice, setScheduleNotice] = useState("");
+  const [scheduleForm, setScheduleForm] = useState({ subject: "", day: String(new Date().getDay()), start: "06:00", end: "07:00", room: "", teacher: "" });
   const profile = JSON.parse(localStorage.getItem(`campus-profile:${user.uid}`) || "{}");
   const firstName = (user.displayName || profile.name || "Student").split(" ")[0];
   const monthStart = new Date(month.getFullYear(), month.getMonth(), 1);
   const calendarDays = Array.from({ length: new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate() }, (_, index) => index + 1);
   const storedAttendance = JSON.parse(localStorage.getItem(`campus-student-attendance:${user.uid}`) || "{}");
-  const todayKey = new Date().toLocaleDateString("en-CA");
+  const todayKey = now.toLocaleDateString("en-CA");
   const checkIn = storedAttendance[todayKey];
-  const todaySchedule = [
-    { start: "7:30 AM", end: "8:20 AM", subject: "Homeroom", room: "Room 101", teacher: "Adviser" },
-    { start: "8:20 AM", end: "9:10 AM", subject: "Mathematics", room: "Room 204", teacher: "Teacher assignment pending" },
-    { start: "9:30 AM", end: "10:20 AM", subject: "English", room: "Room 206", teacher: "Teacher assignment pending" },
-    { start: "10:20 AM", end: "11:10 AM", subject: "Science", room: "Room 301", teacher: "Teacher assignment pending" },
-  ];
+  const dayClasses = savedClasses
+    .filter((item) => Number(item.day) === selectedScheduleDay)
+    .sort((first, second) => first.start.localeCompare(second.start));
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const activeClass = selectedScheduleDay === now.getDay()
+    ? dayClasses.find((item) => timeToMinutes(item.start) <= currentMinutes && currentMinutes < timeToMinutes(item.end))
+    : null;
+  const nextClass = selectedScheduleDay === now.getDay()
+    ? dayClasses.find((item) => timeToMinutes(item.start) > currentMinutes)
+    : null;
+  const attendanceRecords = Object.values(storedAttendance).filter((record) => record && ["present", "late", "absent"].includes(record.status));
+  const attendanceTotals = attendanceRecords.reduce((totals, record) => ({ ...totals, [record.status]: totals[record.status] + 1 }), { present: 0, late: 0, absent: 0 });
+  const attendanceRate = attendanceRecords.length
+    ? Math.round(((attendanceTotals.present + attendanceTotals.late) / attendanceRecords.length) * 100)
+    : null;
   const announcements = [
     { title: "Welcome to your student portal", date: "Portal update", text: "Check this feed for school notices and event announcements." },
-    { title: "Schedule information", date: "Action needed", text: "Your official class schedule and teacher details will appear when published by the school." },
+    { title: "Schedule information", date: "Your timetable", text: "Add each class with its exact start and end time. Your schedule is saved in this browser." },
   ];
+
   useEffect(() => {
     const updateOnline = () => setOnline(navigator.onLine);
+    const clock = window.setInterval(() => setNow(new Date()), 15000);
     window.addEventListener("online", updateOnline);
     window.addEventListener("offline", updateOnline);
     return () => {
+      window.clearInterval(clock);
       window.removeEventListener("online", updateOnline);
       window.removeEventListener("offline", updateOnline);
     };
   }, []);
+
+  const saveClass = (event) => {
+    event.preventDefault();
+    setScheduleError("");
+    setScheduleNotice("");
+    const startMinutes = timeToMinutes(scheduleForm.start);
+    const endMinutes = timeToMinutes(scheduleForm.end);
+    if (endMinutes <= startMinutes) {
+      setScheduleError("The end time needs to be after the start time.");
+      return;
+    }
+    const conflict = savedClasses.some((item) => Number(item.day) === Number(scheduleForm.day)
+      && startMinutes < timeToMinutes(item.end)
+      && endMinutes > timeToMinutes(item.start));
+    if (conflict) {
+      setScheduleError("This time overlaps another class that day. Change one of the times.");
+      return;
+    }
+    const newClass = {
+      id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      subject: scheduleForm.subject.trim(),
+      day: Number(scheduleForm.day),
+      start: scheduleForm.start,
+      end: scheduleForm.end,
+      room: scheduleForm.room.trim(),
+      teacher: scheduleForm.teacher.trim(),
+    };
+    const nextClasses = [...savedClasses, newClass].sort((first, second) => first.day - second.day || first.start.localeCompare(second.start));
+    setSavedClasses(nextClasses);
+    localStorage.setItem(`campus-schedule:${user.uid}`, JSON.stringify(nextClasses));
+    setSelectedScheduleDay(newClass.day);
+    setScheduleForm((current) => ({ ...current, subject: "", room: "", teacher: "" }));
+    setScheduleNotice(`${newClass.subject} added for ${scheduleWeekdays[newClass.day]}. Add another class or tap Done.`);
+  };
+
+  const removeClass = (classId) => {
+    const nextClasses = savedClasses.filter((item) => item.id !== classId);
+    setSavedClasses(nextClasses);
+    localStorage.setItem(`campus-schedule:${user.uid}`, JSON.stringify(nextClasses));
+    setScheduleNotice("Class removed from your saved timetable.");
+  };
+
   const findClass = () => {
     onClose();
     window.setTimeout(() => document.querySelector("#features")?.scrollIntoView({ behavior: "smooth" }), 50);
   };
+
   return (
     <div className="student-portal-shell" role="dialog" aria-modal="true" aria-labelledby="student-portal-title">
       <header className="student-portal-header"><a className="student-portal-brand" href="#about"><span className="brand-mark" /><span><b>SAINT SIMON OF CYRENE</b><small>STUDENT PORTAL</small></span></a><div className="student-header-tools"><span className={`connectivity-pill ${online ? "online" : "offline"}`}><i />{online ? "Internet connected · School Wi-Fi unverified" : "Offline · School Wi-Fi unverified"}</span><button className="student-close" onClick={onClose} aria-label="Close student portal"><Icon name="close" /></button></div></header>
-      <main className="student-dashboard"><section className="student-welcome"><div><p className="kicker">PERSONAL CAMPUS DASHBOARD</p><h1 id="student-portal-title">Hello, {firstName}</h1><p>Your school day, attendance, and campus updates in one place.</p></div><div className={`checkin-card ${checkIn ? "checked-in" : "not-checked-in"}`}><span className="checkin-indicator" /><div><small>TODAY'S ATTENDANCE</small><b>{checkIn ? `Checked in at ${checkIn.time}` : "Not checked in"}</b><span>{checkIn ? checkIn.location || "Campus gate" : "Your check-in will appear here"}</span></div></div></section>
-        <div className="student-dashboard-grid"><section className="student-card schedule-card"><div className="student-card-heading"><div><p className="kicker">TODAY'S CLASSES</p><h2>Daily schedule</h2></div><span className="schedule-day">{new Date().toLocaleDateString("en-US", { weekday: "long" })}</span></div><div className="schedule-notice">Sample schedule · Official class and teacher assignments are not connected yet.</div><div className="class-timeline">{todaySchedule.map((item) => <article className="class-item" key={item.start}><div className="class-time"><b>{item.start}</b><small>{item.end}</small></div><div className="class-marker" /><div className="class-details"><b>{item.subject}</b><span>{item.room} · {item.teacher}</span></div><button onClick={findClass}>Find class <Icon name="arrow" size={14} /></button></article>)}</div></section>
-        <section className="student-card student-attendance-card"><div className="student-card-heading"><div><p className="kicker">MY ATTENDANCE</p><h2>Attendance history</h2></div><div className="month-switch"><button onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} aria-label="Previous month">‹</button><b>{month.toLocaleDateString("en-US", { month: "short", year: "numeric" })}</b><button onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))} aria-label="Next month">›</button></div></div><div className="student-calendar"><div className="student-weekdays">{"SMTWTFS".split("").map((day, index) => <span key={`${day}-${index}`}>{day}</span>)}</div><div className="student-calendar-days">{Array.from({ length: monthStart.getDay() }, (_, index) => <i key={`empty-${index}`} />)}{calendarDays.map((day) => { const key = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`; const status = storedAttendance[key]?.status || "unrecorded"; return <span key={key} className={`${status} ${key === todayKey ? "today" : ""}`} title={`${key}: ${status}`}>{day}</span>; })}</div><div className="student-calendar-legend"><span><i className="present" /> Present</span><span><i className="late" /> Late</span><span><i className="absent" /> Absent</span></div><p className="student-data-note">Attendance records will appear after the school connects your check-ins.</p></div></section>
-        <section className="student-card grades-card"><div className="student-card-heading"><div><p className="kicker">ACADEMIC PROGRESS</p><h2>Grades & performance</h2></div><span className="pending-badge">Awaiting teacher data</span></div><p>Subject grades, GPA, and progress reports will be shown here when published by your teachers.</p><div className="grade-placeholder"><Icon name="building" size={21} /><span>No academic results have been published to your account yet.</span></div></section>
-        <section className="student-card announcements-card"><div className="student-card-heading"><div><p className="kicker">SCHOOL BROADCAST</p><h2>Announcements</h2></div><span className="pending-badge">Portal notices</span></div>{announcements.map((item) => <article className="announcement-item" key={item.title}><span><Icon name="sparkle" size={16} /></span><div><div><b>{item.title}</b><small>{item.date}</small></div><p>{item.text}</p></div></article>)}</section></div>
-        <footer className="student-portal-footer"><span>{user.displayName || profile.name || user.email} · {profile.year || "Student"}{profile.section ? ` · ${profile.section}` : ""}</span><button onClick={onSignOut}>Sign out</button></footer>
+      <main className="student-dashboard">
+        <section className="student-welcome"><div><p className="kicker">PERSONAL CAMPUS DASHBOARD</p><h1 id="student-portal-title">Hello, {firstName}</h1><p>Your school day, attendance, and campus updates in one place.</p></div><div className={`checkin-card ${checkIn ? "checked-in" : "not-checked-in"}`}><span className="checkin-indicator" /><div><small>TODAY&apos;S ATTENDANCE</small><b>{checkIn ? `Checked in at ${checkIn.time}` : "Not checked in"}</b><span>{checkIn ? checkIn.location || "Campus gate" : "Your check-in will appear here"}</span></div></div></section>
+        <div className="student-dashboard-grid">
+          <section className="student-card schedule-card">
+            <div className="student-card-heading"><div><p className="kicker">MY SCHOOL WEEK</p><h2>My classes</h2></div><div className="schedule-heading-tools"><span className="schedule-clock">Now · {now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span><button className="schedule-manage-button" type="button" onClick={() => { setScheduleEditorOpen((open) => !open); setScheduleError(""); setScheduleNotice(""); }}>{scheduleEditorOpen ? "Done" : "Change classes"}</button></div></div>
+            <div className="schedule-status-line" aria-live="polite">{activeClass ? <><span className="live-dot" /> Class now: <b>{activeClass.subject}</b> · until {displayClassTime(activeClass.end)}</> : nextClass ? <>Coming up: <b>{nextClass.subject}</b> · starts at {displayClassTime(nextClass.start)}</> : selectedScheduleDay === now.getDay() ? "Nothing else planned today." : `Classes for ${scheduleWeekdays[selectedScheduleDay]}.`}</div>
+            <div className="schedule-week-picker" aria-label="Choose a day">{scheduleWeekdays.map((day, index) => <button key={day} type="button" className={selectedScheduleDay === index ? "active" : ""} aria-label={`Show ${day} classes`} title={day} aria-pressed={selectedScheduleDay === index} onClick={() => { setSelectedScheduleDay(index); setScheduleForm((current) => ({ ...current, day: String(index) })); }}><span className="day-full">{day}</span><span className="day-short">{day.slice(0, 3)}</span></button>)}</div>
+            {scheduleEditorOpen && <form className="schedule-editor" onSubmit={saveClass}>
+              <div className="schedule-editor-heading"><div><p className="kicker">ADD CLASSES ONE AT A TIME</p><h3>Add a class</h3></div></div>
+              <ol className="schedule-steps"><li>Choose the day and class name.</li><li>Set when it starts and ends.</li><li>Tap Add class. Repeat for your other classes.</li></ol>
+              <div className="schedule-form-grid">
+                <label>Class name<input name="subject" value={scheduleForm.subject} onChange={(event) => setScheduleForm((current) => ({ ...current, subject: event.target.value }))} placeholder="e.g. Science or Math" required maxLength={60} /></label>
+                <label>Day<select value={scheduleForm.day} onChange={(event) => { const day = event.target.value; setScheduleForm((current) => ({ ...current, day })); setSelectedScheduleDay(Number(day)); }}>{scheduleWeekdays.map((day, index) => <option key={day} value={index}>{day}</option>)}</select></label>
+                <label>Starts at<input type="time" value={scheduleForm.start} onChange={(event) => setScheduleForm((current) => ({ ...current, start: event.target.value }))} required /></label>
+                <label>Ends at<input type="time" value={scheduleForm.end} onChange={(event) => setScheduleForm((current) => ({ ...current, end: event.target.value }))} required /></label>
+              </div>
+              <details className="schedule-optional"><summary>Add a room or teacher (optional)</summary><div className="schedule-form-grid"><label>Room<input value={scheduleForm.room} onChange={(event) => setScheduleForm((current) => ({ ...current, room: event.target.value }))} placeholder="e.g. Room 204" maxLength={50} /></label><label>Teacher<input value={scheduleForm.teacher} onChange={(event) => setScheduleForm((current) => ({ ...current, teacher: event.target.value }))} placeholder="Teacher name" maxLength={60} /></label></div></details>
+              {scheduleError && <p className="schedule-feedback error" role="alert">{scheduleError}</p>}
+              {scheduleNotice && <p className="schedule-feedback success" role="status">{scheduleNotice}</p>}
+              <button className="schedule-save-button" type="submit">Add class</button>
+            </form>}
+            {!scheduleEditorOpen && scheduleNotice && <p className="schedule-feedback success" role="status">{scheduleNotice}</p>}
+            <div className="class-timeline">
+              {dayClasses.length ? dayClasses.map((item) => <article className={`class-item ${activeClass?.id === item.id ? "is-current" : ""}`} key={item.id}>
+                <div className="class-time"><b>{displayClassTime(item.start)}</b><small>to {displayClassTime(item.end)}</small></div><div className="class-marker" />
+                <div className="class-details"><b>{item.subject}</b><span>{[item.room, item.teacher].filter(Boolean).join(" · ") || "Class details not added"}</span></div>
+                <button className="class-remove-button" type="button" onClick={() => removeClass(item.id)} aria-label={`Remove ${item.subject} from ${scheduleWeekdays[item.day]}`}>Remove</button>
+              </article>) : <div className="schedule-empty"><b>No classes for {scheduleWeekdays[selectedScheduleDay]} yet.</b><span>Add your first class using the steps above. Your classes stay saved on this device.</span>{!scheduleEditorOpen && <button type="button" onClick={() => setScheduleEditorOpen(true)}>Add a class</button>}</div>}
+            </div>
+          </section>
+          <section className="student-card student-attendance-card"><div className="student-card-heading"><div><p className="kicker">MY ATTENDANCE</p><h2>Attendance history</h2></div><div className="month-switch"><button onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} aria-label="Previous month">‹</button><b>{month.toLocaleDateString("en-US", { month: "short", year: "numeric" })}</b><button onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))} aria-label="Next month">›</button></div></div><div className="student-calendar"><div className="student-weekdays">{"SMTWTFS".split("").map((day, index) => <span key={`${day}-${index}`}>{day}</span>)}</div><div className="student-calendar-days">{Array.from({ length: monthStart.getDay() }, (_, index) => <i key={`empty-${index}`} />)}{calendarDays.map((day) => { const key = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`; const status = storedAttendance[key]?.status || "unrecorded"; return <span key={key} className={`${status} ${key === todayKey ? "today" : ""}`} title={`${key}: ${status}`}>{day}</span>; })}</div><div className="student-calendar-legend"><span><i className="present" /> Present</span><span><i className="late" /> Late</span><span><i className="absent" /> Absent</span></div><p className="student-data-note">Attendance records will appear here when check-ins are connected.</p></div></section>
+          <section className="student-card performance-card"><div className="student-card-heading"><div><p className="kicker">LEARNING & ATTENDANCE</p><h2>Performance</h2></div><span className="pending-badge">{attendanceRecords.length ? "Attendance tracked" : "Awaiting attendance data"}</span></div><p className="performance-intro">A simple view of attendance progress. Grades are not shown here.</p><div className="performance-metrics"><article><span>Attendance rate</span><b>{attendanceRate === null ? "—" : `${attendanceRate}%`}</b><small>{attendanceRecords.length ? `${attendanceRecords.length} recorded days` : "No records yet"}</small></article><article><span>Present</span><b>{attendanceTotals.present}</b><small>days recorded</small></article><article><span>Late / absent</span><b>{attendanceTotals.late + attendanceTotals.absent}</b><small>{attendanceTotals.late} late · {attendanceTotals.absent} absent</small></article></div><p className="performance-note">Calculated from attendance data stored in this browser. Official school performance records are not connected yet.</p></section>
+          <section className="student-card announcements-card"><div className="student-card-heading"><div><p className="kicker">SCHOOL BROADCAST</p><h2>Announcements</h2></div><span className="pending-badge">Portal notices</span></div>{announcements.map((item) => <article className="announcement-item" key={item.title}><span><Icon name="sparkle" size={16} /></span><div><div><b>{item.title}</b><small>{item.date}</small></div><p>{item.text}</p></div></article>)}</section>
+        </div>
+        <footer className="student-portal-footer"><a className="student-portal-brand footer-brand" href="#about"><span className="brand-mark" /><span><b>SAINT SIMON OF CYRENE</b><small>STUDENT PORTAL</small></span></a><div className="student-footer-account"><div><b>{user.displayName || profile.name || user.email}</b><span>{profile.year || "Student"}{profile.section ? ` · ${profile.section}` : ""}</span></div><button onClick={onSignOut}>Sign out <Icon name="arrow" size={15} /></button></div></footer>
       </main>
-      <SiiBot onSignIn={() => {}} onNavigate={(sectionId) => { onClose(); window.setTimeout(() => document.querySelector(`#${sectionId}`)?.scrollIntoView({ behavior: "smooth" }), 50); }} />
+      <SiiBot onSignIn={() => {}} onSignOut={onSignOut} onOpenAccount={() => {}} alreadySignedIn onNavigate={(sectionId) => { onClose(); window.setTimeout(() => document.querySelector(`#${sectionId}`)?.scrollIntoView({ behavior: "smooth" }), 50); }} />
     </div>
   );
 }
@@ -324,119 +450,190 @@ function AdminLogin({ onClose, onSuccess }) {
   return <div className="modal-shell" role="dialog" aria-modal="true" aria-labelledby="admin-login-title"><form className="login-modal admin-login" onSubmit={submit}><button type="button" className="modal-close" onClick={onClose} aria-label="Close admin login"><Icon name="close" /></button><div className="modal-mark"><Icon name="shield" size={26} /></div><p className="kicker">RESTRICTED STAFF ACCESS</p><h2 id="admin-login-title">Administrator sign in</h2><p className="modal-copy">Sign in with the administrator username and password.</p><input className="admin-password" type="text" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Username" autoComplete="username" required autoFocus /><input className="admin-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" autoComplete="current-password" required />{error && <p className="auth-error" role="alert">{error}</p>}<button className="visitor-button" type="submit" disabled={busy}>{busy ? "Verifying admin access..." : "Sign in to admin"}</button><p className="terms">Admin access is verified by Firebase authorization.</p></form></div>;
 }
 
-function SiiBot({ onSignIn, onNavigate, alreadySignedIn = false }) {
+function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, alreadySignedIn = false }) {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
-  const [answerVisible, setAnswerVisible] = useState(false);
-  const [reply, setReply] = useState("Hi! I’m SiBot. Ask me about campus directions, rooms, and school access.");
+  const [centerAnswer, setCenterAnswer] = useState("");
+  const [listening, setListening] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState("");
+  const [messages, setMessages] = useState([{ id: "welcome", role: "assistant", text: "Hi! I’m SiBot, your school helper. Ask about school hours, the address, school levels, or finding your way around campus." }]);
+  const conversationRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const voiceCommandRef = useRef(false);
+
+  useEffect(() => {
+    if (conversationRef.current) {
+      conversationRef.current.scrollTop = conversationRef.current.scrollHeight;
+    }
+  }, [messages, open]);
+
+  const startVoiceInput = () => {
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setVoiceStatus("Voice input is not available in this browser. You can type your question instead.");
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
+    recognition.lang = "en-PH";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onstart = () => {
+      voiceCommandRef.current = true;
+      setListening(true);
+      setVoiceStatus("Listening… say a question or a command.");
+    };
+    recognition.onresult = (event) => {
+      const spokenText = event.results[0][0].transcript;
+      setQuestion(spokenText);
+      setVoiceStatus(`I heard: “${spokenText}”`);
+      askSiiBot(spokenText);
+    };
+    recognition.onerror = (event) => {
+      voiceCommandRef.current = false;
+      setListening(false);
+      setVoiceStatus(event.error === "not-allowed"
+        ? "Please allow microphone access in your browser to use voice commands."
+        : event.error === "no-speech"
+          ? "I didn’t hear anything. Tap the microphone and try again."
+          : "Voice input had a problem. You can type your question instead.");
+    };
+    recognition.onend = () => setListening(false);
+    try {
+      recognition.start();
+    } catch {
+      voiceCommandRef.current = false;
+      setListening(false);
+      setVoiceStatus("Could not start the microphone. Please try again or type your question.");
+    }
+  };
 
   const askSiiBot = (value) => {
     const text = value.trim();
-    if (!text) {
-      setReply("Please ask a question or provide a command.");
-      return;
-    }
+    if (!text) return;
     const normalized = text.toLowerCase();
     setOpen(true);
-    setAnswerVisible(true);
+    setVoiceStatus(voiceCommandRef.current ? `I heard: “${text}”` : "");
     const hasAny = (terms) => terms.some((term) => normalized.includes(term.toLowerCase()));
-    if (hasAny(["sign in", "signin", "log in", "login", "portal access", "my account"])) {
+    let answer;
+    if (hasAny(["sign out", "signout", "sign me out", "log out", "log me out", "logout"])) {
       if (alreadySignedIn) {
-        setReply("You are already signed in. Your student portal is open.");
+        answer = "Okay, I’m signing you out.";
+        onSignOut?.();
       } else {
-        setReply("Sign in is in the top-right Portal Access button. I can open it for you now.");
-        onSignIn();
+        answer = "You’re not signed in right now.";
       }
-      <SiiBot alreadySignedIn onSignIn={() => {}} onNavigate={(sectionId) => { onClose(); window.setTimeout(() => document.querySelector(`#${sectionId}`)?.scrollIntoView({ behavior: "smooth" }), 50); }} />
+    } else if (hasAny(["open my account", "open account", "show my account", "my profile", "student portal", "open portal"])) {
+      if (alreadySignedIn) {
+        answer = "Opening your student account now.";
+        onOpenAccount?.();
+      } else {
+        answer = "Please sign in first. I’ll open the sign-in window for you.";
+        onSignIn?.();
+      }
+    } else if (hasAny(["sign in", "signin", "sign me in", "sign into", "log in", "log me in", "log into", "login", "portal access"])) {
+      if (alreadySignedIn) {
+        answer = "You’re signed in already. Choose My Account in the top menu to open your student portal.";
+      } else {
+        answer = "Choose Sign In / Portal Access in the top menu. I’ll open it for you now.";
+        onSignIn?.();
+      }
     } else if (hasAny(["ar live", "ar view", "augmented reality", "camera guide", "live view"])) {
-      setReply("AR Live View is in the Explore the Platform section. It guides you through campus with turn-by-turn directions and room distance updates.");
+      answer = "AR Live View is in Explore the Platform. Open it for a visual walkthrough with directions and room distance.";
       onNavigate("features");
     } else if (hasAny(["3d", "floor plan", "floor map", "dollhouse", "building map", "campus map"])) {
-      setReply("The 3D Dollhouse Map is in the Explore the Platform section. Choose a floor to explore the Main Academic Building and find rooms or services.");
+      answer = "The 3D campus map is in Explore the Platform. Choose a floor to look around the campus buildings.";
       onNavigate("features");
-    } else if (hasAny(["where is the school", "school address", "school located", "where are you located", "campus address", "location of the school"])) {
-      setReply("Saint Simon of Cyrene Academy, Inc. is at N.I.A. Road / 39 Reyes Compound, Carsadang Bago II, Imus, Cavite, Philippines.");
-    } else if (hasAny(["school hour", "opening hour", "what time", "when does school open", "when is the school open", "operating hour"])) {
-      setReply("The school operates Monday to Friday, from 7:00 AM to 5:00 PM. Please contact the school directly for special schedules or holidays.");
-    } else if (hasAny(["grade level", "academic level", "year level", "what levels", "what grades", "nursery", "kindergarten", "elementary", "junior high", "senior high"])) {
-      setReply("SSCAI offers Nursery, Kindergarten and Prep, Elementary / Grade School, Junior High School, and Senior High School. Ask me about a specific level if you need help finding its campus area.");
-    } else if (hasAny(["student group", "student organization", "school club", "extracurricular", "ssg", "supreme student", "star group", "pixels group"])) {
-      setReply("Active groups include the SSCAI Supreme Student Government for leadership, STAR for dance, drama, music, and stage performances, and PIXELS for photography, digital content, coverage, and creative arts.");
-    } else if (hasAny(["building", "zone", "multi-purpose court", "multipurpose court", "administration office", "academic building"])) {
-      setReply("The campus map can be organized into the Main Academic Building, Administration, and Multi-Purpose Court zones. Use the 3D map to explore each area.");
+    } else if (hasAny(["address", "where is the school", "school located", "where are you located", "campus location", "location of the school", "directions to the school", "how do i get to school"])) {
+      answer = "Saint Simon of Cyrene Academy is at N.I.A. Road / 39 Reyes Compound, Carsadang Bago II, Imus, Cavite, Philippines.";
+    } else if (hasAny(["school hour", "school hours", "opening hour", "what time does school", "when does school open", "when is the school open", "operating hour", "open on saturday"])) {
+      answer = "The school is open Monday to Friday, 7:00 AM to 5:00 PM. For holiday or special schedules, please check with the school office.";
+    } else if (hasAny(["grade level", "academic level", "year level", "school levels", "what levels", "what grades", "nursery", "kindergarten", "elementary", "grade school", "junior high", "senior high", "prep class"])) {
+      answer = "The school has Nursery, Kindergarten and Prep, Elementary, Junior High School, and Senior High School. Ask a teacher or the school office about a specific grade.";
+    } else if (hasAny(["student group", "student organization", "school club", "extracurricular", "ssg", "supreme student", "star group", "pixels group", "clubs", "organizations"])) {
+      answer = "Student groups include SSG for student leadership, STAR for performing arts, and PIXELS for photography and creative media. Ask the school which groups are open to your grade.";
+    } else if (hasAny(["subject list", "what subjects", "curriculum", "what do students study", "subjects do you offer"])) {
+      answer = "I don’t have the official subject list in my school information yet. Subjects can differ by grade, so please check with your teacher or adviser.";
+    } else if (hasAny(["building", "zone", "multi-purpose court", "multipurpose court", "administration office", "academic building", "how many floors", "which floors"])) {
+      answer = "The campus map includes the Main Academic Building, Administration area, and Multi-Purpose Court. The map has floor choices from 1 to 4. Open the 3D map to explore.";
       onNavigate("features");
-    } else if (hasAny(["enroll", "enrollment", "admission", "how can i register", "how do i apply", "new student", "requirements"])) {
-      setReply("For enrollment or admission requirements, please contact the SSCAI school office. I can help you locate the campus, check operating hours, or guide you through the portal.");
+    } else if (hasAny(["enroll", "enrollment", "admission", "how can i register", "how do i apply", "new student", "requirements", "tuition", "school fee"])) {
+      answer = "For enrollment, documents, tuition, or fees, please ask a parent or guardian to contact the school office. I don’t have the current rates or requirements listed.";
+    } else if (hasAny(["contact", "phone number", "telephone", "email address", "facebook", "youtube", "social media", "office number"])) {
+      answer = "I don’t have a verified phone number or email in my information. You can find the school’s Facebook and YouTube links in the page footer, or ask a parent to contact the school office.";
     } else if (hasAny(["visitor", "guest", "parent", "can i enter", "public access"])) {
-      setReply("Visitors can use the public campus map and emergency routes without signing in. For entry policies, please check with the school office during Monday to Friday, 7:00 AM to 5:00 PM.");
+      answer = "Visitors can look at the public campus map without signing in. Please ask school staff about visiting rules before coming to campus.";
     } else if (hasAny(["emergency", "fire exit", "safest route", "evacuate", "safety route"])) {
-      setReply("Use the visible emergency exit route in the campus map and follow school staff instructions. The portal keeps public emergency guidance available without sign-in.");
+      answer = "For an emergency, follow your teacher and school staff. The campus map can help show exit routes, but always follow staff instructions first.";
       onNavigate("features");
-    } else if (hasAny(["room", "office", "restroom", "comfort room", "library", "clinic", "where can i find", "how do i get to", "take me to"])) {
-      setReply("Tell me the room, office, or facility name and I will point you to the campus map or AR Live View. The current portal can guide you through floors and building zones.");
+    } else if (hasAny(["room", "office", "restroom", "comfort room", "library", "clinic", "where can i find", "how do i get to", "take me to", "where is"])) {
+      answer = "Open the 3D campus map and choose a floor to look for rooms and school facilities. If you still need help, ask a teacher or staff member.";
       onNavigate("features");
-    } else if (hasAny(["next class", "my class", "class schedule", "where is my class"])) {
-      setReply("The sample schedule lists Mathematics at 8:20 AM in Room 204. Your official schedule is not connected yet, so please confirm the time and room with your adviser.");
-    } else if (hasAny(["school", "campus", "saint simon", "simon of cyrene", "ssca", "what is this school"])) {
-      setReply("Saint Simon of Cyrene Academy, Inc. (SSCAI) is a non-stock, non-profit private school recognized by the DepEd Division of City of Imus. It provides basic education from early childhood through high school.");
+    } else if (hasAny(["next class", "my class", "class schedule", "where is my class", "timetable", "my subjects", "school schedule", "class times", "what time do classes start"])) {
+      answer = "Open My Account to see your timetable. Choose Change classes to add or update your subjects and times. Check your timetable with your teacher to make sure it is official.";
+    } else if (hasAny(["who is saint simon", "tell me about the school", "about the school", "what is this school", "what does sscai mean", "what kind of school"])) {
+      answer = "Saint Simon of Cyrene Academy, Inc. (SSCAI) is a private, non-stock, non-profit school in Imus, Cavite. It provides basic education from early childhood through Senior High School and is recognized by the DepEd Division of City of Imus.";
       onNavigate("about");
     } else {
-      setReply("Hi! I’m SiBot. Ask me about the school address, hours, rooms, sign-in, the 3D map, or AR Live View.");
+      answer = "I don’t have that answer in my school information yet. I can help with the school overview, address and hours, grade levels, student groups, subjects, enrollment, contact links, your timetable, and the campus map. For other details, please ask a teacher or the school office.";
     }
+    const timestamp = Date.now();
+    setMessages((current) => [...current,
+      { id: `${timestamp}-question-${Math.random()}`, role: "user", text },
+      { id: `${timestamp}-answer-${Math.random()}`, role: "assistant", text: answer },
+    ]);
+    setCenterAnswer(answer);
+    if (voiceCommandRef.current && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      const spokenAnswer = new SpeechSynthesisUtterance(answer);
+      spokenAnswer.lang = "en-PH";
+      window.speechSynthesis.speak(spokenAnswer);
+    }
+    voiceCommandRef.current = false;
     setQuestion("");
   };
 
   const choosePrompt = (prompt) => askSiiBot(prompt);
 
-  function SiBotMascot({ compact = false }) {
-    return (
-      <img
-        className={`sibot-figure ${compact ? "compact" : ""}`}
-        src="/sibot-robot.png"
-        alt="SiBot robot assistant"
-      />
-    );
-  }
-
   return (
     <div className="siibot-wrap">
-      {answerVisible && (
-        <div className="siibot-answer-pop" role="status" aria-live="polite">
-          <div className="siibot-answer-layout">
-            <SiBotMascot compact />
-            <div className="siibot-answer-card">
-              <div className="siibot-answer-topline"><span><Icon name="sparkle" size={16} /> SiBot answer</span><button onClick={() => setAnswerVisible(false)} aria-label="Close SiBot answer"><Icon name="close" size={15} /></button></div>
-              <p>{reply}</p>
-            </div>
-          </div>
-        </div>
-      )}
+      {centerAnswer && <div className="siibot-answer-pop" role="status" aria-live="assertive"><section className="siibot-answer-card"><div className="siibot-answer-topline"><span><Icon name="sparkle" size={16} /> SiBot answer</span><button onClick={() => setCenterAnswer("")} aria-label="Close answer"><Icon name="close" size={15} /></button></div><p>{centerAnswer}</p><button className="siibot-answer-dismiss" onClick={() => setCenterAnswer("")}>Got it</button></section></div>}
       {open && (
         <div className="siibot-panel-shell">
           <section className="siibot-panel" role="dialog" aria-label="SiBot school assistant">
             <div className="siibot-heading">
               <div className="siibot-identity">
                 <span className="siibot-avatar"><Icon name="bot" size={18} /></span>
-                <span><strong>SiBot</strong></span>
+                <span><strong>SiBot</strong><small>School helper</small></span>
               </div>
               <button className="siibot-close" onClick={() => setOpen(false)} aria-label="Close SiBot"><Icon name="close" size={17} /></button>
             </div>
-            <div className="siibot-message"><Icon name="sparkle" size={15} /><p>{reply}</p></div>
-            <p className="siibot-label">Where do you want to go, or what would you like to know?</p>
+            <div className="siibot-conversation" ref={conversationRef} aria-live="polite" aria-relevant="additions">
+              {messages.map((message) => <div className={`siibot-message ${message.role === "user" ? "from-user" : "from-bot"}`} key={message.id}><p>{message.text}</p></div>)}
+            </div>
+            <p className="siibot-label">Ask a question or try a command</p>
             <div className="siibot-options">
-              <button onClick={() => choosePrompt("Where is sign in?")}><Icon name="shield" size={15} /> Sign in</button>
-              <button onClick={() => choosePrompt("Take me to AR Live View")}><Icon name="scan" size={15} /> AR Live View</button>
-              <button onClick={() => choosePrompt("Show me the 3D map")}><Icon name="cube" size={15} /> 3D map</button>
+              <button onClick={() => choosePrompt("What are the school hours?")}>School hours</button>
+              <button onClick={() => choosePrompt("What is the school address?")}>School address</button>
+              <button onClick={() => choosePrompt("What grade levels are there?")}>Grade levels</button>
+              <button onClick={() => choosePrompt("Show me the 3D campus map")}>Campus map</button>
+              {alreadySignedIn ? <><button onClick={() => choosePrompt("Open my account")}>My account</button><button onClick={() => choosePrompt("Sign out")}>Sign out</button></> : <button onClick={() => choosePrompt("Sign in")}>Sign in</button>}
             </div>
             <form className="siibot-form" onSubmit={(event) => { event.preventDefault(); askSiiBot(question); }}>
-              <input value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ask about the school..." aria-label="Ask SiBot about the school" />
+              <input value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Type your question..." aria-label="Ask SiBot about the school" />
+              <button type="button" className={`siibot-voice-button ${listening ? "listening" : ""}`} onClick={startVoiceInput} aria-label={listening ? "Stop listening" : "Ask SiBot by voice"} title={listening ? "Stop listening" : "Ask by voice"}><Icon name="mic" size={17} /></button>
               <button type="submit" aria-label="Send question"><Icon name="arrow" size={17} /></button>
             </form>
-            <small className="siibot-note">SiBot answers campus navigation questions only.</small>
+            {voiceStatus && <small className="siibot-voice-status" role="status">{voiceStatus}</small>}
+            <small className="siibot-note">Tap the microphone to speak. SiBot can answer common school questions and help you sign in or out.</small>
           </section>
         </div>
       )}
-      <button className={open ? "siibot-launcher active" : "siibot-launcher"} onClick={() => setOpen((current) => !current)} aria-expanded={open} aria-label="Open SiBot school assistant">
+      <button className={open ? "siibot-launcher active" : "siibot-launcher"} onClick={() => setOpen((current) => !current)} aria-expanded={open} aria-label={open ? "Close SiBot school assistant" : "Open SiBot school assistant"}>
         <Icon name={open ? "close" : "bot"} size={21} /> <span>SiBot</span>
       </button>
     </div>
@@ -749,13 +946,13 @@ export default function App() {
             <div className="card-title">
               <div>
                 <p>03 · INTELLIGENT SUPPORT</p>
-                <h3>AI Assistant</h3>
+                <h3>SiBot School Helper</h3>
               </div>
               <Icon name="arrow" />
             </div>
             <p className="card-copy">
-              Ask for any room, facility, or safest route. The assistant
-              understands natural, conversational requests.
+              Ask about school hours, grade levels, the campus address, or the
+              map. SiBot gives quick answers to common school questions.
             </p>
             <div className="assistant-preview">
               <div className="assistant-status">
@@ -763,8 +960,8 @@ export default function App() {
                   <Icon name="sparkle" size={16} />
                 </span>
                 <p>
-                  <b>Campus AI</b>
-                  <small>Online · Ready to help</small>
+                  <b>SiBot</b>
+                  <small>School helper · Ready</small>
                 </p>
                 <i />
               </div>
@@ -779,7 +976,7 @@ export default function App() {
                 </span>
               </div>
               <div className="search-box">
-                <span>Ask for a destination...</span>
+                <span>Ask a school question...</span>
                 <button aria-label="Search campus assistant">
                   <Icon name="arrow" size={18} />
                 </button>
@@ -827,7 +1024,7 @@ export default function App() {
         <p>Building a safer, more connected campus.</p>
         <span>© 2026 Saint Simon of Cyrene Academy</span>
       </footer>
-      {!accountOpen && !loginOpen && <SiiBot onSignIn={openLogin} onNavigate={navigateTo} />}
+      {!accountOpen && !loginOpen && <SiiBot onSignIn={openLogin} onSignOut={handleSignOut} onOpenAccount={() => setAccountOpen(true)} alreadySignedIn={Boolean(signedInUser)} onNavigate={navigateTo} />}
       {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} onCreate={openCreateAccount} onAdmin={openAdminLogin} onSignedIn={setSignedInUser} />}
       {accountOpen && signedInUser && <AccountPanel user={signedInUser} onClose={() => setAccountOpen(false)} onSignOut={handleSignOut} />}
       {createAccountOpen && <CreateAccountModal onClose={() => setCreateAccountOpen(false)} onCreated={(user) => { setSignedInUser(user); setCreateAccountOpen(false); }} />}

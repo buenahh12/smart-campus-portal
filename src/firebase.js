@@ -1,10 +1,12 @@
 import { initializeApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
 import { 
   getAuth, 
   GoogleAuthProvider, 
   signInWithPopup, 
   signInWithRedirect,
   getRedirectResult,
+  sendPasswordResetEmail,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   getIdTokenResult,
@@ -25,6 +27,7 @@ const firebaseConfig = {
 const hasFirebaseConfig = Object.values(firebaseConfig).every(Boolean);
 
 const app = hasFirebaseConfig ? initializeApp(firebaseConfig) : null;
+export const db = app ? getFirestore(app) : null;
 export const auth = app ? getAuth(app) : null;
 export const googleProvider = new GoogleAuthProvider();
 
@@ -40,6 +43,12 @@ export const loginWithGoogle = () => {
   });
 };
 export const finishGoogleRedirect = () => hasFirebaseConfig ? getRedirectResult(auth) : Promise.resolve(null);
+export const requestPasswordReset = (email) => {
+  if (!auth) {
+    return Promise.reject(new Error('Firebase is not configured. Add the VITE_FIREBASE_* values to your .env file.'));
+  }
+  return sendPasswordResetEmail(auth, email.trim());
+};
 export const loginAsAdmin = async ({ email, password }) => {
   if (!auth) throw new Error('Firebase is not configured. Add the VITE_FIREBASE_* values to your .env file.');
   const credential = await signInWithEmailAndPassword(auth, email, password);
