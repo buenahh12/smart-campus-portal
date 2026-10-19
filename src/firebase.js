@@ -30,6 +30,9 @@ const app = hasFirebaseConfig ? initializeApp(firebaseConfig) : null;
 export const db = app ? getFirestore(app) : null;
 export const auth = app ? getAuth(app) : null;
 export const googleProvider = new GoogleAuthProvider();
+// Always show Google's account chooser instead of silently using the last account,
+// so people on shared or school computers can pick (or add) the right Gmail.
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 export const loginWithGoogle = () => {
   if (!hasFirebaseConfig) {
