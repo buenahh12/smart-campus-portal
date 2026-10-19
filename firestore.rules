@@ -1,0 +1,172 @@
+rules_version = '2';
+
+// Role-based access control for the campus portal.
+//
+// Every request from a signed-in user carries a Firebase ID token (a signed JWT).
+// Firebase verifies its signature on the server and exposes its claims here as
+// request.auth.token. There is exactly one administrator: the admin1 account,
+// identified by the email inside its verified token.
+//
+//   Visitors and standard users: read published campus content, add visit counts,
+//                                and turn their own email updates on or off.
+//   The administrator:           create, update, and delete campus content, and read
+//                                visit statistics and the email subscriber list.
+//
+// Deploy with:  npx firebase-tools deploy --only firestore:rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // The one and only administrator account (username admin1).
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == "admin1@sscai-portal.invalid";
+    }
+
+    function data() {
+      return request.resource.data;
+    }
+
+    function text(field, required, maxLength) {
+      return data()[field] is string
+        && data()[field].size() <= maxLength
+        && (!required || data()[field].size() > 0);
+    }
+
+    function floor() {
+      return data().floor is int && data().floor >= 0 && data().floor <= 20;
+    }
+
+    function dateOrEmpty(field) {
+      return data()[field] is string
+        && (data()[field] == '' || data()[field].matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'));
+    }
+
+    // Every admin write is stamped with the server time and the editor's identity.
+    function stamped() {
+      return data().updatedAt == request.time && data().updatedBy is string;
+    }
+
+    function validRoom() {
+      return data().keys().hasOnly(['name', 'building', 'floor', 'type', 'capacity', 'status', 'notes', 'updatedAt', 'updatedBy'])
+        && text('name', true, 80) && text('building', true, 80) && floor()
+        && data().type in ['Classroom', 'Laboratory', 'Library', 'Clinic', 'Restroom', 'Faculty room', 'Facility', 'Other']
+        && (data().capacity == null || (data().capacity is int && data().capacity >= 0 && data().capacity <= 5000))
+        && data().status in ['Available', 'In use', 'Under maintenance', 'Closed']
+        && text('notes', false, 500);
+    }
+
+    function validOffice() {
+      return data().keys().hasOnly(['name', 'building', 'floor', 'room', 'hours', 'contact', 'description', 'updatedAt', 'updatedBy'])
+        && text('name', true, 80) && text('building', true, 80) && floor()
+        && text('room', false, 40) && text('hours', false, 120)
+        && text('contact', false, 120) && text('description', false, 500);
+    }
+
+    function validAnnouncement() {
+      return data().keys().hasOnly(['title', 'body', 'expiresOn', 'pinned', 'published', 'updatedAt', 'updatedBy'])
+        && text('title', true, 120) && text('body', true, 2000)
+        && dateOrEmpty('expiresOn')
+        && data().pinned is bool && data().published is bool;
+    }
+
+    function validClosure() {
+      return data().keys().hasOnly(['pathway', 'building', 'floor', 'reason', 'detour', 'details', 'startDate', 'endDate', 'active', 'mapArea', 'updatedAt', 'updatedBy'])
+        && text('pathway', true, 100) && text('building', true, 80) && floor()
+        && data().reason in ['Maintenance', 'Cleaning', 'Construction', 'Safety hazard', 'School event', 'Other']
+        && text('detour', false, 160) && text('details', false, 500)
+        && (!('mapArea' in data()) || text('mapArea', false, 40))
+        && dateOrEmpty('startDate') && data().startDate != '' && dateOrEmpty('endDate')
+        && data().active is bool;
+    }
+
+    match /rooms/{id} {
+      allow read: if true;
+      allow create, update: if isAdmin() && stamped() && validRoom();
+      allow delete: if isAdmin();
+    }
+
+    match /offices/{id} {
+      allow read: if true;
+      allow create, update: if isAdmin() && stamped() && validOffice();
+      allow delete: if isAdmin();
+    }
+
+    match /pathwayClosures/{id} {
+      allow read: if true;
+      allow create, update: if isAdmin() && stamped() && validClosure();
+      allow delete: if isAdmin();
+    }
+
+    // Drafts stay hidden from everyone except administrators.
+    match /announcements/{id} {
+      allow read: if resource.data.published == true || isAdmin();
+      allow create, update: if isAdmin() && stamped() && validAnnouncement();
+      allow delete: if isAdmin();
+    }
+
+    // Personal profile: saved places and preferences. Only its owner (the uid in
+    // their verified JWT) can read or write it.
+    function validProfile() {
+      return data().keys().hasOnly(['name', 'role', 'savedPlaces', 'prefs', 'updatedAt'])
+        && data().updatedAt == request.time
+        && (!('name' in data()) || (data().name is string && data().name.size() <= 80))
+        && (!('role' in data()) || data().role in ['Student', 'Faculty / Staff', 'Parent / Guardian', 'Visitor'])
+        && (!('savedPlaces' in data()) || (data().savedPlaces is list && data().savedPlaces.size() <= 30))
+        && (!('prefs' in data()) || (data().prefs is map
+          && data().prefs.keys().hasOnly(['speakAnswers', 'allClosureAlerts'])));
+    }
+
+    match /users/{uid} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid && validProfile();
+    }
+
+    // Daily visit counters (no personal data). Anyone may add 1 to a counter; nobody can
+    // lower, reset, or invent counters. Only the administrator can read them.
+    function statsKeys() {
+      return ['total', 'guests', 'students', 'faculty', 'parents', 'visitorAccounts'];
+    }
+    function newCounter(field) {
+      return !(field in data()) || data()[field] == 1;
+    }
+    function bumpedCounter(field) {
+      return !(field in data())
+        || (field in resource.data
+          ? (data()[field] == resource.data[field] || data()[field] == resource.data[field] + 1)
+          : data()[field] == 1);
+    }
+
+    match /stats/{day} {
+      allow read: if isAdmin();
+      allow create: if day.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+)
+        && data().keys().hasOnly(statsKeys())
+        && newCounter('total') && newCounter('guests') && newCounter('students')
+        && newCounter('faculty') && newCounter('parents') && newCounter('visitorAccounts');
+      allow update: if data().keys().hasOnly(statsKeys())
+        && bumpedCounter('total') && bumpedCounter('guests') && bumpedCounter('students')
+        && bumpedCounter('faculty') && bumpedCounter('parents') && bumpedCounter('visitorAccounts');
+    }
+
+    // Email updates: people subscribe or unsubscribe themselves, with the email on their own
+    // verified account. Only the administrator can read the whole list (to send updates).
+    match /subscribers/{uid} {
+      allow read: if isAdmin() || (request.auth != null && request.auth.uid == uid);
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && data().keys().hasOnly(['email', 'name', 'updatedAt'])
+        && data().email == request.auth.token.email
+        && data().name is string && data().name.size() <= 80
+        && data().updatedAt == request.time;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Anything not listed above is closed by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

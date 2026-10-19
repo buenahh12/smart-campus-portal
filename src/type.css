@@ -1,0 +1,99 @@
+/* Poster typography, after the reference: an extra-heavy, extra-wide grotesk in caps with
+   tight leading, lines set in outline or horizontal-stripe fills, and small "//" mono labels.
+   Archivo (variable width 62-125, weight 400-900) for display and body, Space Mono for labels.
+   Loaded last, so it sets type across the whole site. */
+
+:root {
+  --display: "Archivo", "Arial Black", ui-sans-serif, system-ui, sans-serif;
+  --sans: "Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Space Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --serif: var(--display);
+  font-family: var(--sans);
+}
+
+h1, h2 { font-family: var(--display); font-weight: 800; font-stretch: 112%; letter-spacing: -.012em; }
+
+/* ---------- Display headings ---------- */
+.ss-display { font-weight: 900; font-stretch: 125%; line-height: .9; letter-spacing: -.02em; text-transform: uppercase; text-wrap: balance; }
+.ss-display > span { display: block; }
+/* Outline line: stroke only. Keeps the normal fill where text-stroke isn't supported. */
+.t-outline { -webkit-text-fill-color: transparent; -webkit-text-stroke: .03em currentColor; paint-order: stroke fill; }
+@supports not (-webkit-text-stroke: 1px) { .t-outline { -webkit-text-fill-color: currentColor; } }
+/* Striped line: the letters are filled with fine horizontal rules. */
+/* Fixed hairline spacing (not em-based) so big letters get many fine lines and keep their shape. */
+.t-stripe { background-image: repeating-linear-gradient(180deg, currentColor 0 2px, transparent 2px 3.5px); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+
+/* ---------- Mono labels ---------- */
+.ss-overline, .ss-facts dt, .ss-quick span, .ss-hero-figure figcaption, .ss-footer h2, .ss-tag, .kicker,
+.ss-way .floor-head span, .ss-brand small, .siibot-label, .map-route-form label > span, .map-floors > span {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-stretch: 100%;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.ss-overline { font-size: 13px; }
+.ss-facts dt, .ss-quick span, .ss-hero-figure figcaption, .ss-way .floor-head span { font-size: 12px; }
+.ss-footer h2 { font-size: 13px; }
+.ss-brand small { font-size: 12px; letter-spacing: .06em; }
+.ss-tag { font-size: 12px; }
+
+/* ---------- Hero: the headline runs the full width like a poster. The picture starts
+   beside its last two lines (the short ones), so it is visible on the first screen. ---------- */
+.ss-hero { --h1-size: clamp(38px, 7vw, 98px); }
+.ss-hero-copy { display: contents; }
+.ss-hero-grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, .75fr); column-gap: 48px; row-gap: 0; align-items: start; }
+.ss-hero .ss-overline { grid-column: 1 / -1; grid-row: 1; margin-bottom: 20px; }
+.ss-hero h1.ss-display { grid-column: 1 / -1; grid-row: 2; max-width: none; margin: 0 0 40px; font-size: var(--h1-size); }
+.ss-hero .t-stripe { color: var(--peach); }
+.ss-lead, .ss-search, .ss-quick { grid-column: 1; }
+.ss-lead { grid-row: 3; }
+.ss-search { grid-row: 4; }
+.ss-quick { grid-row: 5; }
+/* Same grid row as the headline, pushed down past its first two lines (2 x 0.9 line height, plus a gap). */
+.ss-hero-figure { position: relative; z-index: 1; grid-column: 2; grid-row: 2 / span 4; align-self: start; order: 0; margin: calc(var(--h1-size) * 2.12) 0 0; }
+
+/* ---------- Section headings ---------- */
+.ss-section-head h2.ss-display, .campus-updates .ss-section-head h2.ss-display { margin-bottom: 18px; font-size: clamp(34px, 5.6vw, 76px); }
+.ss-section-head { max-width: none; }
+.ss-section-head p { max-width: 40em; }
+.campus-updates .t-stripe { color: var(--clay); }
+.ss-emergency h2.ss-display { margin-bottom: 14px; font-size: clamp(34px, 4.8vw, 64px); }
+.ss-emergency .t-stripe { color: var(--peach); }
+
+/* ---------- Smaller headings, numbers, buttons ---------- */
+.ss-facts dd { font-family: var(--display); font-weight: 900; font-stretch: 125%; font-size: 42px; letter-spacing: -.02em; }
+.ss-facts dd.ss-facts-text { font-family: var(--display); font-weight: 700; font-stretch: 110%; font-size: 18px; letter-spacing: 0; }
+.ss-way h3, .updates-card-title { font-family: var(--display); font-weight: 800; font-stretch: 118%; font-size: 20px; letter-spacing: -.005em; text-transform: uppercase; }
+.ss-brand b, .ss-header .ss-brand b { font-family: var(--display); font-weight: 800; font-stretch: 115%; font-size: 15px; letter-spacing: 0; line-height: 1.1; text-transform: uppercase; }
+.ss-btn, .dollhouse-actions button, .ss-emergency .ss-btn { font-family: var(--display); font-weight: 700; font-stretch: 112%; font-size: 14px; letter-spacing: .03em; text-transform: uppercase; }
+.ss-nav-link { font-family: var(--display); font-weight: 600; font-stretch: 108%; font-size: 14px; letter-spacing: .02em; text-transform: uppercase; }
+.ss-way .floor-head b { font-family: var(--display); font-weight: 800; font-stretch: 115%; font-size: 17px; text-transform: uppercase; }
+.ss-way .floor-buttons button { font-family: var(--display); font-weight: 800; font-stretch: 115%; }
+
+/* Dialogs, My Campus, admin and the floor plan use the same family, without the poster caps. */
+.login-modal h2, .student-welcome h1, .student-card h2, .admin-dashboard-header h2, .map-title h2 { font-family: var(--display); font-weight: 800; font-stretch: 112%; letter-spacing: -.015em; }
+.siibot-identity strong { font-family: var(--display); font-weight: 800; font-stretch: 112%; font-size: 17px; }
+
+/* ---------- Small screens ---------- */
+@media (max-width: 900px) {
+  .ss-hero { --h1-size: clamp(34px, 9.6vw, 72px); }
+  .ss-hero-grid { grid-template-columns: minmax(0, 1fr); }
+  /* Headline stays on top; the picture comes right after it, before the paragraph. */
+  .ss-hero .ss-overline, .ss-hero h1.ss-display, .ss-lead, .ss-search, .ss-quick, .ss-hero-figure { grid-column: 1; grid-row: auto; }
+  .ss-hero h1.ss-display { margin-bottom: 24px; }
+  .ss-hero-figure { order: 1; margin: 0 0 28px; }
+  .ss-hero .ss-overline, .ss-hero h1.ss-display { order: 0; }
+  .ss-lead, .ss-search, .ss-quick { order: 2; }
+}
+@media (max-width: 600px) {
+  /* Narrower letters so long words fit a phone screen without breaking mid-word. */
+  .ss-display { font-stretch: 108%; }
+  /* At phone sizes the stripes can't stay fine enough to read, so the line is solid instead. */
+  .t-stripe { background-image: none; -webkit-text-fill-color: currentColor; }
+  .ss-hero { --h1-size: clamp(30px, 9.4vw, 46px); }
+  .ss-section-head h2.ss-display, .campus-updates .ss-section-head h2.ss-display { font-size: clamp(30px, 9vw, 44px); }
+  .ss-emergency h2.ss-display { font-size: clamp(30px, 9vw, 44px); }
+  .ss-facts dd { font-size: 34px; }
+  .ss-brand b, .ss-header .ss-brand b { font-size: 13px; }
+}

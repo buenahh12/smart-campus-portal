@@ -3,74 +3,101 @@ import {
   createCampusAccount,
   finishGoogleRedirect,
   loginAsAdmin,
+  loginWithEmail,
   loginWithGoogle,
   logoutUser,
   requestPasswordReset,
 } from "./firebase";
+import Icon from "./Icon";
+import AdminCms from "./AdminCms";
+import CampusUpdates, { usePublicCollection } from "./CampusUpdates";
+import { CMS_COLLECTIONS, USER_ROLES, isClosureActive, recordVisit, todayKey, watchSession } from "./cms";
+import AdminAnalytics from "./AdminAnalytics";
+import MyCampus from "./MyCampus";
+import CampusMap from "./CampusMap";
+import { FLOORS, PLACES, findPlaceKey, placeByKey, placeTitle, floorLabel as planFloorLabel } from "./floorPlans";
 
-function Icon({ name, size = 20 }) {
-  const paths = {
-    arrow: <path d="M5 12h14m-5-5 5 5-5 5" />,
-    building: (
-      <path d="M4 21V5l8-3 8 3v16M9 7h1m4 0h1M9 11h1m4 0h1M9 15h1m4 0h1M2 21h20" />
-    ),
-    bot: (
-      <path d="M8 9h8a4 4 0 0 1 4 4v4a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-4a4 4 0 0 1 4-4Zm4-6v3m-5 7h.01m10 0h.01M8 16h8" />
-    ),
-    close: <path d="m6 6 12 12M18 6 6 18" />,
-    cube: <path d="m12 2 9 5-9 5-9-5 9-5Zm9 5v10l-9 5-9-5V7m9 5v10" />,
-    eye: <><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></>,
-    eyeOff: <><path d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8" /><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a16 16 0 0 1-3 3.8M6.2 6.2C3.5 8 2 12 2 12s3.6 7 10 7a10 10 0 0 0 4-.8" /></>,
-    location: (
-      <path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Zm-8-3a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z" />
-    ),
-    menu: <path d="M4 7h16M4 12h16M4 17h16" />,
-    mic: (
-      <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm-7 9a7 7 0 0 0 14 0M12 19v3m-4 0h8" />
-    ),
-    route: (
-      <path d="M5 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm14-8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM7 15c5 0 4-6 9-6" />
-    ),
-    scan: <path d="M8 3H3v5m13-5h5v5M8 21H3v-5m13 5h5v-5M8 12h8" />,
-    shield: (
-      <path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Zm-3-10 2 2 4-5" />
-    ),
-    sparkle: (
-      <path d="m12 3 1.2 4.8L18 9l-4.8 1.2L12 15l-1.2-4.8L6 9l4.8-1.2L12 3Zm6 11 .6 2.4L21 17l-2.4.6L18 20l-.6-2.4L15 17l2.4-.6L18 14Z" />
-    ),
-  };
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {paths[name]}
+// Public files live under the site base path (GitHub Pages serves the app from a sub-folder).
+const asset = (file) => `${import.meta.env.BASE_URL}${file}`;
+const MAPPED_PLACES = PLACES.filter((item) => item.type !== "exit" && item.type !== "stairs" && !item.unlabeled);
+const EXIT_COUNT = PLACES.filter((item) => item.type === "exit").length;
+const QUICK_PLACES = ["2:clinic", "2:guidance", "3:library-hs", "2:computer-room", "4:room-403"];
+// School location. Google Maps finds the school by name, so no exact coordinates are hard-coded.
+const SCHOOL_MAP_QUERY = "Saint Simon of Cyrene Academy, Carsadang Bago II, Imus, Cavite";
+const MAP_EMBED_URL = `https://www.google.com/maps?q=${encodeURIComponent(SCHOOL_MAP_QUERY)}&output=embed`;
+const MAP_OPEN_URL = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(SCHOOL_MAP_QUERY)}`;
+const MAP_DIRECTIONS_URL = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(SCHOOL_MAP_QUERY)}`;
+const SIBOT_PROMPTS = ["Where is the clinic?", "Take me to Room 403", "Show the nearest exit", "What are the school hours?"];
+
+// Small, real outline of the chosen floor; opens the full floor plan.
+function MiniPlan({ floor, onOpen }) {
+  const plan = FLOORS.find((item) => item.floor === floor);
+  return <button type="button" className="ss-miniplan" onClick={onOpen} aria-label={`Open the ${planFloorLabel(floor).toLowerCase()} plan`}>
+    <svg key={floor} viewBox="-2 -2 164 104" aria-hidden="true">
+      <rect x="0" y="0" width="160" height="100" className="mp-floor" />
+      {plan.rooms.map((item) => <rect key={item.id} x={item.rect[0]} y={item.rect[1]} width={item.rect[2]} height={item.rect[3]} className={`mp-room mp-${item.type}`} />)}
+      <rect x="0" y="0" width="160" height="100" className="mp-outline" />
     </svg>
-  );
+  </button>;
+}
+
+// Fades sections in as they scroll into view; everything shows at once when reduced motion is on.
+function useReveal() {
+  useEffect(() => {
+    const items = [...document.querySelectorAll("[data-reveal]")];
+    const show = (element) => element.classList.add("is-visible");
+    if (!("IntersectionObserver" in window) || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      items.forEach(show);
+      return undefined;
+    }
+    const observer = new IntersectionObserver((entries) => entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        show(entry.target);
+        observer.unobserve(entry.target);
+      }
+    }), { rootMargin: "0px 0px -8% 0px", threshold: 0.12 });
+    items.forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+  }, []);
 }
 
 function LoginModal({ onClose, onCreate, onAdmin, onSignedIn = () => {} }) {
   const [signingIn, setSigningIn] = useState(false);
+  const [emailSigningIn, setEmailSigningIn] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
   const [resetMode, setResetMode] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [resetSent, setResetSent] = useState(false);
   const [error, setError] = useState("");
-  const [authenticatedUser, setAuthenticatedUser] = useState(null);
+
+  const handleEmailSignIn = async (event) => {
+    event.preventDefault();
+    setError("");
+    setEmailSigningIn(true);
+    try {
+      const credential = await loginWithEmail({ email: loginEmail, password: loginPassword });
+      onSignedIn(credential.user);
+    } catch (signInError) {
+      setError(signInError.code === "auth/invalid-credential" || signInError.code === "auth/user-not-found" || signInError.code === "auth/wrong-password"
+        ? "Email or password is incorrect. Check both and try again."
+        : signInError.code === "auth/too-many-requests"
+          ? "Too many sign-in attempts. Wait a little and try again, or reset your password."
+          : signInError.code === "auth/invalid-email"
+            ? "Enter a valid email address."
+            : signInError.message || "Email sign-in could not be completed.");
+    } finally {
+      setEmailSigningIn(false);
+    }
+  };
 
   const handleGoogleSignIn = async () => {
     setSigningIn(true);
     setError("");
     try {
       const result = await loginWithGoogle();
-      setAuthenticatedUser(result.user);
       onSignedIn(result.user);
     } catch (signInError) {
       setError(
@@ -115,19 +142,6 @@ function LoginModal({ onClose, onCreate, onAdmin, onSignedIn = () => {} }) {
     };
   }, [onClose]);
 
-  if (authenticatedUser) {
-    return (
-      <AccountPanel
-        user={authenticatedUser}
-        onClose={onClose}
-        onSignOut={() => {
-          setAuthenticatedUser(null);
-          logoutUser();
-        }}
-      />
-    );
-  }
-
   return (
     <div
       className="modal-shell"
@@ -166,13 +180,17 @@ function LoginModal({ onClose, onCreate, onAdmin, onSignedIn = () => {} }) {
             <button className="google-button" onClick={handleGoogleSignIn} disabled={signingIn}>
               {signingIn ? "Opening Google sign-in..." : "Sign in with Google Account"}
             </button>
+            <div className="divider"><span>OR USE EMAIL</span></div>
+            <form className="email-login-form" onSubmit={handleEmailSignIn}>
+              <label>Email address<input type="email" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} autoComplete="username" placeholder="you@example.com" required /></label>
+              <label>Password<div className="password-field"><input type={showLoginPassword ? "text" : "password"} value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} autoComplete="current-password" placeholder="Your password" required /><button type="button" className="password-visibility" onClick={() => setShowLoginPassword((visible) => !visible)} aria-label={showLoginPassword ? "Hide password" : "Show password"}><Icon name={showLoginPassword ? "eyeOff" : "eye"} size={18} /></button></div></label>
+              <button className="password-reset-inline" type="button" onClick={() => { setResetEmail(loginEmail); setResetMode(true); setError(""); setResetSent(false); }}>Forgot password?</button>
+              {error && <p className="auth-error" role="alert">{error}</p>}
+              <button className="visitor-button" type="submit" disabled={emailSigningIn}>{emailSigningIn ? "Signing in..." : "Sign in with email"}</button>
+            </form>
             <button className="create-account-link" onClick={onCreate}>Create a new campus account</button>
-            <button className="staff-access-link" onClick={() => { setResetMode(true); setError(""); setResetSent(false); }}>Forgot password?</button>
             <button className="staff-access-link" onClick={onAdmin}>Staff / administrator access</button>
-            {error && <p className="auth-error" role="alert">{error}</p>}
-            <div className="divider"><span>OR</span></div>
-            <button className="visitor-button" onClick={onClose}>Continue as Visitor <Icon name="arrow" size={18} /></button>
-            <p className="visitor-note"><Icon name="shield" size={15} /> Visitors have access to public floor plans and emergency exit routes.</p>
+            <p className="auth-security-note"><Icon name="shield" size={15} /> Sign-in is handled by Firebase. Your password is not shared with Google.</p>
             <p className="terms">By continuing, you agree to the campus portal&apos;s <a href="#terms">Terms</a> and <a href="#privacy">Privacy Policy</a>.</p>
           </>
         )}
@@ -185,9 +203,8 @@ function CreateAccountModal({ onClose, onCreated }) {
   const [form, setForm] = useState({
     name: "",
     email: "",
-    year: "",
-    section: "",
-    contact: "",
+    role: "",
+    emailUpdates: true,
     password: "",
     confirmPassword: "",
   });
@@ -209,7 +226,7 @@ function CreateAccountModal({ onClose, onCreated }) {
   const handleCreate = async (event) => {
     event.preventDefault();
     setError("");
-    if (!Object.values(form).every(Boolean)) {
+    if (!["name", "email", "role", "password", "confirmPassword"].every((field) => form[field])) {
       setError("Complete every field before creating your account.");
       return;
     }
@@ -241,180 +258,20 @@ function CreateAccountModal({ onClose, onCreated }) {
         <div className="modal-mark"><Icon name="building" size={26} /></div>
         <p className="kicker">NEW CAMPUS ACCOUNT</p>
         <h2 id="create-account-title">Create your account</h2>
-        <p className="modal-copy">Use your email and a strong password to save routes and campus preferences.</p>
+        <p className="modal-copy">Save the rooms and offices you visit and get alerts when a hallway on your way is closed.</p>
         <div className="account-fields">
           <input name="name" value={form.name} onChange={updateField} placeholder="Full name" autoComplete="name" />
           <input name="email" type="email" value={form.email} onChange={updateField} placeholder="Email address" autoComplete="email" />
-          <select name="year" value={form.year} onChange={updateField}><option value="">Year level</option><option>First Year</option><option>Second Year</option><option>Third Year</option><option>Fourth Year</option><option>Faculty / Staff</option></select>
-          <input name="section" value={form.section} onChange={updateField} placeholder="Section" />
-          <input name="contact" type="tel" value={form.contact} onChange={updateField} placeholder="Contact number" autoComplete="tel" />
+          <select name="role" value={form.role} onChange={updateField} aria-label="I am a"><option value="">I am a…</option>{USER_ROLES.map((item) => <option key={item}>{item}</option>)}</select>
           <div className="password-field"><input name="password" type={showPassword ? "text" : "password"} value={form.password} onChange={updateField} placeholder="Password (12+ characters)" autoComplete="new-password" aria-describedby="password-strength" /><button type="button" className="password-visibility" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "Hide password" : "Show password"}><Icon name={showPassword ? "eyeOff" : "eye"} size={18} /></button></div>
           {passwordStrength && <div className={`password-strength ${passwordStrength.toLowerCase()}`} id="password-strength" aria-live="polite"><div className="strength-meter"><i /><i /><i /></div><span>Password strength: <b>{passwordStrength}</b></span></div>}
           <div className="password-field"><input name="confirmPassword" type={showConfirmPassword ? "text" : "password"} value={form.confirmPassword} onChange={updateField} placeholder="Confirm password" autoComplete="new-password" /><button type="button" className="password-visibility" onClick={() => setShowConfirmPassword((visible) => !visible)} aria-label={showConfirmPassword ? "Hide confirmation password" : "Show confirmation password"}><Icon name={showConfirmPassword ? "eyeOff" : "eye"} size={18} /></button></div>
         </div>
+        <label className="email-updates-check"><input type="checkbox" checked={form.emailUpdates} onChange={(event) => setForm((current) => ({ ...current, emailUpdates: event.target.checked }))} /><span>Email me new school announcements and closed hallways. You can turn this off anytime in My Campus.</span></label>
         {error && <p className="auth-error" role="alert">{error}</p>}
         <button className="visitor-button" type="submit" disabled={saving}>{saving ? "Creating account..." : "Create account"}</button>
         <p className="terms password-policy">Password policy: at least 12 characters, including uppercase and lowercase letters, a number, and a symbol.</p>
       </form>
-    </div>
-  );
-}
-
-const scheduleWeekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-function readSavedSchedule(uid) {
-  try {
-    const value = JSON.parse(localStorage.getItem(`campus-schedule:${uid}`) || "[]");
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
-}
-
-function timeToMinutes(value) {
-  const [hours, minutes] = value.split(":").map(Number);
-  return hours * 60 + minutes;
-}
-
-function displayClassTime(value) {
-  return new Date(`2000-01-01T${value}:00`).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
-
-function AccountPanel({ user, onClose, onSignOut }) {
-  const [month, setMonth] = useState(() => new Date());
-  const [online, setOnline] = useState(navigator.onLine);
-  const [now, setNow] = useState(() => new Date());
-  const [savedClasses, setSavedClasses] = useState(() => readSavedSchedule(user.uid));
-  const [scheduleEditorOpen, setScheduleEditorOpen] = useState(() => readSavedSchedule(user.uid).length === 0);
-  const [selectedScheduleDay, setSelectedScheduleDay] = useState(() => new Date().getDay());
-  const [scheduleError, setScheduleError] = useState("");
-  const [scheduleNotice, setScheduleNotice] = useState("");
-  const [scheduleForm, setScheduleForm] = useState({ subject: "", day: String(new Date().getDay()), start: "06:00", end: "07:00", room: "", teacher: "" });
-  const profile = JSON.parse(localStorage.getItem(`campus-profile:${user.uid}`) || "{}");
-  const firstName = (user.displayName || profile.name || "Student").split(" ")[0];
-  const monthStart = new Date(month.getFullYear(), month.getMonth(), 1);
-  const calendarDays = Array.from({ length: new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate() }, (_, index) => index + 1);
-  const storedAttendance = JSON.parse(localStorage.getItem(`campus-student-attendance:${user.uid}`) || "{}");
-  const todayKey = now.toLocaleDateString("en-CA");
-  const checkIn = storedAttendance[todayKey];
-  const dayClasses = savedClasses
-    .filter((item) => Number(item.day) === selectedScheduleDay)
-    .sort((first, second) => first.start.localeCompare(second.start));
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  const activeClass = selectedScheduleDay === now.getDay()
-    ? dayClasses.find((item) => timeToMinutes(item.start) <= currentMinutes && currentMinutes < timeToMinutes(item.end))
-    : null;
-  const nextClass = selectedScheduleDay === now.getDay()
-    ? dayClasses.find((item) => timeToMinutes(item.start) > currentMinutes)
-    : null;
-  const attendanceRecords = Object.values(storedAttendance).filter((record) => record && ["present", "late", "absent"].includes(record.status));
-  const attendanceTotals = attendanceRecords.reduce((totals, record) => ({ ...totals, [record.status]: totals[record.status] + 1 }), { present: 0, late: 0, absent: 0 });
-  const attendanceRate = attendanceRecords.length
-    ? Math.round(((attendanceTotals.present + attendanceTotals.late) / attendanceRecords.length) * 100)
-    : null;
-  const announcements = [
-    { title: "Welcome to your student portal", date: "Portal update", text: "Check this feed for school notices and event announcements." },
-    { title: "Schedule information", date: "Your timetable", text: "Add each class with its exact start and end time. Your schedule is saved in this browser." },
-  ];
-
-  useEffect(() => {
-    const updateOnline = () => setOnline(navigator.onLine);
-    const clock = window.setInterval(() => setNow(new Date()), 15000);
-    window.addEventListener("online", updateOnline);
-    window.addEventListener("offline", updateOnline);
-    return () => {
-      window.clearInterval(clock);
-      window.removeEventListener("online", updateOnline);
-      window.removeEventListener("offline", updateOnline);
-    };
-  }, []);
-
-  const saveClass = (event) => {
-    event.preventDefault();
-    setScheduleError("");
-    setScheduleNotice("");
-    const startMinutes = timeToMinutes(scheduleForm.start);
-    const endMinutes = timeToMinutes(scheduleForm.end);
-    if (endMinutes <= startMinutes) {
-      setScheduleError("The end time needs to be after the start time.");
-      return;
-    }
-    const conflict = savedClasses.some((item) => Number(item.day) === Number(scheduleForm.day)
-      && startMinutes < timeToMinutes(item.end)
-      && endMinutes > timeToMinutes(item.start));
-    if (conflict) {
-      setScheduleError("This time overlaps another class that day. Change one of the times.");
-      return;
-    }
-    const newClass = {
-      id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      subject: scheduleForm.subject.trim(),
-      day: Number(scheduleForm.day),
-      start: scheduleForm.start,
-      end: scheduleForm.end,
-      room: scheduleForm.room.trim(),
-      teacher: scheduleForm.teacher.trim(),
-    };
-    const nextClasses = [...savedClasses, newClass].sort((first, second) => first.day - second.day || first.start.localeCompare(second.start));
-    setSavedClasses(nextClasses);
-    localStorage.setItem(`campus-schedule:${user.uid}`, JSON.stringify(nextClasses));
-    setSelectedScheduleDay(newClass.day);
-    setScheduleForm((current) => ({ ...current, subject: "", room: "", teacher: "" }));
-    setScheduleNotice(`${newClass.subject} added for ${scheduleWeekdays[newClass.day]}. Add another class or tap Done.`);
-  };
-
-  const removeClass = (classId) => {
-    const nextClasses = savedClasses.filter((item) => item.id !== classId);
-    setSavedClasses(nextClasses);
-    localStorage.setItem(`campus-schedule:${user.uid}`, JSON.stringify(nextClasses));
-    setScheduleNotice("Class removed from your saved timetable.");
-  };
-
-  const findClass = () => {
-    onClose();
-    window.setTimeout(() => document.querySelector("#features")?.scrollIntoView({ behavior: "smooth" }), 50);
-  };
-
-  return (
-    <div className="student-portal-shell" role="dialog" aria-modal="true" aria-labelledby="student-portal-title">
-      <header className="student-portal-header"><a className="student-portal-brand" href="#about"><span className="brand-mark" /><span><b>SAINT SIMON OF CYRENE</b><small>STUDENT PORTAL</small></span></a><div className="student-header-tools"><span className={`connectivity-pill ${online ? "online" : "offline"}`}><i />{online ? "Internet connected · School Wi-Fi unverified" : "Offline · School Wi-Fi unverified"}</span><button className="student-close" onClick={onClose} aria-label="Close student portal"><Icon name="close" /></button></div></header>
-      <main className="student-dashboard">
-        <section className="student-welcome"><div><p className="kicker">PERSONAL CAMPUS DASHBOARD</p><h1 id="student-portal-title">Hello, {firstName}</h1><p>Your school day, attendance, and campus updates in one place.</p></div><div className={`checkin-card ${checkIn ? "checked-in" : "not-checked-in"}`}><span className="checkin-indicator" /><div><small>TODAY&apos;S ATTENDANCE</small><b>{checkIn ? `Checked in at ${checkIn.time}` : "Not checked in"}</b><span>{checkIn ? checkIn.location || "Campus gate" : "Your check-in will appear here"}</span></div></div></section>
-        <div className="student-dashboard-grid">
-          <section className="student-card schedule-card">
-            <div className="student-card-heading"><div><p className="kicker">MY SCHOOL WEEK</p><h2>My classes</h2></div><div className="schedule-heading-tools"><span className="schedule-clock">Now · {now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span><button className="schedule-manage-button" type="button" onClick={() => { setScheduleEditorOpen((open) => !open); setScheduleError(""); setScheduleNotice(""); }}>{scheduleEditorOpen ? "Done" : "Change classes"}</button></div></div>
-            <div className="schedule-status-line" aria-live="polite">{activeClass ? <><span className="live-dot" /> Class now: <b>{activeClass.subject}</b> · until {displayClassTime(activeClass.end)}</> : nextClass ? <>Coming up: <b>{nextClass.subject}</b> · starts at {displayClassTime(nextClass.start)}</> : selectedScheduleDay === now.getDay() ? "Nothing else planned today." : `Classes for ${scheduleWeekdays[selectedScheduleDay]}.`}</div>
-            <div className="schedule-week-picker" aria-label="Choose a day">{scheduleWeekdays.map((day, index) => <button key={day} type="button" className={selectedScheduleDay === index ? "active" : ""} aria-label={`Show ${day} classes`} title={day} aria-pressed={selectedScheduleDay === index} onClick={() => { setSelectedScheduleDay(index); setScheduleForm((current) => ({ ...current, day: String(index) })); }}><span className="day-full">{day}</span><span className="day-short">{day.slice(0, 3)}</span></button>)}</div>
-            {scheduleEditorOpen && <form className="schedule-editor" onSubmit={saveClass}>
-              <div className="schedule-editor-heading"><div><p className="kicker">ADD CLASSES ONE AT A TIME</p><h3>Add a class</h3></div></div>
-              <ol className="schedule-steps"><li>Choose the day and class name.</li><li>Set when it starts and ends.</li><li>Tap Add class. Repeat for your other classes.</li></ol>
-              <div className="schedule-form-grid">
-                <label>Class name<input name="subject" value={scheduleForm.subject} onChange={(event) => setScheduleForm((current) => ({ ...current, subject: event.target.value }))} placeholder="e.g. Science or Math" required maxLength={60} /></label>
-                <label>Day<select value={scheduleForm.day} onChange={(event) => { const day = event.target.value; setScheduleForm((current) => ({ ...current, day })); setSelectedScheduleDay(Number(day)); }}>{scheduleWeekdays.map((day, index) => <option key={day} value={index}>{day}</option>)}</select></label>
-                <label>Starts at<input type="time" value={scheduleForm.start} onChange={(event) => setScheduleForm((current) => ({ ...current, start: event.target.value }))} required /></label>
-                <label>Ends at<input type="time" value={scheduleForm.end} onChange={(event) => setScheduleForm((current) => ({ ...current, end: event.target.value }))} required /></label>
-              </div>
-              <details className="schedule-optional"><summary>Add a room or teacher (optional)</summary><div className="schedule-form-grid"><label>Room<input value={scheduleForm.room} onChange={(event) => setScheduleForm((current) => ({ ...current, room: event.target.value }))} placeholder="e.g. Room 204" maxLength={50} /></label><label>Teacher<input value={scheduleForm.teacher} onChange={(event) => setScheduleForm((current) => ({ ...current, teacher: event.target.value }))} placeholder="Teacher name" maxLength={60} /></label></div></details>
-              {scheduleError && <p className="schedule-feedback error" role="alert">{scheduleError}</p>}
-              {scheduleNotice && <p className="schedule-feedback success" role="status">{scheduleNotice}</p>}
-              <button className="schedule-save-button" type="submit">Add class</button>
-            </form>}
-            {!scheduleEditorOpen && scheduleNotice && <p className="schedule-feedback success" role="status">{scheduleNotice}</p>}
-            <div className="class-timeline">
-              {dayClasses.length ? dayClasses.map((item) => <article className={`class-item ${activeClass?.id === item.id ? "is-current" : ""}`} key={item.id}>
-                <div className="class-time"><b>{displayClassTime(item.start)}</b><small>to {displayClassTime(item.end)}</small></div><div className="class-marker" />
-                <div className="class-details"><b>{item.subject}</b><span>{[item.room, item.teacher].filter(Boolean).join(" · ") || "Class details not added"}</span></div>
-                <button className="class-remove-button" type="button" onClick={() => removeClass(item.id)} aria-label={`Remove ${item.subject} from ${scheduleWeekdays[item.day]}`}>Remove</button>
-              </article>) : <div className="schedule-empty"><b>No classes for {scheduleWeekdays[selectedScheduleDay]} yet.</b><span>Add your first class using the steps above. Your classes stay saved on this device.</span>{!scheduleEditorOpen && <button type="button" onClick={() => setScheduleEditorOpen(true)}>Add a class</button>}</div>}
-            </div>
-          </section>
-          <section className="student-card student-attendance-card"><div className="student-card-heading"><div><p className="kicker">MY ATTENDANCE</p><h2>Attendance history</h2></div><div className="month-switch"><button onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} aria-label="Previous month">‹</button><b>{month.toLocaleDateString("en-US", { month: "short", year: "numeric" })}</b><button onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))} aria-label="Next month">›</button></div></div><div className="student-calendar"><div className="student-weekdays">{"SMTWTFS".split("").map((day, index) => <span key={`${day}-${index}`}>{day}</span>)}</div><div className="student-calendar-days">{Array.from({ length: monthStart.getDay() }, (_, index) => <i key={`empty-${index}`} />)}{calendarDays.map((day) => { const key = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`; const status = storedAttendance[key]?.status || "unrecorded"; return <span key={key} className={`${status} ${key === todayKey ? "today" : ""}`} title={`${key}: ${status}`}>{day}</span>; })}</div><div className="student-calendar-legend"><span><i className="present" /> Present</span><span><i className="late" /> Late</span><span><i className="absent" /> Absent</span></div><p className="student-data-note">Attendance records will appear here when check-ins are connected.</p></div></section>
-          <section className="student-card performance-card"><div className="student-card-heading"><div><p className="kicker">LEARNING & ATTENDANCE</p><h2>Performance</h2></div><span className="pending-badge">{attendanceRecords.length ? "Attendance tracked" : "Awaiting attendance data"}</span></div><p className="performance-intro">A simple view of attendance progress. Grades are not shown here.</p><div className="performance-metrics"><article><span>Attendance rate</span><b>{attendanceRate === null ? "—" : `${attendanceRate}%`}</b><small>{attendanceRecords.length ? `${attendanceRecords.length} recorded days` : "No records yet"}</small></article><article><span>Present</span><b>{attendanceTotals.present}</b><small>days recorded</small></article><article><span>Late / absent</span><b>{attendanceTotals.late + attendanceTotals.absent}</b><small>{attendanceTotals.late} late · {attendanceTotals.absent} absent</small></article></div><p className="performance-note">Calculated from attendance data stored in this browser. Official school performance records are not connected yet.</p></section>
-          <section className="student-card announcements-card"><div className="student-card-heading"><div><p className="kicker">SCHOOL BROADCAST</p><h2>Announcements</h2></div><span className="pending-badge">Portal notices</span></div>{announcements.map((item) => <article className="announcement-item" key={item.title}><span><Icon name="sparkle" size={16} /></span><div><div><b>{item.title}</b><small>{item.date}</small></div><p>{item.text}</p></div></article>)}</section>
-        </div>
-        <footer className="student-portal-footer"><a className="student-portal-brand footer-brand" href="#about"><span className="brand-mark" /><span><b>SAINT SIMON OF CYRENE</b><small>STUDENT PORTAL</small></span></a><div className="student-footer-account"><div><b>{user.displayName || profile.name || user.email}</b><span>{profile.year || "Student"}{profile.section ? ` · ${profile.section}` : ""}</span></div><button onClick={onSignOut}>Sign out <Icon name="arrow" size={15} /></button></div></footer>
-      </main>
-      <SiiBot onSignIn={() => {}} onSignOut={onSignOut} onOpenAccount={() => {}} alreadySignedIn onNavigate={(sectionId) => { onClose(); window.setTimeout(() => document.querySelector(`#${sectionId}`)?.scrollIntoView({ behavior: "smooth" }), 50); }} />
     </div>
   );
 }
@@ -450,14 +307,18 @@ function AdminLogin({ onClose, onSuccess }) {
   return <div className="modal-shell" role="dialog" aria-modal="true" aria-labelledby="admin-login-title"><form className="login-modal admin-login" onSubmit={submit}><button type="button" className="modal-close" onClick={onClose} aria-label="Close admin login"><Icon name="close" /></button><div className="modal-mark"><Icon name="shield" size={26} /></div><p className="kicker">RESTRICTED STAFF ACCESS</p><h2 id="admin-login-title">Administrator sign in</h2><p className="modal-copy">Sign in with the administrator username and password.</p><input className="admin-password" type="text" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Username" autoComplete="username" required autoFocus /><input className="admin-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" autoComplete="current-password" required />{error && <p className="auth-error" role="alert">{error}</p>}<button className="visitor-button" type="submit" disabled={busy}>{busy ? "Verifying admin access..." : "Sign in to admin"}</button><p className="terms">Admin access is verified by Firebase authorization.</p></form></div>;
 }
 
-function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, alreadySignedIn = false }) {
+function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alreadySignedIn = false, speakAnswers = false }) {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
   const [centerAnswer, setCenterAnswer] = useState("");
   const [listening, setListening] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState("");
   const [messages, setMessages] = useState([{ id: "welcome", role: "assistant", text: "Hi! I’m SiBot, your school helper. Ask about school hours, the address, school levels, or finding your way around campus." }]);
+  const liveRooms = usePublicCollection(CMS_COLLECTIONS.rooms).items;
+  const liveOffices = usePublicCollection(CMS_COLLECTIONS.offices).items;
+  const liveClosures = usePublicCollection(CMS_COLLECTIONS.closures).items;
   const conversationRef = useRef(null);
+  const askRef = useRef(null);
   const recognitionRef = useRef(null);
   const voiceCommandRef = useRef(false);
 
@@ -519,8 +380,29 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, alreadySignedI
     setOpen(true);
     setVoiceStatus(voiceCommandRef.current ? `I heard: “${text}”` : "");
     const hasAny = (terms) => terms.some((term) => normalized.includes(term.toLowerCase()));
+    const floorName = (floor) => (floor === 0 ? "the ground floor" : `floor ${floor}`);
+    const activeClosures = liveClosures.filter((item) => isClosureActive(item, todayKey()));
+    // Longest name first so "Room 204" wins over "Room 2".
+    const place = [...liveOffices, ...liveRooms]
+      .filter((item) => item.name && normalized.includes(item.name.toLowerCase()))
+      .sort((first, second) => second.name.length - first.name.length)[0];
+    const planPlace = placeByKey(findPlaceKey(normalized));
     let answer;
-    if (hasAny(["sign out", "signout", "sign me out", "log out", "log me out", "logout"])) {
+    if (place) {
+      const closedNearby = activeClosures.filter((item) => item.building === place.building && item.floor === place.floor);
+      answer = `${place.name} is in the ${place.building}, on ${floorName(place.floor)}${place.room ? `, ${place.room}` : ""}.`
+        + (place.hours ? ` Office hours: ${place.hours}.` : "")
+        + (place.status && place.status !== "Available" ? ` Status right now: ${place.status.toLowerCase()}.` : "")
+        + (closedNearby.length ? ` Heads up: ${closedNearby.map((item) => `${item.pathway} is closed${item.detour ? ` (${item.detour})` : ""}`).join("; ")}.` : "");
+      const mapKey = findPlaceKey(place.room, place.name);
+      if (mapKey && onOpenMap) onOpenMap({ destination: mapKey, floor: place.floor });
+      else onNavigate("updates");
+    } else if (hasAny(["closed", "closure", "blocked", "maintenance", "restricted", "hallway", "pathway", "detour"])) {
+      answer = activeClosures.length
+        ? `Current pathway restrictions: ${activeClosures.map((item) => `${item.pathway} in the ${item.building}, ${floorName(item.floor)} (${item.reason.toLowerCase()})${item.detour ? `. ${item.detour}` : ""}`).join("; ")}.`
+        : "All campus pathways are open right now.";
+      onNavigate("updates");
+    } else if (hasAny(["sign out", "signout", "sign me out", "log out", "log me out", "logout"])) {
       if (alreadySignedIn) {
         answer = "Okay, I’m signing you out.";
         onSignOut?.();
@@ -545,11 +427,21 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, alreadySignedI
     } else if (hasAny(["ar live", "ar view", "augmented reality", "camera guide", "live view"])) {
       answer = "AR Live View is in Explore the Platform. Open it for a visual walkthrough with directions and room distance.";
       onNavigate("features");
-    } else if (hasAny(["3d", "floor plan", "floor map", "dollhouse", "building map", "campus map"])) {
+    } else if (hasAny(["emergency", "fire exit", "nearest exit", "safest route", "evacuate", "safety route", "earthquake", "way out"])) {
+      answer = "I’m showing the nearest exit on the floor plan. In a real emergency, stay calm and follow your teacher and school staff first.";
+      onOpenMap?.({ emergency: true });
+    } else if (planPlace && hasAny(["where", "take me", "go to", "find", "how do i get", "directions", "room", "office", "clinic", "library", "guidance", "laboratory", "lab"])) {
+      answer = `${placeTitle(planPlace)} is on the ${planFloorLabel(planPlace.floor).toLowerCase()} of the Main Academic Building. I’ve opened the floor plan with directions.`;
+      onOpenMap?.({ destination: planPlace.key, floor: planPlace.floor });
+    } else if (hasAny(["2d", "floor plan", "floor map", "directions", "navigate"])) {
+      answer = "Opening the 2D floor plan. Tap any room to get directions, or use Route to the nearest exit.";
+      onOpenMap?.({});
+    } else if (hasAny(["3d", "dollhouse", "building map", "campus map"])) {
       answer = "The 3D campus map is in Explore the Platform. Choose a floor to look around the campus buildings.";
       onNavigate("features");
     } else if (hasAny(["address", "where is the school", "school located", "where are you located", "campus location", "location of the school", "directions to the school", "how do i get to school"])) {
-      answer = "Saint Simon of Cyrene Academy is at N.I.A. Road / 39 Reyes Compound, Carsadang Bago II, Imus, Cavite, Philippines.";
+      answer = "Saint Simon of Cyrene Academy is at N.I.A. Road / 39 Reyes Compound, Carsadang Bago II, Imus, Cavite, Philippines. I've scrolled to the map so you can get directions.";
+      onNavigate("visit");
     } else if (hasAny(["school hour", "school hours", "opening hour", "what time does school", "when does school open", "when is the school open", "operating hour", "open on saturday"])) {
       answer = "The school is open Monday to Friday, 7:00 AM to 5:00 PM. For holiday or special schedules, please check with the school office.";
     } else if (hasAny(["grade level", "academic level", "year level", "school levels", "what levels", "what grades", "nursery", "kindergarten", "elementary", "grade school", "junior high", "senior high", "prep class"])) {
@@ -567,19 +459,19 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, alreadySignedI
       answer = "I don’t have a verified phone number or email in my information. You can find the school’s Facebook and YouTube links in the page footer, or ask a parent to contact the school office.";
     } else if (hasAny(["visitor", "guest", "parent", "can i enter", "public access"])) {
       answer = "Visitors can look at the public campus map without signing in. Please ask school staff about visiting rules before coming to campus.";
-    } else if (hasAny(["emergency", "fire exit", "safest route", "evacuate", "safety route"])) {
-      answer = "For an emergency, follow your teacher and school staff. The campus map can help show exit routes, but always follow staff instructions first.";
-      onNavigate("features");
     } else if (hasAny(["room", "office", "restroom", "comfort room", "library", "clinic", "where can i find", "how do i get to", "take me to", "where is"])) {
-      answer = "Open the 3D campus map and choose a floor to look for rooms and school facilities. If you still need help, ask a teacher or staff member.";
-      onNavigate("features");
-    } else if (hasAny(["next class", "my class", "class schedule", "where is my class", "timetable", "my subjects", "school schedule", "class times", "what time do classes start"])) {
-      answer = "Open My Account to see your timetable. Choose Change classes to add or update your subjects and times. Check your timetable with your teacher to make sure it is official.";
+      answer = "Open the 2D floor plan and tap a room to get directions. If you still need help, ask a teacher or staff member.";
+      onOpenMap?.({});
+    } else if (hasAny(["saved place", "my places", "favorite", "favourite", "bookmark"])) {
+      answer = alreadySignedIn
+        ? "Your saved places are in My Campus. Search for a room or office there and tap Save. I’ll open it for you."
+        : "Sign in to save rooms and offices to your account and get alerts when a hallway near them is closed.";
+      if (alreadySignedIn) onOpenAccount?.(); else onSignIn?.();
     } else if (hasAny(["who is saint simon", "tell me about the school", "about the school", "what is this school", "what does sscai mean", "what kind of school"])) {
       answer = "Saint Simon of Cyrene Academy, Inc. (SSCAI) is a private, non-stock, non-profit school in Imus, Cavite. It provides basic education from early childhood through Senior High School and is recognized by the DepEd Division of City of Imus.";
       onNavigate("about");
     } else {
-      answer = "I don’t have that answer in my school information yet. I can help with the school overview, address and hours, grade levels, student groups, subjects, enrollment, contact links, your timetable, and the campus map. For other details, please ask a teacher or the school office.";
+      answer = "I don’t have that answer in my school information yet. I can help with the school overview, address and hours, grade levels, student groups, subjects, enrollment, contact links, finding rooms and offices, closed hallways, and the campus map. For other details, please ask a teacher or the school office.";
     }
     const timestamp = Date.now();
     setMessages((current) => [...current,
@@ -587,7 +479,7 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, alreadySignedI
       { id: `${timestamp}-answer-${Math.random()}`, role: "assistant", text: answer },
     ]);
     setCenterAnswer(answer);
-    if (voiceCommandRef.current && "speechSynthesis" in window) {
+    if ((voiceCommandRef.current || speakAnswers) && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
       const spokenAnswer = new SpeechSynthesisUtterance(answer);
       spokenAnswer.lang = "en-PH";
@@ -598,6 +490,12 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, alreadySignedI
   };
 
   const choosePrompt = (prompt) => askSiiBot(prompt);
+  askRef.current = askSiiBot;
+  useEffect(() => {
+    const onAsk = (event) => askRef.current?.(String(event.detail || ""));
+    window.addEventListener("sibot:ask", onAsk);
+    return () => window.removeEventListener("sibot:ask", onAsk);
+  }, []);
 
   return (
     <div className="siibot-wrap">
@@ -640,112 +538,32 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, alreadySignedI
   );
 }
 
-const demoStudents = [
-  { id: "ST-001", name: "Maria Santos", year: "First Year", section: "Emerald" },
-  { id: "ST-002", name: "Joshua Cruz", year: "Second Year", section: "Jade" },
-  { id: "ST-003", name: "Leah Garcia", year: "Third Year", section: "Sapphire" },
-  { id: "ST-004", name: "Daniel Reyes", year: "Fourth Year", section: "Ruby" },
-];
-
-function AdminDashboard({ onClose }) {
-  const [studentId, setStudentId] = useState(demoStudents[0].id);
-  const [month, setMonth] = useState("2026-09");
-  const [preset, setPreset] = useState("This Week");
-  const [rangeStart, setRangeStart] = useState("2026-09-01");
-  const [rangeEnd, setRangeEnd] = useState("2026-09-07");
-  const [dragging, setDragging] = useState(false);
-  const dragAnchor = useRef(null);
-  const [records] = useState(() => JSON.parse(localStorage.getItem("campus-attendance") || "{}"));
-  const student = demoStudents.find((item) => item.id === studentId) || demoStudents[0];
-  const monthDays = Array.from({ length: new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate() }, (_, index) => {
-    const day = index + 1;
-    const date = `${month}-${String(day).padStart(2, "0")}`;
-    const record = records[`2026-2027 · First Semester|${studentId}|${date}`];
-    const status = record?.status || "unrecorded";
-    return { day, date, status, time: record?.updatedAt ? new Date(record.updatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "", location: record?.location || "No location recorded" };
-  });
-  const selectedDays = monthDays.filter((item) => item.date >= rangeStart && item.date <= rangeEnd);
-  const selectedTotals = selectedDays.reduce((summary, item) => ({ ...summary, [item.status]: (summary[item.status] || 0) + 1 }), { present: 0, late: 0, absent: 0, unrecorded: 0 });
-  const monthLabel = new Date(`${month}-01T12:00:00`).toLocaleDateString("en-US", { month: "long", year: "numeric" });
-  const monthStartDay = new Date(`${month}-01T12:00:00`).getDay();
-  const recordedDays = monthDays.filter((item) => item.status !== "unrecorded").length;
-  const monthlyRate = recordedDays ? Math.round((monthDays.filter((item) => item.status === "present").length / recordedDays) * 100) : 0;
-  const selectPreset = (value) => {
-    setPreset(value);
-    if (value === "Last 7 Days") { setRangeStart(`${month}-01`); setRangeEnd(`${month}-07`); }
-    if (value === "This Week") { setRangeStart(`${month}-07`); setRangeEnd(`${month}-13`); }
-    if (value === "Last 14 Days") { setRangeStart(`${month}-01`); setRangeEnd(`${month}-14`); }
-  };
-  const beginDrag = (date) => {
-    dragAnchor.current = date;
-    setDragging(true);
-    setPreset("Custom Drag Range");
-    setRangeStart(date);
-    setRangeEnd(date);
-  };
-  const chooseDay = (date) => {
-    const anchor = dragAnchor.current || date;
-    setPreset("Custom Drag Range");
-    setRangeStart(anchor < date ? anchor : date);
-    setRangeEnd(anchor < date ? date : anchor);
-  };
-  const finishDrag = () => {
-    setDragging(false);
-    dragAnchor.current = null;
-  };
-  const exportCsv = () => {
-    const rows = [["Date", "Student", "Status", "Time", "Location"], ...selectedDays.map((item) => [item.date, student.name, item.status, item.time, item.location])];
-    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")).join("\n");
-    const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); link.download = `${student.name.replaceAll(" ", "-").toLowerCase()}-attendance.csv`; link.click(); URL.revokeObjectURL(link.href);
-  };
-  return (
-    <div className="admin-shell"><div className="admin-dashboard">
-      <header className="admin-dashboard-header"><div><p className="kicker">SSCAI ADMINISTRATION</p><h2>Attendance intelligence</h2><p>Review daily check-ins, trends, and student reliability from one workspace.</p></div><div className="admin-header-actions"><button onClick={exportCsv}>Export CSV</button><button className="admin-close" onClick={onClose} aria-label="Close admin dashboard"><Icon name="close" /></button></div></header>
-      <div className="admin-dashboard-controls"><label>Active student<select value={studentId} onChange={(event) => setStudentId(event.target.value)}>{demoStudents.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.section}</option>)}</select></label><label>Attendance month<select value={month} onChange={(event) => { const nextMonth = event.target.value; setMonth(nextMonth); setRangeStart(`${nextMonth}-01`); setRangeEnd(`${nextMonth}-07`); setPreset("This Week"); }}>{["2026-08", "2026-09", "2026-10", "2026-11"].map((item) => <option key={item} value={item}>{new Date(`${item}-01T12:00:00`).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</option>)}</select></label><span className="admin-student-meta">{student.id} · {student.year} · {monthLabel}</span></div>
-      <section className="range-workspace"><div className="section-title-row"><div><p className="kicker">DATE RANGE</p><h3>Interactive attendance timeline</h3></div><span className="range-readout">{rangeStart} → {rangeEnd}</span></div><div className="preset-row">{["Last 7 Days", "This Week", "Last 14 Days", "Custom Drag Range"].map((item) => <button type="button" key={item} className={preset === item ? "active" : ""} onClick={() => selectPreset(item)}>{item}</button>)}</div><div className="timeline" onMouseLeave={() => dragging && finishDrag()} onMouseUp={finishDrag}>{monthDays.map((item) => <button type="button" key={item.date} className={`timeline-day ${item.date >= rangeStart && item.date <= rangeEnd ? "selected" : ""}`} onMouseDown={() => beginDrag(item.date)} onMouseEnter={() => dragging && chooseDay(item.date)} onMouseUp={finishDrag}><span>{item.day}</span><i className={item.status} /></button>)}</div><small className="drag-note">Click and drag across the dates to inspect a custom range. The selected dates are highlighted in green.</small></section>
-      <div className="admin-dashboard-grid"><section className="status-log"><div className="section-title-row"><div><p className="kicker">SELECTED RANGE</p><h3>Detailed status log</h3></div><span className="record-count">{selectedDays.length} days</span></div><div className="admin-log-list">{selectedDays.length ? selectedDays.map((item) => <article className="admin-log-item" key={item.date}><div className="log-date"><b>{new Date(`${item.date}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</b><small>{month.slice(0, 4)}</small></div><div className="log-line" /><div className="log-detail"><div><span className={`attendance-status ${item.status}`}>{item.status}</span><b>{item.status === "absent" || item.status === "unrecorded" ? "No attendance record" : `Checked in at ${item.time}`}</b></div><small><Icon name="location" size={13} /> {item.location}</small></div></article>) : <p className="empty-attendance">Select at least one day to view attendance.</p>}</div></section><aside className="range-summary"><p className="kicker">RANGE SUMMARY</p><h3>Attendance snapshot</h3><div className="summary-large"><b>{selectedTotals.present + selectedTotals.late ? Math.round(((selectedTotals.present + selectedTotals.late) / (selectedDays.length - selectedTotals.unrecorded)) * 100) : 0}%</b><span>recorded attendance rate</span></div><div className="summary-stat"><span><i className="present" /> Present</span><b>{selectedTotals.present}</b></div><div className="summary-stat"><span><i className="late" /> Late</span><b>{selectedTotals.late}</b></div><div className="summary-stat"><span><i className="absent" /> Absent</span><b>{selectedTotals.absent}</b></div><div className="summary-stat"><span><i className="unrecorded" /> No record</span><b>{selectedTotals.unrecorded}</b></div></aside></div>
-      <section className="analytics-section"><div className="section-title-row"><div><p className="kicker">MONTHLY ANALYTICS</p><h3>{monthLabel} overview</h3></div><span className="record-count">{student.name} · {recordedDays} recorded days</span></div><div className="analytics-grid"><div className="heatmap-card"><div className="weekday-row">{["S", "M", "T", "W", "T", "F", "S"].map((day, index) => <span key={`${day}-${index}`}>{day}</span>)}</div><div className="heatmap-grid">{Array.from({ length: monthStartDay }, (_, index) => <span key={`blank-${index}`} />)}{monthDays.map((item) => <button key={`heat-${item.date}`} className={item.status} title={`${item.date}: ${item.status}`} onClick={() => { setRangeStart(item.date); setRangeEnd(item.date); setPreset("Custom Drag Range"); }}>{item.day}</button>)}</div><div className="heatmap-legend"><span><i className="present" /> Present</span><span><i className="late" /> Late</span><span><i className="absent" /> Absent</span><span><i className="unrecorded" /> No record</span></div></div><div className="trend-card"><div className="trend-heading"><div><b>Attendance trends</b><small>Student vs section average</small></div><span>Aug · Sep · Oct</span></div><div className="bar-chart">{[["Aug", 78, 84], ["Sep", 92, 88], ["Oct", 86, 90]].map(([label, studentValue, sectionValue]) => <div className="bar-group" key={label}><div className="bars"><i style={{ height: `${studentValue}%` }} title={`Student ${studentValue}%`} /><b style={{ height: `${sectionValue}%` }} title={`Section ${sectionValue}%`} /></div><span>{label}</span></div>)}</div><div className="chart-legend"><span><i /> {student.name}</span><span><b /> Section average</span></div></div></div><div className="monthly-totals"><div><b>{monthDays.filter((item) => item.status === "absent").length}</b><span>Total absences</span></div><div><b>{monthDays.filter((item) => item.status === "late").length}</b><span>Total lates</span></div><div><b>{monthlyRate}%</b><span>Recorded attendance rate</span></div><div><b>{recordedDays ? "Live" : "Pending"}</b><span>{recordedDays ? "Based on saved records" : "Awaiting attendance"}</span></div></div></section>
-    </div></div>
-  );
-}
-
-function AdminAttendance({ onClose }) {
-  const [semester, setSemester] = useState("2026-2027 · First Semester");
-  const [studentId, setStudentId] = useState(demoStudents[0].id);
-  const [records, setRecords] = useState(() => JSON.parse(localStorage.getItem("campus-attendance") || "{}"));
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [status, setStatus] = useState("present");
-  const student = demoStudents.find((item) => item.id === studentId) || demoStudents[0];
-  const currentKey = `${semester}|${studentId}|${date}`;
-  const studentRecords = Object.entries(records).filter(([key]) => key.startsWith(`${semester}|${studentId}|`));
-  const totals = studentRecords.reduce((summary, [, value]) => ({ ...summary, [value.status]: summary[value.status] + 1 }), { present: 0, absent: 0, late: 0, excused: 0 });
-  const saveRecord = () => {
-    const next = { ...records, [currentKey]: { status, updatedAt: new Date().toISOString() } };
-    setRecords(next);
-    localStorage.setItem("campus-attendance", JSON.stringify(next));
-  };
-  const exportCsv = () => {
-    const rows = [["Student ID", "Student", "Year", "Section", "Semester", "Date", "Status"], ...studentRecords.map(([key, value]) => { const [, , recordDate] = key.split("|"); return [student.id, student.name, student.year, student.section, semester, recordDate, value.status]; })];
-    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")).join("\n");
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-    link.download = `${student.name.replaceAll(" ", "-").toLowerCase()}-attendance.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
-  };
-  return <div className="admin-shell"><div className="admin-panel"><div className="admin-heading"><div><p className="kicker">ADMIN WORKSPACE</p><h2>Attendance register</h2><p>Record daily attendance, review semester performance, and export a spreadsheet for reports.</p></div><button className="modal-close" onClick={onClose} aria-label="Close attendance admin"><Icon name="close" /></button></div><div className="admin-controls"><label>Semester<select value={semester} onChange={(event) => setSemester(event.target.value)}><option>2026-2027 · First Semester</option><option>2026-2027 · Second Semester</option></select></label><label>Student<select value={studentId} onChange={(event) => setStudentId(event.target.value)}>{demoStudents.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.id}</option>)}</select></label><label>Date<input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label><label>Status<select value={status} onChange={(event) => setStatus(event.target.value)}><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option><option value="excused">Excused</option></select></label><button className="attendance-save" onClick={saveRecord}>Save attendance</button></div><div className="admin-summary"><div><b>{student.name}</b><span>{student.year} · {student.section}</span></div><div><b>{totals.present}</b><span>Present</span></div><div><b>{totals.absent}</b><span>Absent</span></div><div><b>{totals.late}</b><span>Late</span></div><div><b>{totals.excused}</b><span>Excused</span></div></div><div className="attendance-tools"><h3>Attendance spreadsheet</h3><div><button onClick={exportCsv}>Export CSV</button><button onClick={() => window.print()}>Print report</button></div></div><div className="attendance-table-wrap"><table><thead><tr><th>Date</th><th>Student</th><th>Year / Section</th><th>Status</th><th>Updated</th></tr></thead><tbody>{studentRecords.length ? studentRecords.sort(([a], [b]) => b.localeCompare(a)).map(([key, value]) => { const [, , recordDate] = key.split("|"); return <tr key={key}><td>{recordDate}</td><td>{student.name}</td><td>{student.year} · {student.section}</td><td><span className={`attendance-status ${value.status}`}>{value.status}</span></td><td>{new Date(value.updatedAt).toLocaleString()}</td></tr>; }) : <tr><td colSpan="5" className="empty-attendance">No records yet. Save today&apos;s attendance above.</td></tr>}</tbody></table></div><p className="admin-note">This prototype stores attendance in this browser. Connect the same actions to Firestore before using it as the official school record.</p></div></div>;
-}
-
 export default function App() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [floor, setFloor] = useState(2);
+  const [mapState, setMapState] = useState(null);
+  const [where, setWhere] = useState("");
+  const [whereError, setWhereError] = useState("");
+  const [scrolled, setScrolled] = useState(false);
+  useReveal();
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
   const [signedInUser, setSignedInUser] = useState(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [createAccountOpen, setCreateAccountOpen] = useState(false);
-  const [adminOpen, setAdminOpen] = useState(false);
+  const [role, setRole] = useState("guest");
+  const [adminView, setAdminView] = useState(null);
   const [adminLoginOpen, setAdminLoginOpen] = useState(false);
-  const openLogin = () => setLoginOpen(true);
+  const isAdmin = role === "admin";
+  const openLogin = () => {
+    setMenuOpen(false);
+    setLoginOpen(true);
+  };
   const openCreateAccount = () => {
     setLoginOpen(false);
     setCreateAccountOpen(true);
@@ -753,11 +571,39 @@ export default function App() {
   const openAdminLogin = () => setAdminLoginOpen(true);
   const navigateTo = (sectionId) => document.querySelector(`#${sectionId}`)?.scrollIntoView({ behavior: "smooth" });
 
+  const submitWhere = (event) => {
+    event.preventDefault();
+    const query = where.trim();
+    if (!query) {
+      setWhereError("Type a room number or name, for example Room 204 or Clinic.");
+      return;
+    }
+    const lower = query.toLowerCase();
+    const exact = MAPPED_PLACES.find((item) => [placeTitle(item), item.name, item.code].some((value) => value && value.toLowerCase() === lower));
+    const key = exact?.key || findPlaceKey(query);
+    if (!key) {
+      setWhereError(`No room called “${query}” is on the floor plan yet. Try a room number such as 204, or pick from the list.`);
+      return;
+    }
+    setMapState({ destination: key, floor: placeByKey(key).floor });
+  };
+
   const handleSignOut = async () => {
     await logoutUser();
     setSignedInUser(null);
+    setRole("guest");
     setAccountOpen(false);
+    setAdminView(null);
   };
+
+  // Keeps the signed-in user and their role (from the Firebase JWT claims) in sync,
+  // including after a page reload.
+  useEffect(() => watchSession(({ user, role: nextRole }) => {
+    setSignedInUser(user && !user.isAnonymous ? user : null);
+    setRole(nextRole);
+    recordVisit(user, nextRole);
+    if (nextRole !== "admin") setAdminView(null);
+  }), []);
 
   useEffect(() => {
     finishGoogleRedirect()
@@ -768,268 +614,197 @@ export default function App() {
   }, []);
 
   return (
-    <div className="site-main">
-      <div className="ambient ambient-one" />
-      <div className="ambient ambient-two" />
-      <header className="topbar">
-        <a
-          href="#about"
-          className="brand"
-          aria-label="Smart Campus Portal home"
-        >
-          <span className="brand-mark">
-            <Icon name="building" size={23} />
-          </span>
-          <span>
-            <strong>SMART CAMPUS</strong>
-            <small>PORTAL</small>
-          </span>
-        </a>
-        <nav className={menuOpen ? "nav-links open" : "nav-links"}>
-          <a href="#about">About Campus</a>
-          <a href="#features">3D Dollhouse Map</a>
-          <a href="#features">AR Live View</a>
-          {signedInUser ? <button className="nav-cta" onClick={() => setAccountOpen(true)}><Icon name="shield" size={17} /> My Account</button> : <button className="nav-cta" onClick={openLogin}>
-            <Icon name="shield" size={17} /> Sign In / Portal Access
-          </button>}
-        </nav>
-        <button
-          className="menu-button"
-          onClick={() => setMenuOpen(!menuOpen)}
-          aria-label="Toggle navigation"
-        >
-          <Icon name={menuOpen ? "close" : "menu"} size={24} />
-        </button>
+    <div className="ss-site">
+      <a className="ss-skip" href="#main">Skip to main content</a>
+      <header className={`ss-header ${scrolled ? "is-scrolled" : ""}`}>
+        <div className="ss-container ss-header-inner">
+          <a className="ss-brand" href="#top" onClick={() => setMenuOpen(false)}>
+            <img src={asset("logologooo.jpg")} alt="" width="44" height="44" />
+            <span><b>Saint Simon of Cyrene Academy</b><small>Campus Portal</small></span>
+          </a>
+          <nav id="ss-nav" className={`ss-nav ${menuOpen ? "open" : ""}`} aria-label="Main">
+            <button type="button" className="ss-nav-link" onClick={() => { setMenuOpen(false); setMapState({ floor: 2 }); }}>Floor plan</button>
+            <a className="ss-nav-link" href="#explore" onClick={() => setMenuOpen(false)}>3D &amp; AR</a>
+            <a className="ss-nav-link" href="#updates" onClick={() => setMenuOpen(false)}>Campus updates</a>
+            <a className="ss-nav-link" href="#visit" onClick={() => setMenuOpen(false)}>Visit</a>
+            <div className="ss-nav-actions">
+              {isAdmin && <button type="button" className="ss-btn ss-btn-quiet" onClick={() => { setMenuOpen(false); setAdminView("content"); }}>Admin</button>}
+              {signedInUser
+                ? <button type="button" className="ss-btn ss-btn-primary" onClick={() => { setMenuOpen(false); setAccountOpen(true); }}>My Campus</button>
+                : <button type="button" className="ss-btn ss-btn-primary" onClick={openLogin}>Sign in</button>}
+            </div>
+          </nav>
+          <button type="button" className="ss-menu" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen} aria-controls="ss-nav" aria-label={menuOpen ? "Close menu" : "Open menu"}>
+            <Icon name={menuOpen ? "close" : "menu"} size={22} />
+          </button>
+        </div>
       </header>
-      <section className="hero" id="about">
-        <div className="hero-copy">
-          <div className="live-badge">
-            <span /> CAMPUS NAVIGATION, REIMAGINED
+
+      <main id="main">
+        <section className="ss-hero" id="top" aria-labelledby="ss-hero-title">
+          <div className="ss-container ss-hero-grid">
+            <div className="ss-hero-copy">
+              <p className="ss-overline" data-reveal style={{ "--delay": "0ms" }}>// Main Academic Building · Imus, Cavite</p>
+              <h1 id="ss-hero-title" className="ss-display" data-reveal style={{ "--delay": "80ms" }}><span>Find any room</span> <span className="t-outline">at Saint Simon</span> <span className="t-stripe">of Cyrene Academy</span></h1>
+              <p className="ss-lead" data-reveal style={{ "--delay": "160ms" }}>Search for a classroom, office, or lab and get step-by-step directions across all four floors, including the nearest way out.</p>
+              <form className={`ss-search ${whereError ? "has-error" : ""}`} onSubmit={submitWhere} role="search" data-reveal style={{ "--delay": "240ms" }}>
+                <label htmlFor="ss-where">Where do you need to go?</label>
+                <div className="ss-search-row">
+                  <input id="ss-where" list="ss-places" value={where} onChange={(event) => { setWhere(event.target.value); setWhereError(""); }} placeholder="Room 204, Clinic, Computer Room…" autoComplete="off" aria-describedby={whereError ? "ss-where-error" : undefined} aria-invalid={Boolean(whereError)} />
+                  <button type="submit" className="ss-btn ss-btn-primary">Get directions</button>
+                </div>
+                <datalist id="ss-places">{MAPPED_PLACES.map((item) => <option key={item.key} value={placeTitle(item)} />)}</datalist>
+                {whereError && <p id="ss-where-error" className="ss-field-error" role="alert">{whereError}</p>}
+              </form>
+              <div className="ss-quick" aria-label="Common places" data-reveal style={{ "--delay": "320ms" }}>
+                <span>Often searched:</span>
+                {QUICK_PLACES.map((key) => placeByKey(key)).filter(Boolean).map((item) => <button key={item.key} type="button" onClick={() => setMapState({ destination: item.key, floor: item.floor })}>{item.code && item.code !== item.name ? item.code : item.name}</button>)}
+              </div>
+            </div>
+            <figure className="ss-hero-figure" data-reveal style={{ "--delay": "200ms" }}>
+              <img src={asset("campus.jpg")} alt="Illustration of the Saint Simon of Cyrene Academy main building" width="1192" height="896" decoding="async" />
+              <figcaption>Main Academic Building, Carsadang Bago II</figcaption>
+            </figure>
           </div>
-          <h1>
-            Navigate Our Campus in <em>Full 3D</em> &amp; AR Live View
-          </h1>
-          <p>
-            Move confidently across every building and floor with intelligent
-            routing, emergency fire exit guidance, and smart campus assistance.
-          </p>
-          <div className="hero-actions">
-            <button
-              className="primary-button"
-              onClick={() =>
-                document
-                  .querySelector("#features")
-                  ?.scrollIntoView({ behavior: "smooth" })
-              }
-            >
-              <Icon name="cube" /> Launch 3D Dollhouse View{" "}
-              <Icon name="arrow" size={18} />
-            </button>
-            <button className="secondary-button" onClick={openLogin}>
-              Explore as Visitor
-            </button>
+          <div className="ss-container">
+            <dl className="ss-facts" data-reveal style={{ "--delay": "120ms" }}>
+              <div><dt>Floors mapped</dt><dd>4</dd></div>
+              <div><dt>Rooms &amp; offices</dt><dd>{MAPPED_PLACES.length}</dd></div>
+              <div><dt>Exits &amp; fire stairs</dt><dd>{EXIT_COUNT}</dd></div>
+              <div><dt>Office hours</dt><dd className="ss-facts-text">Mon–Fri, 7 AM–5 PM</dd></div>
+            </dl>
           </div>
-          <div className="trust-row">
-            <span>
-              <Icon name="shield" size={17} /> Emergency-ready routes
-            </span>
-            <i />
-            <span>
-              <Icon name="scan" size={17} /> Real-time indoor guidance
-            </span>
+        </section>
+
+        <section className="ss-section" id="explore" aria-labelledby="ss-explore-title">
+          <div className="ss-container">
+            <div className="ss-section-head" data-reveal>
+              <h2 id="ss-explore-title" className="ss-display"><span>Three ways to</span> <span className="t-outline">find your way</span></h2>
+              <p>Use the plan you&apos;re most comfortable with. They all share the same room list, so directions match.</p>
+            </div>
+            <div className="ss-ways" data-reveal>
+              <article className="ss-way" id="features">
+                <span className="ss-way-icon" aria-hidden="true"><Icon name="cube" size={26} /></span>
+                <h3>3D dollhouse</h3>
+                <p>Look at the building one floor at a time, then open the flat floor plan for turn-by-turn directions.</p>
+                <div className="floor-selector">
+                  <div className="floor-head">
+                    <span>Floor</span>
+                    <b>{planFloorLabel(floor)}</b>
+                  </div>
+                  <div className="floor-buttons" role="group" aria-label="Choose a floor">
+                    {[1, 2, 3, 4].map((item) => <button key={item} type="button" className={floor === item ? "active" : ""} aria-pressed={floor === item} onClick={() => setFloor(item)}>{item === 1 ? "G" : item}</button>)}
+                  </div>
+                  <MiniPlan floor={floor} onOpen={() => setMapState({ floor })} />
+                </div>
+                <div className="dollhouse-actions">
+                  <button type="button" onClick={() => setMapState({ floor })}><Icon name="route" size={16} /> Open the 2D floor plan</button>
+                </div>
+              </article>
+              <article className="ss-way">
+                <span className="ss-way-icon" aria-hidden="true"><Icon name="scan" size={26} /></span>
+                <h3>AR live view <span className="ss-tag">Preview</span></h3>
+                <p>Point your phone down a hallway and follow arrows to the room, with the distance left to walk.</p>
+                <div className="ar-preview" aria-hidden="true">
+                  <div className="corridor"><i /><i /><i /></div>
+                  <div className="ar-header"><span>AR</span><b>Room 204 · 38 m</b></div>
+                  <div className="ar-arrow">↑</div>
+                  <div className="ar-bottom"><span><Icon name="route" size={14} /> Continue straight</span><small>about 1 min</small></div>
+                </div>
+              </article>
+              <article className="ss-way">
+                <span className="ss-way-icon" aria-hidden="true"><Icon name="bot" size={26} /></span>
+                <h3>Ask SiBot</h3>
+                <p>Type or say what you need. SiBot answers common school questions and opens the floor plan for you.</p>
+                <ul className="ss-prompts">
+                  {SIBOT_PROMPTS.map((prompt) => <li key={prompt}><button type="button" onClick={() => window.dispatchEvent(new CustomEvent("sibot:ask", { detail: prompt }))}><span>{prompt}</span><Icon name="arrow" size={16} /></button></li>)}
+                </ul>
+              </article>
+            </div>
           </div>
-        </div>
-      </section>
-      <section className="features" id="features">
-        <div className="section-heading">
+        </section>
+
+        <CampusUpdates />
+
+        <section className="ss-section ss-visit" id="visit" aria-labelledby="ss-visit-title">
+          <div className="ss-container">
+            <div className="ss-section-head" data-reveal>
+              <h2 id="ss-visit-title" className="ss-display"><span>How to</span> <span className="t-outline">get here</span></h2>
+              <p>The school is on N.I.A. Road in Carsadang Bago II, Imus, Cavite. Get directions from wherever you are.</p>
+            </div>
+            <div className="ss-visit-grid" data-reveal>
+              <div className="ss-map-frame">
+                <iframe title="Map showing Saint Simon of Cyrene Academy in Imus, Cavite" src={MAP_EMBED_URL} loading="lazy" referrerPolicy="no-referrer-when-downgrade" allowFullScreen />
+              </div>
+              <aside className="ss-visit-card" aria-label="Address and directions">
+                <h3>Saint Simon of Cyrene Academy, Inc.</h3>
+                <address>N.I.A. Road / 39 Reyes Compound<br />Carsadang Bago II, Imus, Cavite<br />Philippines</address>
+                <dl>
+                  <div><dt>Office hours</dt><dd>Monday to Friday, 7:00 AM to 5:00 PM</dd></div>
+                  <div><dt>On campus</dt><dd>Use the floor plan above to find a room once you arrive.</dd></div>
+                </dl>
+                <div className="ss-visit-actions">
+                  <a className="ss-btn ss-btn-primary" href={MAP_DIRECTIONS_URL} target="_blank" rel="noreferrer"><Icon name="route" size={18} /> Get directions</a>
+                  <a className="ss-btn ss-btn-quiet" href={MAP_OPEN_URL} target="_blank" rel="noreferrer">Open in Google Maps</a>
+                </div>
+                <p className="ss-visit-note">Opens Google Maps in a new tab. Directions start from your current location.</p>
+              </aside>
+            </div>
+          </div>
+        </section>
+
+        <section className="ss-emergency" aria-labelledby="ss-emergency-title">
+          <div className="ss-container ss-emergency-inner" data-reveal>
+            <div>
+              <h2 id="ss-emergency-title" className="ss-display"><span>In an</span> <span className="t-stripe">emergency</span></h2>
+              <p>Stay calm and follow your teacher and school staff. The floor plan shows the closest exit or fire stairs from any room, and you don&apos;t need to sign in.</p>
+            </div>
+            <button type="button" className="ss-btn ss-btn-danger" onClick={() => setMapState({ emergency: true })}><Icon name="alert" size={18} /> Show the nearest exit</button>
+          </div>
+        </section>
+      </main>
+
+      <footer className="ss-footer">
+        <div className="ss-container ss-footer-grid" data-reveal>
+          <div className="ss-footer-school" id="about">
+            <a className="ss-brand" href="#top"><img src={asset("logologooo.jpg")} alt="" width="44" height="44" /><span><b>Saint Simon of Cyrene Academy, Inc.</b><small>Since 2006</small></span></a>
+            <p>A private, non-stock, non-profit school in Imus, Cavite, teaching learners from nursery through senior high school.</p>
+          </div>
           <div>
-            <p className="kicker">EXPLORE THE PLATFORM</p>
-            <h2>Everything you need to find your way.</h2>
+            <h2>Visit</h2>
+            <address>N.I.A. Road / 39 Reyes Compound<br />Carsadang Bago II, Imus, Cavite</address>
           </div>
-          <p>
-            One intelligent campus layer, built for students, faculty, visitors,
-            and emergency response teams.
-          </p>
+          <div>
+            <h2>Office hours</h2>
+            <p>Monday to Friday<br />7:00 AM to 5:00 PM</p>
+          </div>
+          <div>
+            <h2>Follow the school</h2>
+            <ul className="ss-social">
+              <li><a className="ss-social-fb" href="https://www.facebook.com/SSCAIPH" target="_blank" rel="noreferrer"><span className="ss-social-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13.4 21v-8h2.7l.4-3.1h-3.1v-2c0-.9.3-1.5 1.6-1.5h1.7V3.6c-.3 0-1.3-.1-2.4-.1-2.4 0-4 1.5-4 4.2v2.2H7.6V13h2.7v8h3.1Z" /></svg></span>Facebook</a></li>
+              <li><a className="ss-social-yt" href="https://www.youtube.com/@saintsimonofcyreneacademyinc" target="_blank" rel="noreferrer"><span className="ss-social-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9.6 8.2v7.6l6.6-3.8Z" /></svg></span>YouTube</a></li>
+            </ul>
+          </div>
         </div>
-        <div className="feature-grid">
-          <article className="feature-card">
-            <div className="card-icon blue">
-              <Icon name="cube" />
-            </div>
-            <div className="card-title">
-              <div>
-                <p>01 · SPATIAL VIEW</p>
-                <h3>3D Dollhouse Viewer</h3>
-              </div>
-              <Icon name="arrow" />
-            </div>
-            <p className="card-copy">
-              Explore every building layer by layer. Rotate, zoom, and jump
-              directly to any room or service.
-            </p>
-            <div className="floor-selector">
-              <div className="floor-head">
-                <span>SELECT FLOOR</span>
-                <b>
-                  {floor === 1
-                    ? "Ground"
-                    : `${floor}${floor === 2 ? "nd" : floor === 3 ? "rd" : "th"} Floor`}
-                </b>
-              </div>
-              <div className="floor-buttons">
-                {[1, 2, 3, 4].map((item) => (
-                  <button
-                    key={item}
-                    className={floor === item ? "active" : ""}
-                    onClick={() => setFloor(item)}
-                  >
-                    {item}
-                    <small>
-                      {item === 1
-                        ? "ST"
-                        : item === 2
-                          ? "ND"
-                          : item === 3
-                            ? "RD"
-                            : "TH"}
-                    </small>
-                  </button>
-                ))}
-              </div>
-              <div className="mini-plan">
-                <span />
-                <span />
-                <span />
-                <span />
-                <i className={`floor-indicator level-${floor}`} />
-              </div>
-            </div>
-          </article>
-          <article className="feature-card">
-            <div className="card-icon violet">
-              <Icon name="scan" />
-            </div>
-            <div className="card-title">
-              <div>
-                <p>02 · IMMERSIVE GUIDANCE</p>
-                <h3>AR / Live View Walkthrough</h3>
-              </div>
-              <Icon name="arrow" />
-            </div>
-            <p className="card-copy">
-              Follow turn-by-turn directional overlays through your camera, with
-              distance and accessibility updates.
-            </p>
-            <div className="ar-preview">
-              <div className="corridor">
-                <i />
-                <i />
-                <i />
-              </div>
-              <div className="ar-header">
-                <span>AR LIVE</span>
-                <b>Room 204 · 38m</b>
-              </div>
-              <div className="ar-arrow">↑</div>
-              <div className="ar-bottom">
-                <span>
-                  <Icon name="route" size={14} /> Continue straight
-                </span>
-                <small>ETA 1 min</small>
-              </div>
-            </div>
-          </article>
-          <article className="feature-card">
-            <div className="card-icon emerald">
-              <Icon name="sparkle" />
-            </div>
-            <div className="card-title">
-              <div>
-                <p>03 · INTELLIGENT SUPPORT</p>
-                <h3>SiBot School Helper</h3>
-              </div>
-              <Icon name="arrow" />
-            </div>
-            <p className="card-copy">
-              Ask about school hours, grade levels, the campus address, or the
-              map. SiBot gives quick answers to common school questions.
-            </p>
-            <div className="assistant-preview">
-              <div className="assistant-status">
-                <span className="ai-orb">
-                  <Icon name="sparkle" size={16} />
-                </span>
-                <p>
-                  <b>SiBot</b>
-                  <small>School helper · Ready</small>
-                </p>
-                <i />
-              </div>
-              <div className="prompt-bubble">
-                “Take me to Room 10 on the 2nd floor”
-              </div>
-              <div className="assistant-response">
-                <Icon name="route" size={17} />
-                <span>
-                  <b>Route ready</b>
-                  <small>4 min · Via east stairwell</small>
-                </span>
-              </div>
-              <div className="search-box">
-                <span>Ask a school question...</span>
-                <button aria-label="Search campus assistant">
-                  <Icon name="arrow" size={18} />
-                </button>
-              </div>
-            </div>
-          </article>
+        <div className="ss-container ss-footer-bottom">
+          <span>© 2026 Saint Simon of Cyrene Academy, Inc.</span>
+          <a href="#top">Back to top</a>
         </div>
-      </section>
-      <section className="safety-strip">
-        <div className="safety-icon">
-          <Icon name="shield" size={27} />
-        </div>
-        <div>
-          <p className="kicker">SAFETY-FIRST NAVIGATION</p>
-          <h3>
-            Emergency routes stay clear, visible, and always within reach.
-          </h3>
-        </div>
-        <p>
-          Live exit guidance and accessible routes are available to every
-          visitor, no sign-in required.
-        </p>
-        <button onClick={openLogin}>
-          View public access <Icon name="arrow" size={17} />
-        </button>
-      </section>
-      <footer>
-        <div className="brand">
-          <span className="brand-mark">
-            <Icon name="building" size={21} />
-          </span>
-          <span>
-            <strong>SMART CAMPUS</strong>
-            <small>PORTAL</small>
-          </span>
-        </div>
-        <div className="footer-socials" aria-label="Saint Simon social media">
-          <a href="https://www.facebook.com/SSCAIPH" target="_blank" rel="noreferrer" aria-label="Visit Saint Simon of Cyrene Academy on Facebook" title="Facebook">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 21v-8h2.7l.4-3.1h-3.1v-2c0-.9.3-1.5 1.6-1.5h1.7V3.6c-.3 0-1.3-.1-2.4-.1-2.4 0-4 1.5-4 4.2v2.2H7.6V13h2.7v8h3.1Z" /></svg>
-          </a>
-          <a href="https://www.youtube.com/@saintsimonofcyreneacademyinc" target="_blank" rel="noreferrer" aria-label="Visit Saint Simon of Cyrene Academy on YouTube" title="YouTube">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 7.2a2.9 2.9 0 0 0-2-2C18.2 4.7 12 4.7 12 4.7s-6.2 0-8 .5a2.9 2.9 0 0 0-2 2A30 30 0 0 0 1.5 12c0 1.6.2 3.2.5 4.8a2.9 2.9 0 0 0 2 2c1.8.5 8 .5 8 .5s6.2 0 8-.5a2.9 2.9 0 0 0 2-2c.3-1.6.5-3.2.5-4.8s-.2-3.2-.5-4.8ZM9.8 15.2V8.8l5.6 3.2-5.6 3.2Z" /></svg>
-          </a>
-        </div>
-        <p>Building a safer, more connected campus.</p>
-        <span>© 2026 Saint Simon of Cyrene Academy</span>
       </footer>
-      {!accountOpen && !loginOpen && <SiiBot onSignIn={openLogin} onSignOut={handleSignOut} onOpenAccount={() => setAccountOpen(true)} alreadySignedIn={Boolean(signedInUser)} onNavigate={navigateTo} />}
-      {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} onCreate={openCreateAccount} onAdmin={openAdminLogin} onSignedIn={setSignedInUser} />}
-      {accountOpen && signedInUser && <AccountPanel user={signedInUser} onClose={() => setAccountOpen(false)} onSignOut={handleSignOut} />}
-      {createAccountOpen && <CreateAccountModal onClose={() => setCreateAccountOpen(false)} onCreated={(user) => { setSignedInUser(user); setCreateAccountOpen(false); }} />}
-      {adminLoginOpen && <AdminLogin onClose={() => setAdminLoginOpen(false)} onSuccess={(user) => { setAdminLoginOpen(false); setLoginOpen(false); setSignedInUser(user); setAdminOpen(true); }} />}
-      {adminOpen && <AdminDashboard onClose={() => setAdminOpen(false)} />}
+      {!accountOpen && !loginOpen && !mapState && <SiiBot onSignIn={openLogin} onSignOut={handleSignOut} onOpenAccount={() => setAccountOpen(true)} alreadySignedIn={Boolean(signedInUser)} onNavigate={navigateTo} onOpenMap={setMapState} />}
+      {mapState && <CampusMap onClose={() => setMapState(null)} initialFloor={mapState.floor || 2} initialDestination={mapState.destination || null} initialEmergency={Boolean(mapState.emergency)} />}
+      {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} onCreate={openCreateAccount} onAdmin={openAdminLogin} onSignedIn={(user) => { setSignedInUser(user); setLoginOpen(false); setAccountOpen(true); }} />}
+      {accountOpen && signedInUser && <MyCampus
+        user={signedInUser}
+        onClose={() => setAccountOpen(false)}
+        onSignOut={handleSignOut}
+        onShowMap={(place) => { setAccountOpen(false); setMapState({ destination: findPlaceKey(place?.room, place?.name), floor: place?.floor }); }}
+        renderAssistant={(prefs) => <SiiBot onSignIn={() => {}} onSignOut={handleSignOut} onOpenAccount={() => {}} alreadySignedIn speakAnswers={prefs.speakAnswers} onNavigate={(sectionId) => { setAccountOpen(false); window.setTimeout(() => navigateTo(sectionId), 50); }} onOpenMap={(state) => { setAccountOpen(false); setMapState(state); }} />}
+      />}
+      {createAccountOpen && <CreateAccountModal onClose={() => setCreateAccountOpen(false)} onCreated={(user) => { setSignedInUser(user); setCreateAccountOpen(false); setAccountOpen(true); }} />}
+      {adminLoginOpen && <AdminLogin onClose={() => setAdminLoginOpen(false)} onSuccess={(user) => { setAdminLoginOpen(false); setLoginOpen(false); setSignedInUser(user); setRole("admin"); setAdminView("content"); }} />}
+      {isAdmin && adminView === "analytics" && <AdminAnalytics onClose={() => setAdminView(null)} onOpenContent={() => setAdminView("content")} />}
+      {isAdmin && adminView === "content" && <AdminCms onClose={() => setAdminView(null)} onOpenAnalytics={() => setAdminView("analytics")} />}
     </div>
   );
 }
