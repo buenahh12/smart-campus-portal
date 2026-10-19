@@ -1,0 +1,285 @@
+/* Earthy, textured theme + motion, layered on top of site.css.
+   Direction (ui-ux-pro-max "Organic Biophilic" / "Nature Distilled"): forest green, clay and
+   sand, subtle grain and ripple textures, 16-24px organic radii, natural ease-out motion.
+   Remove the import in main.jsx to go back to the plain site.css look. */
+
+:root {
+  --ink: #1b2a21;
+  --ink-2: #3c4a3f;
+  --muted: #5d6a5e;
+  --paper: #f5efe2;
+  --surface: #fffcf5;
+  --line: #e2d7c2;
+  --line-strong: #cbbc9f;
+  --forest: #1c3a2a;
+  --forest-deep: #132a1e;
+  --moss: #3b6347;
+  --sage: #a4bd9c;
+  --clay: #8a4c30;
+  --sand: #e8dabd;
+  --peach: #f1c39a;
+  --peach-hover: #e9b07f;
+  --cream: #f6efe1;
+  --cream-soft: #d7e0d1;
+  --green: #1f4a35;
+  --green-hover: #163a29;
+  --green-tint: #e2ebdb;
+  --orange-ink: #7a3c1f;
+  --orange-tint: #f6e2d2;
+  --focus: #c97a3f;
+  --radius-sm: 8px;
+  --radius: 14px;
+  --radius-lg: 24px;
+  --shadow-card: 0 1px 2px rgba(40,30,15,.08), 0 14px 32px rgba(40,30,15,.12);
+  --shadow-lift: 0 2px 4px rgba(40,30,15,.08), 0 22px 44px rgba(40,30,15,.18);
+  --shadow-lg: 0 2px 6px rgba(20,30,20,.1), 0 24px 60px rgba(20,30,20,.22);
+  --ease-out: cubic-bezier(.22, .61, .36, 1);
+  --ease-in: cubic-bezier(.55, .06, .68, .19);
+  --t-fast: 160ms;
+  --t-reveal: 560ms;
+  /* Film-grain noise (dark specks for light surfaces, light specks for dark surfaces). */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .2 0 0 0 0 .15 0 0 0 0 .08 0 0 0 .16 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --grain-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .97 0 0 0 0 .9 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* Sand-ripple lines, like wind patterns on a dune. */
+  --ripples: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='60'%3E%3Cg fill='none' stroke='%23f6efe1' stroke-opacity='.07' stroke-width='1.3'%3E%3Cpath d='M0 10 C40 -4 80 24 120 10 S200 -4 240 10'/%3E%3Cpath d='M0 30 C40 16 80 44 120 30 S200 16 240 30'/%3E%3Cpath d='M0 50 C40 36 80 64 120 50 S200 36 240 50'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+body { background: var(--paper) var(--grain); }
+.ss-site { background: transparent; }
+.kicker { color: var(--moss); }
+
+/* ---------- Buttons ---------- */
+.ss-btn { border-radius: 999px; transition: background-color var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-out), box-shadow var(--t-fast) var(--ease-out); }
+.ss-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(20,30,20,.18); }
+.ss-btn:active { transform: translateY(1px) scale(.98); box-shadow: none; transition-duration: 80ms; }
+.ss-btn-peach { color: var(--ink); background: var(--peach); border-color: var(--peach); }
+.ss-btn-peach:hover { background: var(--peach-hover); border-color: var(--peach-hover); }
+
+/* ---------- Header (sits on the dark hero) ---------- */
+.ss-header { border-bottom-color: rgba(246,239,225,.08); background: rgba(28,58,42,.97); transition: box-shadow 220ms var(--ease-out), background-color 220ms var(--ease-out); }
+.ss-header.is-scrolled { background: rgba(19,42,30,.98); box-shadow: 0 10px 28px rgba(10,20,14,.28); }
+.ss-header .ss-brand, .ss-header .ss-brand b { color: var(--cream); }
+.ss-header .ss-brand small { color: var(--cream-soft); }
+.ss-header .ss-brand img { box-shadow: 0 0 0 2px rgba(246,239,225,.25); }
+.ss-nav-link { color: var(--cream-soft); }
+.ss-nav-link:hover { color: var(--cream); background: rgba(246,239,225,.08); }
+.ss-header .ss-btn-primary { color: var(--ink); background: var(--peach); border-color: var(--peach); }
+.ss-header .ss-btn-primary:hover { background: var(--peach-hover); border-color: var(--peach-hover); }
+.ss-header .ss-btn-quiet { color: var(--cream); border-color: rgba(246,239,225,.35); }
+.ss-menu { color: var(--cream); background: transparent; border-color: rgba(246,239,225,.3); }
+
+/* ---------- Hero ---------- */
+.ss-hero {
+  position: relative;
+  isolation: isolate;
+  padding: 64px 0 0;
+  color: var(--cream);
+  background-color: var(--forest);
+  background-image:
+    var(--grain-light),
+    radial-gradient(70% 90% at 92% 8%, rgba(111,150,100,.42), transparent 62%),
+    radial-gradient(60% 80% at -5% 105%, rgba(138,76,48,.5), transparent 60%),
+    linear-gradient(160deg, #234634 0%, #1c3a2a 55%, #162f22 100%);
+}
+.ss-hero .ss-overline { color: var(--peach); }
+.ss-hero h1 { color: var(--cream); }
+.ss-lead { color: #d3ddcf; }
+.ss-search label { color: var(--cream); }
+.ss-search input { border-color: transparent; background: var(--surface); box-shadow: 0 8px 22px rgba(0,0,0,.18); }
+.ss-search input:focus { border-color: var(--peach); outline: 3px solid rgba(241,195,154,.45); }
+.ss-search .ss-btn-primary { color: var(--ink); background: var(--peach); border-color: var(--peach); }
+.ss-search .ss-btn-primary:hover { background: var(--peach-hover); border-color: var(--peach-hover); }
+.ss-field-error { display: inline-block; padding: 6px 10px; border-radius: 8px; color: #fff; background: rgba(180,35,24,.85); }
+.ss-quick span { color: var(--cream-soft); }
+.ss-quick button { border-color: rgba(246,239,225,.32); border-radius: 999px; color: var(--cream); background: rgba(246,239,225,.06); transition: background-color var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-out); }
+.ss-quick button:hover { border-color: var(--peach); color: var(--cream); background: rgba(241,195,154,.16); transform: translateY(-1px); }
+.ss-hero-figure img { border: 6px solid rgba(246,239,225,.1); border-radius: var(--radius-lg); box-shadow: 0 30px 70px rgba(5,15,9,.45); }
+.ss-hero-figure figcaption { color: var(--cream-soft); }
+
+
+/* Facts panel floats over the edge between the hero and the next section. */
+.ss-facts { position: relative; z-index: 2; margin: 56px 0 -60px; padding: 24px 32px; border: 1px solid var(--line); border-radius: 20px; color: var(--ink); background: var(--surface) var(--grain); box-shadow: var(--shadow-lift); }
+.ss-facts dt { color: var(--muted); }
+.ss-facts dd { color: var(--forest); }
+
+/* ---------- "Three ways" on a moss band with ripples ---------- */
+#explore { padding-top: 140px; border-top: 0; color: var(--cream); background-color: var(--moss); background-image: var(--grain-light), var(--ripples); }
+#explore .ss-section-head h2 { color: var(--cream); }
+#explore .ss-section-head p { color: #dbe5d6; }
+.ss-ways { padding: 8px; border: 1px solid rgba(246,239,225,.08); border-top: 1px solid rgba(246,239,225,.08); border-radius: var(--radius-lg); background: var(--forest) var(--grain-light); box-shadow: 0 30px 60px rgba(8,20,12,.35); }
+.ss-way, .ss-way:first-child, .ss-way:last-child { padding: 28px; border-right: 1px solid rgba(246,239,225,.12); }
+.ss-way:last-child { border-right: 0; }
+.ss-way h3 { color: var(--cream); }
+.ss-way > p { color: #cfdacb; }
+.ss-way-icon { display: grid; place-items: center; width: 60px; height: 60px; margin-bottom: 18px; border: 1.5px solid rgba(246,239,225,.45); border-radius: 50%; color: var(--peach); background: rgba(246,239,225,.05); transition: transform 300ms var(--ease-out), background-color 300ms var(--ease-out); }
+.ss-way:hover .ss-way-icon { transform: rotate(-8deg) scale(1.05); background: rgba(241,195,154,.12); }
+.ss-tag { color: var(--ink); background: var(--peach); }
+.ss-way .floor-selector { border: 0; border-radius: var(--radius); background: var(--cream) var(--grain); }
+.ss-way .floor-head span { color: var(--muted); }
+.ss-way .floor-head b { color: var(--forest); }
+.ss-way .floor-buttons button { border-color: var(--line-strong); border-radius: 10px; background: var(--surface); transition: background-color var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out); }
+.ss-way .floor-buttons button.active { border-color: var(--forest); color: var(--cream); background: var(--forest); }
+.ss-miniplan { border-color: var(--line); background: var(--surface); }
+.ss-miniplan:hover { border-color: var(--clay); }
+.ss-miniplan svg { animation: plan-swap 280ms var(--ease-out); }
+@keyframes plan-swap { from { opacity: .15; transform: scale(.985); } }
+.dollhouse-actions button { border-color: var(--peach); border-radius: 999px; color: var(--ink); background: var(--peach); transition: background-color var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-out); }
+.dollhouse-actions button:hover { background: var(--peach-hover); transform: translateY(-1px); }
+.dollhouse-actions button:active { transform: translateY(1px) scale(.98); }
+.ss-way .ar-preview { border: 1px solid rgba(246,239,225,.1); border-radius: var(--radius); }
+.ss-way .ar-arrow { color: var(--ink); background: var(--peach); }
+.ss-prompts { border-top-color: rgba(246,239,225,.14); }
+.ss-prompts li { border-bottom-color: rgba(246,239,225,.14); }
+.ss-prompts button { color: var(--cream); }
+.ss-prompts button svg { color: var(--peach); }
+.ss-prompts button:hover { color: var(--peach); }
+
+/* ---------- Campus updates: three earthy cards ---------- */
+.campus-updates { border-top: 0; background: transparent; }
+.campus-updates .updates-grid { gap: 20px; border-top: 0; }
+.campus-updates .updates-card, .campus-updates .updates-card:first-child, .campus-updates .updates-card:last-child { gap: 14px; padding: 28px; border: 0; border-radius: 20px; box-shadow: var(--shadow-card); transition: transform 260ms var(--ease-out), box-shadow 260ms var(--ease-out); }
+.campus-updates .updates-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lift); }
+.updates-card-title { display: grid; justify-items: start; gap: 14px; font-size: 21px; }
+.updates-icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; }
+.updates-card-title svg, .updates-card:first-child .updates-card-title svg { color: inherit; }
+.campus-updates .updates-card.tone-clay { color: var(--cream); background: var(--clay) var(--grain-light); }
+.tone-clay .updates-icon { color: var(--cream); background: rgba(246,239,225,.14); box-shadow: inset 0 0 0 1.5px rgba(246,239,225,.4); }
+.tone-clay .updates-empty { color: #f3e2d4; }
+.tone-clay .closure-item { border-left-color: var(--peach); background: rgba(246,239,225,.94); }
+.campus-updates .updates-card.tone-sage { color: var(--ink); background: var(--sage) var(--grain); }
+.tone-sage .updates-icon { color: var(--cream); background: var(--forest); }
+.tone-sage .updates-empty, .tone-sage .notice-item p { color: #26352a; }
+.tone-sage .notice-item, .tone-sage .notice-item small { border-top-color: rgba(27,42,33,.18); color: #2c3b30; }
+.campus-updates .updates-card.tone-sand { color: var(--ink); background: var(--sand) var(--grain); }
+.tone-sand .updates-icon { color: var(--cream); background: var(--clay); }
+.tone-sand .updates-empty, .tone-sand .directory-more { color: #4c4537; }
+.tone-sand .directory-item { border-top-color: rgba(27,42,33,.14); }
+.campus-updates .directory-search { border-color: transparent; border-radius: 999px; padding: 0 18px; background: var(--surface); box-shadow: inset 0 1px 2px rgba(40,30,15,.12); }
+
+/* ---------- Emergency + footer ---------- */
+.ss-emergency { background-color: var(--forest-deep); background-image: var(--grain-light), var(--ripples); }
+.ss-emergency .ss-btn-danger { border-radius: 999px; }
+.ss-footer { border-top: 0; background: var(--sand) var(--grain); }
+.ss-footer-bottom { border-top-color: rgba(27,42,33,.16); }
+.ss-social a:hover { color: var(--clay); }
+
+/* ---------- Shared surfaces pick up the earthy palette ---------- */
+.siibot-launcher { border-color: var(--forest); background: var(--forest); }
+.siibot-launcher:hover, .siibot-launcher.active { background: var(--forest-deep); }
+.siibot-panel, .siibot-answer-card { border-radius: 20px; background: var(--surface) var(--grain); }
+.siibot-message.from-bot { background: #efe6d3; }
+.siibot-message.from-user { background: var(--forest); }
+.login-modal { border-radius: 22px; background: var(--surface) var(--grain); }
+.visitor-button, .email-login-form .visitor-button, .google-button { border-radius: 999px; }
+.student-portal-header, .map-header { background: var(--surface); }
+.student-card, .checkin-card { border-radius: 18px; background: var(--surface); }
+.admin-dashboard { border-radius: 22px; }
+
+/* ---------- Motion ---------- */
+/* Scroll reveal: content rises into place once, the first time it scrolls into view. */
+[data-reveal] { opacity: 0; transform: translateY(24px); transition: opacity var(--t-reveal) var(--ease-out) var(--delay, 0ms), transform var(--t-reveal) var(--ease-out) var(--delay, 0ms); }
+[data-reveal].is-visible { opacity: 1; transform: none; }
+/* Grids reveal their items one after another (80ms apart) instead of all at once. */
+.ss-ways[data-reveal], .updates-grid[data-reveal] { opacity: 1; transform: none; }
+.ss-ways[data-reveal] > *, .updates-grid[data-reveal] > * { opacity: 0; transform: translateY(24px); transition: opacity var(--t-reveal) var(--ease-out), transform var(--t-reveal) var(--ease-out), box-shadow 260ms var(--ease-out); }
+.ss-ways.is-visible > *, .updates-grid.is-visible > * { opacity: 1; transform: none; }
+.ss-ways.is-visible > :nth-child(2), .updates-grid.is-visible > :nth-child(2) { transition-delay: 80ms, 80ms, 0ms; }
+.ss-ways.is-visible > :nth-child(3), .updates-grid.is-visible > :nth-child(3) { transition-delay: 160ms, 160ms, 0ms; }
+.updates-grid.is-visible > .updates-card:hover { transform: translateY(-4px); transition-delay: 0ms; }
+
+/* Mobile menu slides down from the header it belongs to. */
+.ss-nav.open { animation: menu-in 220ms var(--ease-out); }
+@keyframes menu-in { from { opacity: 0; transform: translateY(-8px); } }
+
+/* Search: a short shake tells you the entry wasn't found, next to the field itself. */
+.ss-search.has-error .ss-search-row { animation: nudge 320ms var(--ease-out); }
+@keyframes nudge { 20% { transform: translateX(-6px); } 45% { transform: translateX(5px); } 70% { transform: translateX(-3px); } }
+
+/* Dialogs grow from the centre; the floor plan sheet slides up. */
+.login-modal { animation: dialog-in 240ms var(--ease-out) both; }
+@keyframes dialog-in { from { opacity: 0; transform: translateY(10px) scale(.97); } }
+.map-shell { animation: sheet-in 300ms var(--ease-out) both; }
+@keyframes sheet-in { from { opacity: 0; transform: translateY(24px); } }
+
+/* Floor plan: crossfade when you change floors, and the route draws itself in walking order. */
+.plan-layer { animation: plan-swap 260ms var(--ease-out); }
+.plan-route .casing, .plan-route .line { stroke-dasharray: 1; stroke-dashoffset: 1; animation: route-draw 900ms var(--ease-out) 120ms forwards; }
+.plan-route .chevron { opacity: 0; animation: fade-in 300ms var(--ease-out) 900ms forwards; }
+@keyframes route-draw { to { stroke-dashoffset: 0; } }
+@keyframes fade-in { to { opacity: 1; } }
+.map-steps li { animation: step-in 360ms var(--ease-out) both; animation-delay: calc(var(--i, 0) * 45ms); }
+@keyframes step-in { from { opacity: 0; transform: translateX(-8px); } }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1024px) {
+  .ss-ways { padding: 0 8px; }
+  .ss-way, .ss-way:first-child, .ss-way:last-child { padding: 28px 20px; border-right: 0; border-bottom: 1px solid rgba(246,239,225,.12); }
+  .ss-way:last-child { border-bottom: 0; }
+  .campus-updates .updates-card, .campus-updates .updates-card:first-child, .campus-updates .updates-card:last-child { padding: 24px; border-bottom: 0; }
+}
+@media (max-width: 900px) {
+  .ss-nav { border-bottom-color: rgba(246,239,225,.1); background: var(--forest-deep); }
+  .ss-hero { padding-top: 32px; }
+  .ss-facts { margin: 32px 0 -48px; padding: 20px; }
+  #explore { padding-top: 112px; }
+}
+@media (max-width: 600px) {
+  .ss-facts { gap: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal], .ss-ways[data-reveal] > *, .updates-grid[data-reveal] > * { opacity: 1 !important; transform: none !important; }
+  .plan-route .casing, .plan-route .line { stroke-dasharray: none; stroke-dashoffset: 0; }
+  .plan-route .chevron { opacity: 1; }
+}
+
+/* ---------- How to get here (map + directions) ---------- */
+.ss-visit { border-top: 1px solid var(--line); background: var(--surface) var(--grain); }
+.ss-visit-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 24px; align-items: stretch; }
+.ss-map-frame { overflow: hidden; min-height: 420px; border: 1px solid var(--line); border-radius: 22px; background: var(--sand); box-shadow: var(--shadow-card); }
+.ss-map-frame iframe { display: block; width: 100%; height: 100%; min-height: 420px; border: 0; }
+.ss-visit-card { display: flex; flex-direction: column; gap: 18px; padding: 30px; border-radius: 22px; color: var(--cream); background: var(--forest) var(--grain-light); box-shadow: var(--shadow-card); }
+.ss-visit-card h3 { margin: 0; font-family: var(--display); font-size: 22px; font-weight: 800; font-stretch: 115%; line-height: 1.1; text-transform: uppercase; }
+.ss-visit-card address { color: #dbe4d6; font-size: 17px; font-style: normal; line-height: 1.6; }
+.ss-visit-card dl { display: grid; gap: 14px; margin: 0; padding-top: 18px; border-top: 1px solid rgba(246,239,225,.16); }
+.ss-visit-card dt { color: var(--peach); font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.ss-visit-card dd { margin: 4px 0 0; color: #dbe4d6; font-size: 15px; line-height: 1.5; }
+.ss-visit-actions { display: grid; gap: 10px; margin-top: auto; }
+.ss-visit-card .ss-btn-primary { color: var(--ink); background: var(--peach); border-color: var(--peach); }
+.ss-visit-card .ss-btn-primary:hover { background: var(--peach-hover); border-color: var(--peach-hover); }
+.ss-visit-card .ss-btn-quiet { color: var(--cream); border-color: rgba(246,239,225,.4); }
+.ss-visit-card .ss-btn-quiet:hover { border-color: var(--cream); background: rgba(246,239,225,.08); }
+.ss-visit-note { margin: 0; color: #b9c7b5; font-size: 13px; }
+
+/* ---------- Social links in brand colors ---------- */
+.ss-social a { gap: 12px; font-weight: 600; }
+.ss-social-icon { display: grid; flex: none; place-items: center; width: 34px; height: 34px; transition: transform var(--t-fast) var(--ease-out); }
+.ss-social-icon svg { width: 18px; height: 18px; fill: #fff; }
+.ss-social-fb .ss-social-icon { border-radius: 50%; background: #1877f2; }
+.ss-social-yt .ss-social-icon { width: 38px; height: 27px; border-radius: 8px; background: #ff0000; }
+.ss-social-yt .ss-social-icon svg { width: 20px; height: 20px; }
+.ss-social a:hover .ss-social-icon { transform: scale(1.08); }
+.ss-social-fb:hover { color: #1877f2; }
+.ss-social-yt:hover { color: #cc0000; }
+
+@media (max-width: 900px) {
+  .ss-visit-grid { grid-template-columns: minmax(0, 1fr); }
+  .ss-map-frame, .ss-map-frame iframe { min-height: 320px; }
+  .ss-visit-card { padding: 24px; }
+}
+
+/* Anchored sections stop below the sticky header instead of under it. */
+main section[id], #features { scroll-margin-top: 88px; }
+
+/* Email updates opt-in on the sign-up form. */
+.email-updates-check { display: flex; align-items: flex-start; gap: 10px; margin: 14px 0 4px; color: var(--ink-2); font-size: 14px; line-height: 1.45; text-align: left; cursor: pointer; }
+.email-updates-check input { flex: none; width: 20px; height: 20px; margin-top: 1px; accent-color: var(--green); }
+.cms-email-check { padding: 10px 12px; border-radius: 10px; background: var(--green-tint); }
+
+/* Admin headers on phones: action buttons wrap under the title, close stays top-right. */
+@media (max-width: 600px) {
+  .admin-dashboard-header { position: relative; flex-direction: column; align-items: stretch; gap: 14px; }
+  .admin-dashboard-header > div:first-child { padding-right: 52px; }
+  .admin-dashboard .admin-header-actions { position: static; display: flex; flex-wrap: wrap; gap: 8px; }
+  .admin-dashboard .admin-header-actions .admin-close { position: absolute; top: 0; right: 0; }
+}

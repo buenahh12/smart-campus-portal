@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { doc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
 import { 
   getAuth, 
   GoogleAuthProvider, 
@@ -21,7 +21,7 @@ const firebaseConfig = {
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 const hasFirebaseConfig = Object.values(firebaseConfig).every(Boolean);
@@ -43,29 +43,58 @@ export const loginWithGoogle = () => {
   });
 };
 export const finishGoogleRedirect = () => hasFirebaseConfig ? getRedirectResult(auth) : Promise.resolve(null);
+export const loginWithEmail = ({ email, password }) => {
+  if (!auth) {
+    return Promise.reject(new Error('Firebase is not configured. Add the VITE_FIREBASE_* values to your .env file.'));
+  }
+  return signInWithEmailAndPassword(auth, email.trim(), password);
+};
 export const requestPasswordReset = (email) => {
   if (!auth) {
     return Promise.reject(new Error('Firebase is not configured. Add the VITE_FIREBASE_* values to your .env file.'));
   }
   return sendPasswordResetEmail(auth, email.trim());
 };
+// There is exactly one administrator: the configured admin account (admin1).
+// firestore.rules enforces the same single account on the server.
+const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL || '').toLowerCase();
+export const isAdminToken = (token) => Boolean(ADMIN_EMAIL) && String(token.claims.email || '').toLowerCase() === ADMIN_EMAIL;
+
 export const loginAsAdmin = async ({ email, password }) => {
   if (!auth) throw new Error('Firebase is not configured. Add the VITE_FIREBASE_* values to your .env file.');
   const credential = await signInWithEmailAndPassword(auth, email, password);
   const token = await getIdTokenResult(credential.user, true);
-  if (token.claims.admin !== true) {
+  if (!isAdminToken(token)) {
     await signOut(auth);
     throw new Error('This Firebase account is not authorized for staff administration.');
   }
   return credential.user;
 };
-export const createCampusAccount = async ({ email, password, name, year, section, contact }) => {
+export const createCampusAccount = async ({ email, password, name, role, emailUpdates = false }) => {
   if (!hasFirebaseConfig) {
     throw new Error('Firebase is not configured. Add the VITE_FIREBASE_* values to your .env file.');
   }
   const credential = await createUserWithEmailAndPassword(auth, email, password);
   await updateProfile(credential.user, { displayName: name });
-  localStorage.setItem(`campus-profile:${credential.user.uid}`, JSON.stringify({ name, year, section, contact }));
+  try {
+    await setDoc(doc(db, 'users', credential.user.uid), {
+      name,
+      role,
+      savedPlaces: [],
+      prefs: { speakAnswers: false, allClosureAlerts: true },
+      updatedAt: serverTimestamp(),
+    });
+  } catch (profileError) {
+    // The account itself was created; My Campus creates the profile on the first save.
+    console.warn('Campus profile could not be saved yet:', profileError);
+  }
+  if (emailUpdates) {
+    try {
+      await setDoc(doc(db, 'subscribers', credential.user.uid), { email: credential.user.email, name, updatedAt: serverTimestamp() });
+    } catch (subscribeError) {
+      console.warn('Email updates could not be turned on yet:', subscribeError);
+    }
+  }
   return credential.user;
 };
 export const loginAsVisitor = () => signInAnonymously(auth);
