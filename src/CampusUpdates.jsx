@@ -50,8 +50,11 @@ export default function CampusUpdates({ onShowMap }) {
   const activeClosures = closures.items.filter((item) => isClosureActive(item));
   const notices = visibleAnnouncements(announcements.items).slice(0, 5);
   const term = search.trim().toLowerCase();
+  // Comfort rooms all share one name, so they only appear when someone searches for them.
+  const wantsCr = /\b(c\.?r\.?|comfort|restroom|toilet|banyo|cr)\b/.test(term);
   const directory = buildDirectory(rooms.items, offices.items)
-    .filter((item) => !term || [item.name, item.building, item.kind, item.room, item.description, item.notes].some((value) => String(value || "").toLowerCase().includes(term)))
+    .filter((item) => item.kind !== "Comfort room" || wantsCr)
+    .filter((item) => !term || (wantsCr && item.kind === "Comfort room") || [item.name, item.building, item.kind, item.room, item.description, item.notes].some((value) => String(value || "").toLowerCase().includes(term)))
     .sort((first, second) => first.name.localeCompare(second.name, undefined, { numeric: true }));
   const unavailable = closures.error || announcements.error;
 
@@ -84,17 +87,15 @@ export default function CampusUpdates({ onShowMap }) {
         <article className="updates-card tone-sand">
           <h3 className="updates-card-title"><span className="updates-icon" aria-hidden="true"><Icon name="location" size={22} /></span> Rooms &amp; offices</h3>
           <input className="directory-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search a room or office…" aria-label="Search rooms and offices" />
-          <div className="directory-list">
-            {directory.length ? directory.slice(0, 8).map((item) => <div className="directory-item" key={`${item.kind}-${item.id}`}>
+          <small className="directory-more" aria-live="polite">{directory.length} {directory.length === 1 ? "place" : "places"}{term ? ` matching “${search.trim()}”` : " · scroll or search"}</small>
+          <div className="directory-list" tabIndex={0} aria-label="Rooms and offices">
+            {directory.length ? directory.map((item) => <div className="directory-item" key={`${item.kind}-${item.id}`}>
               <div><b>{item.name}</b><small>{item.kind} · {item.floorText}{item.room ? ` · ${item.room}` : ""}</small>{item.hours && <small>{item.hours}</small>}{item.notes && <small>{item.notes}</small>}</div>
               <div className="directory-actions">
                 {item.status && <span className={`cms-badge ${item.status === "Available" ? "good" : item.status === "In use" ? "warn" : "bad"}`}>{item.status}</span>}
                 {item.mapKey && onShowMap && <button type="button" className="directory-map" onClick={() => onShowMap(item.mapKey)} aria-label={`Show ${item.name} on the floor plan`}><Icon name="route" size={14} /> Map</button>}
               </div>
-            </div>) : <p className="updates-empty">{term ? "No matching rooms or offices." : "No rooms are listed yet."}</p>}
-            {directory.length > 8 && <p className="directory-more">Showing 8 of {directory.length}. Type to narrow the list.</p>}
-            {directory.length > 8 && <small className="directory-more">Showing 8 of {directory.length}. Search to narrow the list.</small>}
-          </div>
+            </div>) : <p className="updates-empty">{term ? "No matching rooms or offices." : "No rooms are listed yet."}</p>}          </div>
         </article>
       </div>
       </div>

@@ -1,4 +1,4 @@
-/* Earthy, textured theme + motion, layered on top of site.css.
+﻿/* Earthy, textured theme + motion, layered on top of site.css.
    Direction (ui-ux-pro-max "Organic Biophilic" / "Nature Distilled"): forest green, clay and
    sand, subtle grain and ripple textures, 16-24px organic radii, natural ease-out motion.
    Remove the import in main.jsx to go back to the plain site.css look. */
@@ -296,3 +296,9 @@ main section[id], #features { scroll-margin-top: 88px; }
 .inapp-notice p { margin: 0; font-size: 14px; line-height: 1.5; }
 .inapp-notice a.google-button { display: flex; align-items: center; justify-content: center; text-decoration: none; }
 .inapp-notice .create-account-link { justify-self: center; }
+
+/* Room directory scrolls inside the card so the three cards stay the same height */
+.campus-updates .tone-sand .directory-list { max-height: 228px; overflow-y: auto; overscroll-behavior: contain; margin-right: -8px; padding-right: 8px; scrollbar-width: thin; scrollbar-color: rgba(27,42,33,.3) transparent; }
+.campus-updates .tone-sand .directory-list:focus-visible { outline: 2px solid var(--clay, #8a4c30); outline-offset: 4px; border-radius: 8px; }
+.campus-updates .tone-sand > .directory-more { display: block; margin: 0; }
+@media (max-width: 600px) { .campus-updates .tone-sand .directory-list { max-height: 360px; } }
