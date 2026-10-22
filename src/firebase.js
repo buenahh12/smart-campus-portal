@@ -34,14 +34,26 @@ export const googleProvider = new GoogleAuthProvider();
 // so people on shared or school computers can pick (or add) the right Gmail.
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
+// Browsers built into apps (Messenger, Facebook, Instagram, TikTok, LINE, WeChat, Android
+// WebViews). Google blocks sign-in inside them and they wipe the storage Firebase needs,
+// so the sign-in screen asks people to open the page in Chrome or Safari instead.
+export const inAppBrowserName = (agent = navigator.userAgent) => {
+  if (/FBAN|FBAV|FB_IAB|FBIOS|Messenger|MESSENGER/.test(agent)) return /Messenger|MESSENGER|Orca/.test(agent) ? 'Messenger' : 'Facebook';
+  if (/Instagram/.test(agent)) return 'Instagram';
+  if (/musical_ly|TikTok|BytedanceWebview/i.test(agent)) return 'TikTok';
+  if (/\bLine\//.test(agent)) return 'LINE';
+  if (/MicroMessenger/.test(agent)) return 'WeChat';
+  if (/Android.*; wv\)/.test(agent)) return 'this app';
+  return '';
+};
+
 export const loginWithGoogle = () => {
   if (!hasFirebaseConfig) {
     return Promise.reject(new Error('Firebase is not configured. Add the VITE_FIREBASE_* values to your .env file.'));
   }
   return signInWithPopup(auth, googleProvider).catch((error) => {
-    if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
-      return signInWithRedirect(auth, googleProvider);
-    }
+    // Only fall back to a full-page redirect when the browser blocked the popup outright.
+    if (error.code === 'auth/popup-blocked') return signInWithRedirect(auth, googleProvider);
     throw error;
   });
 };

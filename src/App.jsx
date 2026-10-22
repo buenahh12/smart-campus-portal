@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   createCampusAccount,
   finishGoogleRedirect,
+  inAppBrowserName,
   loginAsAdmin,
   loginWithEmail,
   loginWithGoogle,
@@ -42,6 +43,31 @@ function MiniPlan({ floor, onOpen }) {
       <rect x="0" y="0" width="160" height="100" className="mp-outline" />
     </svg>
   </button>;
+}
+
+// Shown instead of the Google button inside Messenger/Facebook and other in-app browsers.
+function OpenInBrowser({ app }) {
+  const [copied, setCopied] = useState(false);
+  const url = window.location.href.split("#")[0];
+  const android = /Android/i.test(navigator.userAgent);
+  // Android: an intent link hands the page to Chrome. iOS has no equivalent, so give steps.
+  const chromeIntent = `intent://${url.replace(/^https?:\/\//, "")}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(url)};end`;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+    } catch {
+      window.prompt("Copy this link and open it in your browser:", url);
+    }
+  };
+  return <div className="inapp-notice" role="note">
+    <b>Google sign-in doesn&apos;t work inside {app}</b>
+    <p>{app} opens links in its own browser, and Google blocks sign-in there. Open this page in {android ? "Chrome" : "Safari"} to sign in with Google, or use your email and password below.</p>
+    {android
+      ? <a className="google-button" href={chromeIntent}>Open in Chrome</a>
+      : <p className="inapp-steps">Tap <b>•••</b> at the top right, then <b>Open in browser</b> (or <b>Open in Safari</b>).</p>}
+    <button type="button" className="create-account-link" onClick={copy}>{copied ? "Link copied. Paste it in your browser." : "Copy the link instead"}</button>
+  </div>;
 }
 
 // Fades sections in as they scroll into view; everything shows at once when reduced motion is on.
@@ -180,9 +206,11 @@ function LoginModal({ onClose, onCreate, onAdmin, onSignedIn = () => {} }) {
         ) : (
           <>
             <p className="modal-copy">Sign in to access personalized routes, saved locations, and campus services.</p>
-            <button className="google-button" onClick={handleGoogleSignIn} disabled={signingIn}>
-              {signingIn ? "Opening Google sign-in..." : "Sign in with Google Account"}
-            </button>
+            {inAppBrowserName()
+              ? <OpenInBrowser app={inAppBrowserName()} />
+              : <button className="google-button" onClick={handleGoogleSignIn} disabled={signingIn}>
+                {signingIn ? "Opening Google sign-in..." : "Sign in with Google Account"}
+              </button>}
             <div className="divider"><span>OR USE EMAIL</span></div>
             <form className="email-login-form" onSubmit={handleEmailSignIn}>
               <label>Email address<input type="email" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} autoComplete="username" placeholder="you@example.com" required /></label>
