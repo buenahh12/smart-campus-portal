@@ -30,8 +30,10 @@ function PicturePreview({ values, setValue }) {
       setStatus({ busy: false, message: "" });
     } catch (error) {
       setStatus({ busy: false, message: error.message === "limit"
-        ? "The free AI service makes one picture every 45 seconds. Wait a moment and try again. The illustration is used until then."
-        : "The AI picture couldn't be made right now. The illustration will be used instead." });
+        ? "The free AI service is busy. Try again in a minute, or keep the illustration. (Adding a free Pollinations key in Vercel fixes this.)"
+        : error.message === "credits"
+          ? "Today's free AI pictures are used up. The illustration will be used until they refill."
+          : "The AI picture couldn't be made right now. The illustration will be used instead." });
     }
   };
   const nextSeed = (Number(values.pictureSeed) || 0) + 1;
