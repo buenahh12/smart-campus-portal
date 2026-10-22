@@ -342,7 +342,7 @@ export async function generateAiPicture(title, body, seed, idToken) {
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
     body: JSON.stringify({ prompt, seed: pictureSeed(title, seed) % 100000 }),
   });
-  if (response.status === 429) throw new Error((await response.json().catch(() => ({}))).error || "limit");
+  if (response.status === 429 || response.status === 503) throw new Error((await response.json().catch(() => ({}))).error || "limit");
   if (!response.ok || !(response.headers.get("content-type") || "").startsWith("image/")) throw new Error("failed");
   const bitmap = await createImageBitmap(await response.blob());
   const canvas = document.createElement("canvas");

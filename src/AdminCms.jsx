@@ -29,8 +29,8 @@ function PicturePreview({ values, setValue }) {
       setValue("pictureData", data);
       setStatus({ busy: false, message: "" });
     } catch (error) {
-      setStatus({ busy: false, message: error.message === "limit"
-        ? "The free AI service is busy. Try again in a minute, or keep the illustration. (Adding a free Pollinations key in Vercel fixes this.)"
+      setStatus({ busy: false, message: error.message === "nokey"
+        ? "AI pictures aren't switched on yet (they need a Pollinations key in Vercel). The illustration will be used."
         : error.message === "credits"
           ? "Today's free AI pictures are used up. The illustration will be used until they refill."
           : "The AI picture couldn't be made right now. The illustration will be used instead." });

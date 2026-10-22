@@ -49,14 +49,13 @@ export default async function handler(req, res) {
   const seed = Math.abs(Number.parseInt(body.seed, 10) || 0) % 1000000;
   if (!prompt.trim()) return res.status(400).json({ error: "Missing prompt." });
 
-  // With a free Pollinations account key (POLLINATIONS_KEY in Vercel, a secret "sk_" key that
-  // never reaches the browser) pictures use the better FLUX model without the anonymous limit.
-  // Without a key the anonymous service is tried, which is usually busy from shared servers.
+  // Needs a free Pollinations account key (POLLINATIONS_KEY in Vercel, a secret "sk_" key that
+  // never reaches the browser). With it, nologo=true is honoured and pictures have no
+  // watermark. The no-account service always stamps a watermark, so it is never used.
   const key = process.env.POLLINATIONS_KEY;
-  const upstream = key
-    ? await fetch(`https://gen.pollinations.ai/image/${encodeURIComponent(prompt)}?model=${encodeURIComponent("black-forest-labs/flux.1-schnell")}&width=768&height=432&seed=${seed}&nologo=true`, { headers: { Authorization: `Bearer ${key}` } })
-    : await fetch(`https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=768&height=432&seed=${seed}&nologo=true`, { signal: AbortSignal.timeout(45000) }).catch(() => ({ status: 429, ok: false, headers: new Headers() }));
-  if (upstream.status === 402 || upstream.status === 429) return res.status(429).json({ error: key ? "credits" : "limit" });
+  if (!key) return res.status(503).json({ error: "nokey" });
+  const upstream = await fetch(`https://gen.pollinations.ai/image/${encodeURIComponent(prompt)}?model=${encodeURIComponent("black-forest-labs/flux.1-schnell")}&width=768&height=432&seed=${seed}&nologo=true`, { headers: { Authorization: `Bearer ${key}` } });
+  if (upstream.status === 402 || upstream.status === 429) return res.status(429).json({ error: "credits" });
   const type = upstream.headers.get("content-type") || "";
   if (!upstream.ok || !type.startsWith("image/")) return res.status(502).json({ error: "The AI service did not return a picture." });
 
