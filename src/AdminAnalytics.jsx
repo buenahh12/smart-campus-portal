@@ -70,7 +70,7 @@ function rangeFor(view, day, month, year) {
   return [`${year}-01-01`, `${year}-12-31`];
 }
 
-export default function AdminAnalytics({ onClose, onOpenContent }) {
+export default function AdminAnalytics({ onClose, onOpenContent, onOpenSignIns }) {
   const today = todayKey();
   const [view, setView] = useState("month");
   const [day, setDay] = useState(today);
@@ -129,6 +129,7 @@ export default function AdminAnalytics({ onClose, onOpenContent }) {
           <div><p className="kicker">SSCAI ADMINISTRATION</p><h2 id="va-title">Site visits</h2><p>How many people used the campus portal, and who they were.</p></div>
           <div className="admin-header-actions">
             {onOpenContent && <button onClick={onOpenContent}>Content manager</button>}
+            {onOpenSignIns && <button onClick={onOpenSignIns}>Sign-ins</button>}
             <button onClick={exportCsv}>Export CSV</button>
             <button className="admin-close" onClick={onClose} aria-label="Close site visits"><Icon name="close" /></button>
           </div>

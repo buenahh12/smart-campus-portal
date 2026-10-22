@@ -283,3 +283,9 @@ main section[id], #features { scroll-margin-top: 88px; }
   .admin-dashboard .admin-header-actions { position: static; display: flex; flex-wrap: wrap; gap: 8px; }
   .admin-dashboard .admin-header-actions .admin-close { position: absolute; top: 0; right: 0; }
 }
+
+/* Room directory: status badge and a button that opens the room on the floor plan */
+.campus-updates .directory-item > .directory-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; }
+.directory-map { display: inline-flex; align-items: center; gap: 5px; min-height: 36px; padding: 0 12px; border: 1px solid rgba(27,42,33,.25); border-radius: 999px; color: var(--forest, #1c3a2a); background: rgba(255,252,245,.7); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: background-color 150ms ease, color 150ms ease; }
+.directory-map:hover, .directory-map:focus-visible { color: #fff; background: var(--forest, #1c3a2a); }
+.directory-more { margin: 4px 0 0; color: var(--muted); font-size: 13px; }

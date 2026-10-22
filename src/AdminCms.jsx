@@ -3,6 +3,9 @@ import Icon from "./Icon";
 import { CMS_COLLECTIONS, deleteItem, isClosureActive, saveItem, todayKey, watchCollection } from "./cms";
 import { MAP_AREAS, mapAreaLabel } from "./floorPlans";
 import { emailConfigured, emailSubscribers } from "./notify";
+import AdminFloorPlan from "./AdminFloorPlan";
+
+const FLOOR_PLAN_TAB = "floorplan";
 
 // Each section describes one Firestore collection: its form fields and how a saved
 // item is summarised in the list. Field names must match firestore.rules.
@@ -132,7 +135,7 @@ const friendlyError = (error) => error?.code === "permission-denied"
   ? "Permission denied. Only accounts with the administrator role can change campus content."
   : error?.message || "Something went wrong. Please try again.";
 
-export default function AdminCms({ onClose, onOpenAnalytics }) {
+export default function AdminCms({ onClose, onOpenAnalytics, onOpenSignIns }) {
   const [activeKey, setActiveKey] = useState(SECTIONS[0].key);
   const [data, setData] = useState({});
   const [loadError, setLoadError] = useState("");
@@ -142,7 +145,7 @@ export default function AdminCms({ onClose, onOpenAnalytics }) {
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
   const [sendEmail, setSendEmail] = useState(true);
-  const section = SECTIONS.find((item) => item.key === activeKey);
+  const section = SECTIONS.find((item) => item.key === activeKey) || SECTIONS[0];
   const items = data[activeKey] || [];
 
   useEffect(() => {
@@ -170,7 +173,7 @@ export default function AdminCms({ onClose, onOpenAnalytics }) {
     const next = SECTIONS.find((item) => item.key === key);
     setActiveKey(key);
     setNotice("");
-    resetForm(next);
+    if (next) resetForm(next);
   };
 
   const startEdit = (item) => {
@@ -232,17 +235,19 @@ export default function AdminCms({ onClose, onOpenAnalytics }) {
     <div className="admin-shell" role="dialog" aria-modal="true" aria-labelledby="cms-title">
       <div className="admin-dashboard cms-dashboard">
         <header className="admin-dashboard-header">
-          <div><p className="kicker">SSCAI ADMINISTRATION</p><h2 id="cms-title">Content manager</h2><p>Update rooms, offices, announcements, and pathway restrictions. Changes go live on the portal right away.</p></div>
+          <div><p className="kicker">SSCAI ADMINISTRATION</p><h2 id="cms-title">Content manager</h2><p>Update announcements, pathway restrictions, rooms, offices, and the names on the floor plan. Changes go live on the portal right away.</p></div>
           <div className="admin-header-actions">
             {onOpenAnalytics && <button onClick={onOpenAnalytics}>Site visits</button>}
+            {onOpenSignIns && <button onClick={onOpenSignIns}>Sign-ins</button>}
             <button className="admin-close" onClick={onClose} aria-label="Close content manager"><Icon name="close" /></button>
           </div>
         </header>
         <div className="cms-tabs" role="tablist" aria-label="Content type">
           {SECTIONS.map((item) => <button key={item.key} type="button" role="tab" aria-selected={activeKey === item.key} className={activeKey === item.key ? "active" : ""} onClick={() => switchSection(item.key)}>{item.label}<span>{data[item.key]?.length ?? "–"}</span></button>)}
+          <button type="button" role="tab" aria-selected={activeKey === FLOOR_PLAN_TAB} className={activeKey === FLOOR_PLAN_TAB ? "active" : ""} onClick={() => switchSection(FLOOR_PLAN_TAB)}>Floor plan</button>
         </div>
         {loadError && <p className="auth-error" role="alert">{loadError}</p>}
-        <div className="cms-grid">
+        {activeKey === FLOOR_PLAN_TAB ? <AdminFloorPlan /> : <div className="cms-grid">
           <form className="cms-form" onSubmit={submit} noValidate>
             <div className="section-title-row"><div><p className="kicker">{editingId ? "EDITING" : "NEW ENTRY"}</p><h3>{editingId ? `Edit ${section.singular}` : `Add ${section.singular}`}</h3></div>{editingId && <button type="button" className="cms-link-button" onClick={() => resetForm()}>Cancel edit</button>}</div>
             {section.fields.map((field) => field.type === "checkbox"
@@ -271,7 +276,7 @@ export default function AdminCms({ onClose, onOpenAnalytics }) {
               </article>;
             }) : <p className="empty-attendance">No {section.label.toLowerCase()} yet. Add the first one with the form.</p>}
           </section>
-        </div>
+        </div>}
       </div>
     </div>
   );

@@ -96,6 +96,18 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // What each room on the 2D floor plan is called and used for. Document ids are
+    // "<floor>-<room id>" from src/floorPlans.js; the walls and doors themselves are fixed.
+    match /mapRooms/{id} {
+      allow read: if true;
+      allow create, update: if isAdmin() && stamped()
+        && id.matches('^[1-9]-[a-z0-9-]{1,40}$')
+        && data().keys().hasOnly(['name', 'code', 'type', 'notes', 'updatedAt', 'updatedBy'])
+        && text('name', true, 50) && text('code', false, 20) && text('notes', false, 300)
+        && data().type in ['classroom', 'office', 'lab', 'facility', 'cr'];
+      allow delete: if isAdmin();
+    }
+
     // Drafts stay hidden from everyone except administrators.
     match /announcements/{id} {
       allow read: if resource.data.published == true || isAdmin();
@@ -156,6 +168,23 @@ service cloud.firestore {
         && data().name is string && data().name.size() <= 80
         && data().updatedAt == request.time;
       allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Sign-in records: each signed-in person can add rows about themselves only (the uid and
+    // email must match their verified token). Nobody can edit them; only the administrator
+    // can read or delete them.
+    match /signIns/{id} {
+      allow read, delete: if isAdmin();
+      allow create: if request.auth != null
+        && data().keys().hasOnly(['uid', 'email', 'name', 'role', 'method', 'device', 'os', 'browser', 'screen', 'at'])
+        && data().uid == request.auth.uid
+        && data().email == request.auth.token.get('email', '')
+        && text('name', false, 80)
+        && data().role in ['', 'Student', 'Faculty / Staff', 'Parent / Guardian', 'Visitor']
+        && data().method in ['google.com', 'password', 'anonymous']
+        && data().device in ['Phone', 'Tablet', 'Computer']
+        && text('os', true, 30) && text('browser', true, 30) && text('screen', false, 20)
+        && data().at == request.time;
     }
 
     // Anything not listed above is closed by default.

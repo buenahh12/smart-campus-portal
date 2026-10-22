@@ -1,0 +1,48 @@
+/* Content manager → Floor plan tab */
+.fp-admin { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr); gap: 20px; align-items: start; }
+.fp-admin-plan { min-width: 0; padding: 18px; border: 1px solid var(--line, #e2d7c2); border-radius: 18px; background: var(--surface, #fffcf5); }
+.fp-admin-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.fp-admin-head small { color: var(--muted, #5d6a5e); font-size: 13px; }
+.fp-admin-head .va-segment { flex-wrap: wrap; border-radius: 14px; }
+.fp-admin-head .va-segment button { padding: 0 14px; }
+
+.fp-admin-svg { display: block; width: 100%; height: auto; }
+.fp-spot .mp-room { transition: fill 150ms ease, stroke 150ms ease; }
+.fp-spot.mp-stairs .mp-room { fill: #e4e0d5; }
+.fp-spot.mp-exit .mp-room { fill: #f6d9d4; stroke: #b3402f; }
+.fp-spot.mp-void .mp-room { fill: #faf9f5; stroke: #b9b4a6; stroke-dasharray: 2 2; }
+.fp-spot.mp-deck .mp-room { fill: #ebe7dc; stroke: #b9b4a6; }
+.fp-spot.editable { cursor: pointer; outline: none; }
+.fp-spot.editable .mp-room { fill: #fff; }
+.fp-spot.editable.unlabeled .mp-room { fill: #f3ecdc; stroke-dasharray: 1.5 1; }
+.fp-spot.editable.edited .mp-room { fill: #dcebdf; }
+.fp-spot.editable:hover .mp-room, .fp-spot.editable:focus-visible .mp-room { fill: #f1c39a; }
+.fp-spot.editable.selected .mp-room { fill: #8a4c30; stroke: #5c2f1c; stroke-width: 1; }
+.fp-spot-label { fill: #1b2a21; font-size: 3px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.fp-spot.selected .fp-spot-label { fill: #fff; }
+
+.fp-admin-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 12px 0; color: var(--muted, #5d6a5e); font-size: 12px; }
+.fp-key { display: inline-block; width: 14px; height: 10px; margin-right: -8px; border: 1px solid #4a564f; border-radius: 2px; background: #fff; vertical-align: middle; }
+.fp-key.edited { background: #dcebdf; }
+.fp-key.unlabeled { background: #f3ecdc; border-style: dashed; }
+
+.fp-admin-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px; }
+.fp-admin-list button { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 6px 12px; border: 1px solid var(--line, #e2d7c2); border-radius: 10px; color: var(--ink, #1b2a21); background: #fff; font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.fp-admin-list button:hover { border-color: var(--line-strong, #cbbc9f); }
+.fp-admin-list button.active { border-color: #8a4c30; box-shadow: inset 0 0 0 1px #8a4c30; }
+.fp-admin-list em { color: var(--muted, #5d6a5e); }
+
+.fp-admin-form { position: sticky; top: 12px; }
+.fp-admin-empty { display: grid; justify-items: start; gap: 8px; color: var(--ink-2, #3c4a3f); }
+.fp-admin-empty h3 { margin: 4px 0 0; }
+.fp-admin-empty p { margin: 0; line-height: 1.55; }
+.fp-restore { justify-self: start; margin-top: 4px; }
+
+@media (max-width: 900px) {
+  .fp-admin { grid-template-columns: 1fr; }
+  .fp-admin-form { position: static; }
+}
+@media (max-width: 600px) {
+  .fp-admin-plan { padding: 12px; }
+  .fp-admin-list { grid-template-columns: 1fr; }
+}

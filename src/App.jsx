@@ -11,15 +11,18 @@ import {
 import Icon from "./Icon";
 import AdminCms from "./AdminCms";
 import CampusUpdates, { usePublicCollection } from "./CampusUpdates";
-import { CMS_COLLECTIONS, USER_ROLES, isClosureActive, recordVisit, todayKey, watchSession } from "./cms";
+import { CMS_COLLECTIONS, USER_ROLES, isClosureActive, recordSignIn, recordVisit, todayKey, watchSession } from "./cms";
 import AdminAnalytics from "./AdminAnalytics";
+import AdminSignIns from "./AdminSignIns";
+import { usePlanVersion } from "./usePlan";
 import MyCampus from "./MyCampus";
 import CampusMap from "./CampusMap";
 import { FLOORS, PLACES, findPlaceKey, placeByKey, placeTitle, floorLabel as planFloorLabel } from "./floorPlans";
 
 // Public files live under the site base path (GitHub Pages serves the app from a sub-folder).
 const asset = (file) => `${import.meta.env.BASE_URL}${file}`;
-const MAPPED_PLACES = PLACES.filter((item) => item.type !== "exit" && item.type !== "stairs" && !item.unlabeled);
+// Read on each render: staff can rename rooms at any time (see usePlan.js).
+const mappedPlaces = () => PLACES.filter((item) => item.type !== "exit" && item.type !== "stairs" && !item.unlabeled);
 const EXIT_COUNT = PLACES.filter((item) => item.type === "exit").length;
 const QUICK_PLACES = ["2:clinic", "2:guidance", "3:library-hs", "2:computer-room", "4:room-403"];
 // School location. Google Maps finds the school by name, so no exact coordinates are hard-coded.
@@ -191,6 +194,7 @@ function LoginModal({ onClose, onCreate, onAdmin, onSignedIn = () => {} }) {
             <button className="create-account-link" onClick={onCreate}>Create a new campus account</button>
             <button className="staff-access-link" onClick={onAdmin}>Staff / administrator access</button>
             <p className="auth-security-note"><Icon name="shield" size={15} /> Sign-in is handled by Firebase. Your password is not shared with Google.</p>
+            <p className="auth-security-note"><Icon name="info" size={15} /> When you sign in, the school can see your account email, how you signed in, and your device type and browser.</p>
             <p className="terms">By continuing, you agree to the campus portal&apos;s <a href="#terms">Terms</a> and <a href="#privacy">Privacy Policy</a>.</p>
           </>
         )}
@@ -553,6 +557,7 @@ export default function App() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+  usePlanVersion(); // re-render when staff rename a room on the floor plan
   const [signedInUser, setSignedInUser] = useState(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [createAccountOpen, setCreateAccountOpen] = useState(false);
@@ -579,7 +584,7 @@ export default function App() {
       return;
     }
     const lower = query.toLowerCase();
-    const exact = MAPPED_PLACES.find((item) => [placeTitle(item), item.name, item.code].some((value) => value && value.toLowerCase() === lower));
+    const exact = mappedPlaces().find((item) => [placeTitle(item), item.name, item.code].some((value) => value && value.toLowerCase() === lower));
     const key = exact?.key || findPlaceKey(query);
     if (!key) {
       setWhereError(`No room called “${query}” is on the floor plan yet. Try a room number such as 204, or pick from the list.`);
@@ -602,6 +607,7 @@ export default function App() {
     setSignedInUser(user && !user.isAnonymous ? user : null);
     setRole(nextRole);
     recordVisit(user, nextRole);
+    recordSignIn(user, nextRole);
     if (nextRole !== "admin") setAdminView(null);
   }), []);
 
@@ -653,7 +659,7 @@ export default function App() {
                   <input id="ss-where" list="ss-places" value={where} onChange={(event) => { setWhere(event.target.value); setWhereError(""); }} placeholder="Room 204, Clinic, Computer Room…" autoComplete="off" aria-describedby={whereError ? "ss-where-error" : undefined} aria-invalid={Boolean(whereError)} />
                   <button type="submit" className="ss-btn ss-btn-primary">Get directions</button>
                 </div>
-                <datalist id="ss-places">{MAPPED_PLACES.map((item) => <option key={item.key} value={placeTitle(item)} />)}</datalist>
+                <datalist id="ss-places">{mappedPlaces().map((item) => <option key={item.key} value={placeTitle(item)} />)}</datalist>
                 {whereError && <p id="ss-where-error" className="ss-field-error" role="alert">{whereError}</p>}
               </form>
               <div className="ss-quick" aria-label="Common places" data-reveal style={{ "--delay": "320ms" }}>
@@ -669,7 +675,7 @@ export default function App() {
           <div className="ss-container">
             <dl className="ss-facts" data-reveal style={{ "--delay": "120ms" }}>
               <div><dt>Floors mapped</dt><dd>4</dd></div>
-              <div><dt>Rooms &amp; offices</dt><dd>{MAPPED_PLACES.length}</dd></div>
+              <div><dt>Rooms &amp; offices</dt><dd>{mappedPlaces().length}</dd></div>
               <div><dt>Exits &amp; fire stairs</dt><dd>{EXIT_COUNT}</dd></div>
               <div><dt>Office hours</dt><dd className="ss-facts-text">Mon–Fri, 7 AM–5 PM</dd></div>
             </dl>
@@ -724,7 +730,7 @@ export default function App() {
           </div>
         </section>
 
-        <CampusUpdates />
+        <CampusUpdates onShowMap={(key) => setMapState({ destination: key, floor: placeByKey(key).floor })} />
 
         <section className="ss-section ss-visit" id="visit" aria-labelledby="ss-visit-title">
           <div className="ss-container">
@@ -803,8 +809,9 @@ export default function App() {
       />}
       {createAccountOpen && <CreateAccountModal onClose={() => setCreateAccountOpen(false)} onCreated={(user) => { setSignedInUser(user); setCreateAccountOpen(false); setAccountOpen(true); }} />}
       {adminLoginOpen && <AdminLogin onClose={() => setAdminLoginOpen(false)} onSuccess={(user) => { setAdminLoginOpen(false); setLoginOpen(false); setSignedInUser(user); setRole("admin"); setAdminView("content"); }} />}
-      {isAdmin && adminView === "analytics" && <AdminAnalytics onClose={() => setAdminView(null)} onOpenContent={() => setAdminView("content")} />}
-      {isAdmin && adminView === "content" && <AdminCms onClose={() => setAdminView(null)} onOpenAnalytics={() => setAdminView("analytics")} />}
+      {isAdmin && adminView === "analytics" && <AdminAnalytics onClose={() => setAdminView(null)} onOpenContent={() => setAdminView("content")} onOpenSignIns={() => setAdminView("signins")} />}
+      {isAdmin && adminView === "signins" && <AdminSignIns onClose={() => setAdminView(null)} onOpenContent={() => setAdminView("content")} onOpenVisits={() => setAdminView("analytics")} />}
+      {isAdmin && adminView === "content" && <AdminCms onClose={() => setAdminView(null)} onOpenAnalytics={() => setAdminView("analytics")} onOpenSignIns={() => setAdminView("signins")} />}
     </div>
   );
 }

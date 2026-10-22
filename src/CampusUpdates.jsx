@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import Icon from "./Icon";
 import { CMS_COLLECTIONS, isClosureActive, todayKey, watchCollection } from "./cms";
+import { BUILDING_NAME, PLACES, findPlaceKey, floorLabel as planFloorLabel } from "./floorPlans";
+import { usePlanVersion } from "./usePlan";
 
 // Live, read-only view of an admin-managed collection for any visitor.
 export function usePublicCollection(name) {
@@ -19,8 +21,27 @@ export const visibleAnnouncements = (items, today = todayKey()) => items
   .sort((first, second) => Number(Boolean(second.pinned)) - Number(Boolean(first.pinned)));
 
 const floorLabel = (floor) => (floor === 0 ? "Ground floor" : `Floor ${floor}`);
+const PLAN_KINDS = { classroom: "Classroom", office: "Office", lab: "Laboratory", facility: "Facility", cr: "Comfort room" };
 
-export default function CampusUpdates() {
+// Every named room on the floor plan, plus rooms and offices staff added in the Content
+// manager. A staff entry that matches a floor plan room adds its details (hours, status)
+// to that room instead of showing twice.
+function buildDirectory(rooms, offices) {
+  const entries = new Map(PLACES
+    .filter((item) => !item.unlabeled && PLAN_KINDS[item.type])
+    .map((item) => [item.key, { id: item.key, mapKey: item.key, name: item.name, room: item.code, kind: PLAN_KINDS[item.type], building: BUILDING_NAME, floorText: planFloorLabel(item.floor), notes: item.notes }]));
+  const extra = [];
+  [...offices.map((item) => ({ ...item, kind: "Office" })), ...rooms.map((item) => ({ ...item, kind: item.type || "Room" }))].forEach((item) => {
+    const mapKey = findPlaceKey(item.room, item.name);
+    const entry = { ...item, floorText: floorLabel(item.floor), mapKey };
+    if (mapKey && entries.has(mapKey)) entries.set(mapKey, { ...entries.get(mapKey), ...entry, id: mapKey, room: item.room || entries.get(mapKey).room, floorText: entries.get(mapKey).floorText });
+    else extra.push(entry);
+  });
+  return [...entries.values(), ...extra];
+}
+
+export default function CampusUpdates({ onShowMap }) {
+  usePlanVersion();
   const closures = usePublicCollection(CMS_COLLECTIONS.closures);
   const announcements = usePublicCollection(CMS_COLLECTIONS.announcements);
   const rooms = usePublicCollection(CMS_COLLECTIONS.rooms);
@@ -29,10 +50,7 @@ export default function CampusUpdates() {
   const activeClosures = closures.items.filter((item) => isClosureActive(item));
   const notices = visibleAnnouncements(announcements.items).slice(0, 5);
   const term = search.trim().toLowerCase();
-  const directory = [
-    ...offices.items.map((item) => ({ ...item, kind: "Office" })),
-    ...rooms.items.map((item) => ({ ...item, kind: item.type || "Room" })),
-  ]
+  const directory = buildDirectory(rooms.items, offices.items)
     .filter((item) => !term || [item.name, item.building, item.kind, item.room, item.description, item.notes].some((value) => String(value || "").toLowerCase().includes(term)))
     .sort((first, second) => first.name.localeCompare(second.name, undefined, { numeric: true }));
   const unavailable = closures.error || announcements.error;
@@ -68,9 +86,13 @@ export default function CampusUpdates() {
           <input className="directory-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search a room or office…" aria-label="Search rooms and offices" />
           <div className="directory-list">
             {directory.length ? directory.slice(0, 8).map((item) => <div className="directory-item" key={`${item.kind}-${item.id}`}>
-              <div><b>{item.name}</b><small>{item.kind} · {item.building} · {floorLabel(item.floor)}{item.room ? ` · ${item.room}` : ""}</small>{item.hours && <small>{item.hours}</small>}</div>
-              {item.status && <span className={`cms-badge ${item.status === "Available" ? "good" : item.status === "In use" ? "warn" : "bad"}`}>{item.status}</span>}
-            </div>) : <p className="updates-empty">{rooms.loading || offices.loading ? "Loading directory…" : term ? "No matching rooms or offices." : "The directory hasn't been published yet."}</p>}
+              <div><b>{item.name}</b><small>{item.kind} · {item.floorText}{item.room ? ` · ${item.room}` : ""}</small>{item.hours && <small>{item.hours}</small>}{item.notes && <small>{item.notes}</small>}</div>
+              <div className="directory-actions">
+                {item.status && <span className={`cms-badge ${item.status === "Available" ? "good" : item.status === "In use" ? "warn" : "bad"}`}>{item.status}</span>}
+                {item.mapKey && onShowMap && <button type="button" className="directory-map" onClick={() => onShowMap(item.mapKey)} aria-label={`Show ${item.name} on the floor plan`}><Icon name="route" size={14} /> Map</button>}
+              </div>
+            </div>) : <p className="updates-empty">{term ? "No matching rooms or offices." : "No rooms are listed yet."}</p>}
+            {directory.length > 8 && <p className="directory-more">Showing 8 of {directory.length}. Type to narrow the list.</p>}
             {directory.length > 8 && <small className="directory-more">Showing 8 of {directory.length}. Search to narrow the list.</small>}
           </div>
         </article>

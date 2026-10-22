@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Icon from "./Icon";
 import { usePublicCollection } from "./CampusUpdates";
 import { CMS_COLLECTIONS, isClosureActive } from "./cms";
+import { usePlanVersion } from "./usePlan";
 import {
   BUILDING_NAME,
   FLOORS,
@@ -416,7 +417,8 @@ const STEP_ICONS = {
   exit: <path d="M10 4H5v16h5M14 8l4 4-4 4M18 12H9" />,
 };
 
-const placeOptions = FLOORS.map(({ floor }) => ({
+// Built on each render because staff can rename rooms while the map is open.
+const placeOptions = () => FLOORS.map(({ floor }) => ({
   floor,
   places: PLACES.filter((item) => item.floor === floor && item.type !== "stairs" && !(item.unlabeled && item.type === "classroom"))
     .sort((a, b) => (a.type === "exit") - (b.type === "exit") || placeTitle(a).localeCompare(placeTitle(b), undefined, { numeric: true })),
@@ -424,6 +426,7 @@ const placeOptions = FLOORS.map(({ floor }) => ({
 
 export default function CampusMap({ onClose, initialFloor = 2, initialDestination = null, initialEmergency = false }) {
   const closures = usePublicCollection(CMS_COLLECTIONS.closures);
+  const planVersion = usePlanVersion();
   const [startKey, setStartKey] = useState(readStart);
   const [destKey, setDestKey] = useState(initialDestination);
   const [emergency, setEmergency] = useState(initialEmergency);
@@ -432,7 +435,7 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
   const activeClosures = closures.items.filter((item) => isClosureActive(item));
   const blockedKey = activeClosures.map((item) => item.mapArea).filter(Boolean).sort().join("|");
   const blocked = useMemo(() => blockedAreas(activeClosures), [blockedKey]); // eslint-disable-line react-hooks/exhaustive-deps
-  const route = useMemo(() => (emergency ? findNearestExit(startKey, blocked) : findRoute(startKey, destKey, blocked)), [emergency, startKey, destKey, blocked]);
+  const route = useMemo(() => (emergency ? findNearestExit(startKey, blocked) : findRoute(startKey, destKey, blocked)), [emergency, startKey, destKey, blocked, planVersion]); // eslint-disable-line react-hooks/exhaustive-deps
   const plan = FLOORS.find((item) => item.floor === floor);
   const selected = placeByKey(selectedKey);
   const routeFloors = route?.floors || [];
@@ -482,7 +485,7 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
 
   const placeSelect = (value, onChange, label, includeEmpty) => <select value={value || ""} onChange={(event) => onChange(event.target.value)} aria-label={label}>
     {includeEmpty && <option value="">Choose a room or office</option>}
-    {placeOptions.map((group) => <optgroup key={group.floor} label={floorLabel(group.floor)}>{group.places.map((item) => <option key={item.key} value={item.key}>{placeTitle(item)}</option>)}</optgroup>)}
+    {placeOptions().map((group) => <optgroup key={group.floor} label={floorLabel(group.floor)}>{group.places.map((item) => <option key={item.key} value={item.key}>{placeTitle(item)}</option>)}</optgroup>)}
   </select>;
 
   return (
@@ -530,7 +533,7 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
           </button>
 
           {selected && selected.key !== startKey && !emergency && <div className="map-selected">
-            <div><b>{placeTitle(selected)}</b><small>{floorLabel(selected.floor)}{selected.unlabeled ? " · name not posted yet" : ""}</small></div>
+            <div><b>{placeTitle(selected)}</b><small>{floorLabel(selected.floor)}{selected.unlabeled ? " · name not posted yet" : ""}</small>{selected.notes && <small>{selected.notes}</small>}</div>
             <button type="button" onClick={() => { chooseStart(selected.key); setDestKey(null); setSelectedKey(null); }}>I&apos;m here</button>
           </div>}
 

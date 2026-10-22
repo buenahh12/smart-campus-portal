@@ -168,6 +168,51 @@ export const PLACES = FLOORS.flatMap(({ floor, rooms }) => rooms
   .filter((item) => item.door)
   .map((item) => ({ ...item, floor, key: `${floor}:${item.id}` })));
 
+// ---------- Room details edited by the administrator ----------
+// The walls, doors, and hallways above are fixed, but what each room is called and used
+// for comes from the mapRooms collection (edited in Content manager → Floor plan), so the
+// school can rename or repurpose rooms without changing code. Values here are the defaults.
+export const EDITABLE_TYPES = [
+  { value: "classroom", label: "Classroom" },
+  { value: "office", label: "Office" },
+  { value: "lab", label: "Laboratory" },
+  { value: "facility", label: "Facility" },
+  { value: "cr", label: "Comfort room" },
+];
+export const isEditableSpot = (item) => Boolean(item.door) && EDITABLE_TYPES.some((type) => type.value === item.base?.type);
+export const mapRoomDocId = (key) => key.replace(":", "-");
+
+const allRooms = () => [...FLOORS.flatMap(({ rooms }) => rooms), ...PLACES];
+allRooms().forEach((item) => {
+  item.base = { name: item.name, code: item.code, type: item.type, unlabeled: Boolean(item.unlabeled) };
+  item.notes = "";
+});
+
+let planVersion = 0;
+const planListeners = new Set();
+export const getPlanVersion = () => planVersion;
+export const subscribePlan = (listener) => {
+  planListeners.add(listener);
+  return () => planListeners.delete(listener);
+};
+
+// overrides: { "2-clinic": { name, code, type, notes }, ... }
+export function applyMapOverrides(overrides) {
+  for (const { floor, rooms } of FLOORS) {
+    for (const item of rooms) {
+      const custom = overrides[mapRoomDocId(`${floor}:${item.id}`)];
+      const next = custom && isEditableSpot(item)
+        ? { name: custom.name || item.base.name, code: custom.code ?? item.base.code, type: custom.type || item.base.type, unlabeled: false, notes: custom.notes || "", edited: true }
+        : { ...item.base, notes: "", edited: false };
+      Object.assign(item, next);
+      const place = PLACES.find((entry) => entry.key === `${floor}:${item.id}`);
+      if (place) Object.assign(place, next);
+    }
+  }
+  planVersion += 1;
+  planListeners.forEach((listener) => listener(planVersion));
+}
+
 export const placeByKey = (key) => PLACES.find((item) => item.key === key) || null;
 export const placeTitle = (place) => (place.code && place.code !== "EXIT" && place.code !== place.name ? `${place.code} · ${place.name}` : place.name);
 

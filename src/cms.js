@@ -7,7 +7,9 @@ import {
   getDoc,
   getDocs,
   increment,
+  limit,
   onSnapshot,
+  orderBy,
   query,
   serverTimestamp,
   setDoc,
@@ -24,6 +26,7 @@ export const CMS_COLLECTIONS = {
   offices: 'offices',
   announcements: 'announcements',
   closures: 'pathwayClosures',
+  mapRooms: 'mapRooms',
 };
 
 const notConfigured = () => new Error('Firebase is not configured. Add the VITE_FIREBASE_* values to your .env file.');
@@ -56,6 +59,12 @@ export async function saveItem(name, id, data) {
   }
   const created = await addDoc(collection(db, name), payload);
   return created.id;
+}
+
+// Creates or fully replaces the document with a known id (used for floor plan rooms).
+export function setItem(name, id, data) {
+  if (!db) return Promise.reject(notConfigured());
+  return setDoc(doc(db, name, id), { ...data, updatedAt: serverTimestamp(), updatedBy: auth.currentUser?.email || auth.currentUser?.uid || '' });
 }
 
 export const deleteItem = (name, id) => {
@@ -169,6 +178,77 @@ export function watchStats(fromDay, toDay, onData, onError = () => {}) {
   }
   const range = query(collection(db, 'stats'), where(documentId(), '>=', fromDay), where(documentId(), '<=', toDay));
   return onSnapshot(range, (snapshot) => onData(Object.fromEntries(snapshot.docs.map((item) => [item.id, item.data()]))), onError);
+}
+
+// ---------- Sign-in records ----------
+// signIns/{id} = one row each time someone signs in (or opens the portal while signed in),
+// once per browser session: who (email from their verified token), how (Google, email and
+// password, or visitor), their role, and the device, system, and browser they used.
+// Only the administrator can read them (see firestore.rules). The admin is never recorded.
+export const SIGN_IN_METHODS = { 'google.com': 'Google', password: 'Email & password', anonymous: 'Visitor (no account)' };
+
+export function describeDevice(agent = navigator.userAgent) {
+  const touchMac = /Macintosh/.test(agent) && navigator.maxTouchPoints > 1; // iPadOS reports itself as a Mac
+  const tablet = /iPad|Tablet/i.test(agent) || touchMac || (/Android/i.test(agent) && !/Mobile/i.test(agent));
+  const phone = !tablet && /Mobi|iPhone|iPod|Android/i.test(agent);
+  const device = tablet ? 'Tablet' : phone ? 'Phone' : 'Computer';
+  const os = /Android/i.test(agent) ? 'Android'
+    : /iPhone|iPad|iPod/.test(agent) || touchMac ? 'iOS / iPadOS'
+      : /Windows/.test(agent) ? 'Windows'
+        : /CrOS/.test(agent) ? 'ChromeOS'
+          : /Mac OS X|Macintosh/.test(agent) ? 'macOS'
+            : /Linux/.test(agent) ? 'Linux' : 'Other';
+  const browser = /SamsungBrowser/.test(agent) ? 'Samsung Internet'
+    : /Edg\//.test(agent) ? 'Edge'
+      : /OPR\/|Opera/.test(agent) ? 'Opera'
+        : /FBAN|FBAV|FB_IAB/.test(agent) ? 'Facebook app'
+          : /Firefox|FxiOS/.test(agent) ? 'Firefox'
+            : /Chrome|CriOS/.test(agent) ? 'Chrome'
+              : /Safari/.test(agent) ? 'Safari' : 'Other';
+  return { device, os, browser, screen: `${window.screen.width}×${window.screen.height}` };
+}
+
+const firstTimeThisSession = (key) => {
+  try {
+    if (sessionStorage.getItem(key)) return false;
+    sessionStorage.setItem(key, '1');
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export async function recordSignIn(user, role) {
+  if (!db || !user || role === 'admin' || !firstTimeThisSession(`campus-signin:${user.uid}`)) return;
+  let profile = {};
+  if (!user.isAnonymous) {
+    try {
+      profile = (await getDoc(doc(db, 'users', user.uid))).data() || {};
+    } catch { /* profile unreadable: leave role blank */ }
+  }
+  try {
+    await addDoc(collection(db, 'signIns'), {
+      uid: user.uid,
+      email: user.email || '',
+      name: (profile.name || user.displayName || '').slice(0, 80),
+      role: user.isAnonymous ? 'Visitor' : profile.role || '',
+      method: user.isAnonymous ? 'anonymous' : user.providerData[0]?.providerId || 'password',
+      ...describeDevice(),
+      at: serverTimestamp(),
+    });
+  } catch (error) {
+    console.warn('Sign-in could not be recorded:', error);
+  }
+}
+
+// Sign-in records between two Date objects, newest first, kept live. Admin only.
+export function watchSignIns(from, to, onData, onError = () => {}) {
+  if (!db) {
+    onError(notConfigured());
+    return () => {};
+  }
+  const range = query(collection(db, 'signIns'), where('at', '>=', from), where('at', '<', to), orderBy('at', 'desc'), limit(2000));
+  return onSnapshot(range, (snapshot) => onData(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))), onError);
 }
 
 // ---------- Email updates ----------
