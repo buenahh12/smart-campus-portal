@@ -62,10 +62,15 @@ service cloud.firestore {
     }
 
     function validAnnouncement() {
-      return data().keys().hasOnly(['title', 'body', 'expiresOn', 'pinned', 'published', 'updatedAt', 'updatedBy'])
+      return data().keys().hasOnly(['title', 'body', 'expiresOn', 'pinned', 'published', 'picture', 'pictureSeed', 'pictureData', 'updatedAt', 'updatedBy'])
         && text('title', true, 120) && text('body', true, 2000)
         && dateOrEmpty('expiresOn')
-        && data().pinned is bool && data().published is bool;
+        && data().pinned is bool && data().published is bool
+        && (!('picture' in data()) || data().picture in ['ai', 'art', 'none'])
+        && (!('pictureSeed' in data()) || (data().pictureSeed is int && data().pictureSeed >= 0 && data().pictureSeed <= 100000))
+        // The AI picture, generated once by the admin and saved as a small JPEG (about 50 KB).
+        && (!('pictureData' in data()) || (data().pictureData is string && data().pictureData.size() <= 300000
+          && (data().pictureData == '' || data().pictureData.matches('data:image/jpeg;base64,[A-Za-z0-9+/=]+'))));
     }
 
     function validClosure() {

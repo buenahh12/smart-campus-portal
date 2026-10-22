@@ -302,3 +302,26 @@ main section[id], #features { scroll-margin-top: 88px; }
 .campus-updates .tone-sand .directory-list:focus-visible { outline: 2px solid var(--clay, #8a4c30); outline-offset: 4px; border-radius: 8px; }
 .campus-updates .tone-sand > .directory-more { display: block; margin: 0; }
 @media (max-width: 600px) { .campus-updates .tone-sand .directory-list { max-height: 360px; } }
+
+/* Generated pictures for announcements and closures (src/EventArt.jsx) */
+.event-art { position: relative; display: block; margin: 0 0 8px; overflow: hidden; aspect-ratio: 16 / 9; border-radius: 12px; background: #e9dfca; box-shadow: inset 0 0 0 1px rgba(27,42,33,.12); }
+.event-art svg { display: block; width: 100%; height: 100%; }
+.event-art-ai { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; animation: event-art-in 500ms var(--ease-out, ease-out); }
+@keyframes event-art-in { from { opacity: 0; } }
+.event-art figcaption { position: absolute; left: 8px; bottom: 8px; padding: 2px 8px; border-radius: 999px; color: #fff; background: rgba(20,28,22,.6); font-size: 11px; font-weight: 700; letter-spacing: .02em; }
+@media (prefers-reduced-motion: reduce) { .event-art-ai { animation: none; } }
+
+/* Closures and announcements scroll inside their cards, like the room directory */
+.campus-updates .updates-scroll { display: grid; gap: 14px; max-height: 300px; overflow-y: auto; overscroll-behavior: contain; margin-right: -8px; padding-right: 8px; scrollbar-width: thin; scrollbar-color: rgba(27,42,33,.3) transparent; }
+.campus-updates .updates-scroll:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; border-radius: 8px; }
+.campus-updates .updates-scroll > .closure-item:first-child, .campus-updates .updates-scroll > .notice-item:first-child { padding-top: 0; border-top: 0; }
+
+/* Admin form preview */
+.cms-preview { display: grid; gap: 8px; padding: 12px; border: 1px dashed var(--line-strong, #cbbc9f); border-radius: 14px; background: #fbf6ea; }
+.cms-preview .event-art { margin: 0; }
+.cms-preview-label { color: var(--muted, #5d6a5e); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.cms-preview .cms-link-button { justify-self: start; }
+.cms-preview-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.cms-preview-button { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border: 0; border-radius: 999px; color: #fff; background: var(--clay, #8a4c30); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.cms-preview-button:disabled { opacity: .7; cursor: progress; }
+.cms-hint-warn { color: #8a4c30; }

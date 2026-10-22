@@ -4,8 +4,51 @@ import { CMS_COLLECTIONS, deleteItem, isClosureActive, saveItem, todayKey, watch
 import { MAP_AREAS, mapAreaLabel } from "./floorPlans";
 import { emailConfigured, emailSubscribers } from "./notify";
 import AdminFloorPlan from "./AdminFloorPlan";
+import { auth } from "./firebase";
+import { AnnouncementArt, ClosureArt, generateAiPicture, useDebounced } from "./EventArt";
 
 const FLOOR_PLAN_TAB = "floorplan";
+
+// Live preview of the announcement picture. The illustration follows the title as it is
+// typed; the AI picture is generated on request and saved with the announcement.
+function PicturePreview({ values, setValue }) {
+  const title = useDebounced(values.title, 500);
+  const [status, setStatus] = useState({ busy: false, message: "" });
+  if (values.picture === "none") return null;
+  const ai = values.picture === "ai";
+  const hasPicture = Boolean(values.pictureData);
+  const generate = async (nextSeed) => {
+    if (!values.title.trim()) {
+      setStatus({ busy: false, message: "Type a title first. The picture is made from it." });
+      return;
+    }
+    setStatus({ busy: true, message: "Making the AI picture… this takes about 10 seconds." });
+    try {
+      const data = await generateAiPicture(values.title, values.body, nextSeed, await auth.currentUser.getIdToken());
+      setValue("pictureSeed", nextSeed);
+      setValue("pictureData", data);
+      setStatus({ busy: false, message: "" });
+    } catch (error) {
+      setStatus({ busy: false, message: error.message === "limit"
+        ? "The free AI service makes one picture every 45 seconds. Wait a moment and try again. The illustration is used until then."
+        : "The AI picture couldn't be made right now. The illustration will be used instead." });
+    }
+  };
+  const nextSeed = (Number(values.pictureSeed) || 0) + 1;
+  return <div className="cms-preview">
+    <span className="cms-preview-label">Picture people will see</span>
+    <AnnouncementArt title={title} body={values.body} picture={values.picture} seed={values.pictureSeed} aiImage={values.pictureData} />
+    {ai && <div className="cms-preview-actions">
+      <button type="button" className="cms-preview-button" disabled={status.busy} onClick={() => generate(hasPicture ? nextSeed : Number(values.pictureSeed) || 0)}>
+        <Icon name="sparkle" size={15} /> {status.busy ? "Making picture…" : hasPicture ? "Make a different AI picture" : "Make the AI picture"}
+      </button>
+      {hasPicture && <button type="button" className="cms-link-button" onClick={() => setValue("pictureData", "")}>Use the illustration instead</button>}
+    </div>}
+    {!ai && title.trim() && <button type="button" className="cms-link-button" onClick={() => setValue("pictureSeed", nextSeed)}>Rearrange the illustration</button>}
+    {ai && !hasPicture && !status.message && <small className="cms-hint">Until you make the AI picture, the illustration above is shown.</small>}
+    {status.message && <small className={status.busy ? "cms-hint" : "cms-hint cms-hint-warn"} role="status">{status.message}</small>}
+  </div>;
+}
 
 // Each section describes one Firestore collection: its form fields and how a saved
 // item is summarised in the list. Field names must match firestore.rules.
@@ -21,7 +64,17 @@ const SECTIONS = [
       { name: "expiresOn", label: "Hide after (optional)", type: "date" },
       { name: "pinned", label: "Pin to the top", type: "checkbox" },
       { name: "published", label: "Published (visible to everyone)", type: "checkbox", initial: true },
+      { name: "picture", label: "Picture", type: "select", required: true, initial: "ai", options: [
+        { value: "ai", label: "AI picture (the illustration shows while it loads)" },
+        { value: "art", label: "Illustration only" },
+        { value: "none", label: "No picture" },
+      ], hint: "The picture is made from the title, for example \"Halloween Party\" or \"Science Fair\". Check the preview below before publishing." },
+      { name: "pictureSeed", type: "seed", initial: 0 },
+      { name: "pictureData", type: "hidden", initial: "" },
     ],
+    // Only keep the saved AI picture when "AI picture" is chosen.
+    beforeSave: (record) => ({ ...record, pictureData: record.picture === "ai" ? record.pictureData : "" }),
+    preview: (values, setValue) => <PicturePreview values={values} setValue={setValue} />,
     title: (item) => item.title,
     meta: (item) => [item.pinned && "Pinned", item.expiresOn && `Until ${item.expiresOn}`].filter(Boolean).join(" · ") || "No end date",
     badge: (item) => item.published ? (item.expiresOn && item.expiresOn < todayKey() ? ["Expired", "muted"] : ["Published", "good"]) : ["Draft", "muted"],
@@ -49,6 +102,7 @@ const SECTIONS = [
       { name: "endDate", label: "Reopens after (optional)", type: "date" },
       { name: "active", label: "Restriction is in effect", type: "checkbox", initial: true },
     ],
+    preview: (values) => <div className="cms-preview"><span className="cms-preview-label">Picture people will see</span><ClosureArt closure={values} /></div>,
     title: (item) => item.pathway,
     meta: (item) => `${item.building} · Floor ${item.floor} · ${item.reason}${item.endDate ? ` · until ${item.endDate}` : ""}${item.mapArea ? ` · map: ${mapAreaLabel(item.mapArea)}` : ""}`,
     badge: (item) => isClosureActive(item) ? ["Closed now", "bad"] : item.active && item.startDate > todayKey() ? ["Scheduled", "warn"] : ["Open", "good"],
@@ -104,7 +158,8 @@ const emptyValues = (section) => Object.fromEntries(section.fields.map((field) =
 
 const valuesFromItem = (section, item) => Object.fromEntries(section.fields.map((field) => [
   field.name,
-  field.type === "checkbox" ? Boolean(item[field.name]) : item[field.name] ?? "",
+  // Fields added later (like picture) fall back to their default for older items.
+  field.type === "checkbox" ? Boolean(item[field.name]) : item[field.name] ?? (typeof field.initial === "function" ? "" : field.initial) ?? "",
 ]));
 
 // Turns form strings into the stored types (numbers, booleans, trimmed text).
@@ -114,6 +169,7 @@ function toRecord(section, values) {
     const raw = values[field.name];
     if (field.type === "checkbox") record[field.name] = Boolean(raw);
     else if (field.type === "number") record[field.name] = raw === "" || raw === null ? null : Number.parseInt(raw, 10);
+    else if (field.type === "seed") record[field.name] = Number.parseInt(raw, 10) || 0;
     else record[field.name] = String(raw ?? "").trim();
   }
   return record;
@@ -185,7 +241,7 @@ export default function AdminCms({ onClose, onOpenAnalytics, onOpenSignIns }) {
 
   const submit = async (event) => {
     event.preventDefault();
-    const record = toRecord(section, values);
+    const record = section.beforeSave ? section.beforeSave(toRecord(section, values)) : toRecord(section, values);
     const problem = validate(section, record);
     if (problem) {
       setFormError(problem);
@@ -250,7 +306,7 @@ export default function AdminCms({ onClose, onOpenAnalytics, onOpenSignIns }) {
         {activeKey === FLOOR_PLAN_TAB ? <AdminFloorPlan /> : <div className="cms-grid">
           <form className="cms-form" onSubmit={submit} noValidate>
             <div className="section-title-row"><div><p className="kicker">{editingId ? "EDITING" : "NEW ENTRY"}</p><h3>{editingId ? `Edit ${section.singular}` : `Add ${section.singular}`}</h3></div>{editingId && <button type="button" className="cms-link-button" onClick={() => resetForm()}>Cancel edit</button>}</div>
-            {section.fields.map((field) => field.type === "checkbox"
+            {section.fields.filter((field) => field.type !== "seed" && field.type !== "hidden").map((field) => field.type === "checkbox"
               ? <label key={field.name} className="cms-check"><input type="checkbox" checked={values[field.name]} onChange={(event) => updateValue(field, event.target.checked)} />{field.label}</label>
               : <label key={field.name}>{field.label}
                 {field.type === "textarea"
@@ -260,6 +316,7 @@ export default function AdminCms({ onClose, onOpenAnalytics, onOpenSignIns }) {
                     : <input type={field.type} value={values[field.name]} onChange={(event) => updateValue(field, event.target.value)} maxLength={field.max} min={field.min} max={field.maxValue} placeholder={field.placeholder} required={field.required} />}
                 {field.hint && <small className="cms-hint">{field.hint}</small>}
               </label>)}
+            {section.preview?.(values, (name, value) => setValues((current) => ({ ...current, [name]: value })))}
             {formError && <p className="auth-error" role="alert">{formError}</p>}
             {section.email && <label className="cms-check cms-email-check"><input type="checkbox" checked={sendEmail} onChange={(event) => setSendEmail(event.target.checked)} />{section.emailLabel}</label>}
             {notice && <p className="auth-success" role="status">{notice}</p>}

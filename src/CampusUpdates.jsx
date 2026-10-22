@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import Icon from "./Icon";
 import { CMS_COLLECTIONS, isClosureActive, todayKey, watchCollection } from "./cms";
 import { BUILDING_NAME, PLACES, findPlaceKey, floorLabel as planFloorLabel } from "./floorPlans";
 import { usePlanVersion } from "./usePlan";
+import { AnnouncementArt, ClosureArt } from "./EventArt";
 
 // Live, read-only view of an admin-managed collection for any visitor.
 export function usePublicCollection(name) {
@@ -69,28 +70,30 @@ export default function CampusUpdates({ onShowMap }) {
       <div className="updates-grid" data-reveal>
         <article className="updates-card tone-clay">
           <h3 className="updates-card-title"><span className="updates-icon" aria-hidden="true"><Icon name="alert" size={22} /></span> Closed hallways</h3>
-          {activeClosures.length ? activeClosures.map((item) => <div className="closure-item" key={item.id}>
+          <div className="updates-scroll" tabIndex={0} aria-label="Closed hallways">{activeClosures.length ? activeClosures.map((item) => <div className="closure-item" key={item.id}>
+            <ClosureArt closure={item} />
             <b>{item.pathway}</b>
-            <small>{item.building} · {floorLabel(item.floor)} · {item.reason}{item.endDate ? ` · until ${item.endDate}` : ""}</small>
+            <small>{item.building} Â· {floorLabel(item.floor)} Â· {item.reason}{item.endDate ? ` Â· until ${item.endDate}` : ""}</small>
             {item.detour && <span><Icon name="route" size={14} /> {item.detour}</span>}
             {item.details && <p>{item.details}</p>}
-          </div>) : <p className="updates-empty">{closures.loading ? "Checking pathways…" : "All campus pathways are open."}</p>}
+          </div>) : <p className="updates-empty">{closures.loading ? "Checking pathwaysâ€¦" : "All campus pathways are open."}</p>}</div>
         </article>
         <article className="updates-card tone-sage">
           <h3 className="updates-card-title"><span className="updates-icon" aria-hidden="true"><Icon name="sparkle" size={22} /></span> Announcements</h3>
-          {notices.length ? notices.map((item) => <div className="notice-item" key={item.id}>
+          <div className="updates-scroll" tabIndex={0} aria-label="Announcements">{notices.length ? notices.map((item) => <div className="notice-item" key={item.id}>
+            <AnnouncementArt title={item.title} body={item.body} picture={item.picture || "ai"} seed={item.pictureSeed} aiImage={item.pictureData} />
             <b>{item.pinned && <span className="cms-badge good">Pinned</span>}{item.title}</b>
             {item.updatedAt?.toDate && <small>{item.updatedAt.toDate().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</small>}
             <p>{item.body}</p>
-          </div>) : <p className="updates-empty">{announcements.loading ? "Loading announcements…" : "No announcements right now."}</p>}
+          </div>) : <p className="updates-empty">{announcements.loading ? "Loading announcementsâ€¦" : "No announcements right now."}</p>}</div>
         </article>
         <article className="updates-card tone-sand">
           <h3 className="updates-card-title"><span className="updates-icon" aria-hidden="true"><Icon name="location" size={22} /></span> Rooms &amp; offices</h3>
-          <input className="directory-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search a room or office…" aria-label="Search rooms and offices" />
-          <small className="directory-more" aria-live="polite">{directory.length} {directory.length === 1 ? "place" : "places"}{term ? ` matching “${search.trim()}”` : " · scroll or search"}</small>
+          <input className="directory-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search a room or officeâ€¦" aria-label="Search rooms and offices" />
+          <small className="directory-more" aria-live="polite">{directory.length} {directory.length === 1 ? "place" : "places"}{term ? ` matching â€œ${search.trim()}â€` : " Â· scroll or search"}</small>
           <div className="directory-list" tabIndex={0} aria-label="Rooms and offices">
             {directory.length ? directory.map((item) => <div className="directory-item" key={`${item.kind}-${item.id}`}>
-              <div><b>{item.name}</b><small>{item.kind} · {item.floorText}{item.room ? ` · ${item.room}` : ""}</small>{item.hours && <small>{item.hours}</small>}{item.notes && <small>{item.notes}</small>}</div>
+              <div><b>{item.name}</b><small>{item.kind} Â· {item.floorText}{item.room ? ` Â· ${item.room}` : ""}</small>{item.hours && <small>{item.hours}</small>}{item.notes && <small>{item.notes}</small>}</div>
               <div className="directory-actions">
                 {item.status && <span className={`cms-badge ${item.status === "Available" ? "good" : item.status === "In use" ? "warn" : "bad"}`}>{item.status}</span>}
                 {item.mapKey && onShowMap && <button type="button" className="directory-map" onClick={() => onShowMap(item.mapKey)} aria-label={`Show ${item.name} on the floor plan`}><Icon name="route" size={14} /> Map</button>}
