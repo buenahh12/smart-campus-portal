@@ -596,8 +596,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 /* 2D floor plan navigation: drawn like the posted architectural plan signs */
 .dollhouse-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-.dollhouse-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 0 16px; border: 1px solid #10b95c; border-radius: 10px; color: white; background: #0b9850; font-size: 13px; font-weight: 700; }
-.dollhouse-actions button:hover { background: #087b41; }
+.dollhouse-actions button, .dollhouse-actions a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 0 16px; border: 1px solid #10b95c; border-radius: 10px; color: white; background: #0b9850; font-size: 13px; font-weight: 700; }
+.dollhouse-actions button:hover, .dollhouse-actions a:hover { background: #087b41; }
 
 .map-shell { --ink: #1f2723; --ink-soft: #4a534d; --muted: #6f7872; --line: #e1e4de; --paper: #f6f5f1; --route: #0b7a45; --you: #1f6feb; --exit: #c4291c; position: fixed; z-index: 120; inset: 0; display: flex; flex-direction: column; overflow: hidden; color: var(--ink); background: var(--paper); }
 .map-header { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 20px; border-bottom: 1px solid var(--line); background: #fff; }

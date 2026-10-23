@@ -11,7 +11,7 @@
 export const BUILDING_NAME = "Main Academic Building";
 export const PLAN_WIDTH = 160;
 export const PLAN_HEIGHT = 100;
-const METERS_PER_UNIT = 0.4; // estimate: the building is roughly 64 m wide
+export const METERS_PER_UNIT = 0.4; // estimate: the building is roughly 64 m wide
 const STAIR_COST = 25; // one flight of stairs counts like ~10 m of walking
 const WALK_SPEED = 1.2; // metres per second
 

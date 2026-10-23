@@ -66,7 +66,7 @@ h1, h2 { font-family: var(--display); font-weight: 800; font-stretch: 112%; lett
 .ss-facts dd.ss-facts-text { font-family: var(--display); font-weight: 700; font-stretch: 110%; font-size: 18px; letter-spacing: 0; }
 .ss-way h3, .updates-card-title { font-family: var(--display); font-weight: 800; font-stretch: 118%; font-size: 20px; letter-spacing: -.005em; text-transform: uppercase; }
 .ss-brand b, .ss-header .ss-brand b { font-family: var(--display); font-weight: 800; font-stretch: 115%; font-size: 15px; letter-spacing: 0; line-height: 1.1; text-transform: uppercase; }
-.ss-btn, .dollhouse-actions button, .ss-emergency .ss-btn { font-family: var(--display); font-weight: 700; font-stretch: 112%; font-size: 14px; letter-spacing: .03em; text-transform: uppercase; }
+.ss-btn, .dollhouse-actions button, .dollhouse-actions a, .ss-emergency .ss-btn { font-family: var(--display); font-weight: 700; font-stretch: 112%; font-size: 14px; letter-spacing: .03em; text-transform: uppercase; }
 .ss-nav-link { font-family: var(--display); font-weight: 600; font-stretch: 108%; font-size: 14px; letter-spacing: .02em; text-transform: uppercase; }
 .ss-way .floor-head b { font-family: var(--display); font-weight: 800; font-stretch: 115%; font-size: 17px; text-transform: uppercase; }
 .ss-way .floor-buttons button { font-family: var(--display); font-weight: 800; font-stretch: 115%; }

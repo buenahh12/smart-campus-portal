@@ -123,9 +123,9 @@ body { background: var(--paper) var(--grain); }
 .ss-miniplan:hover { border-color: var(--clay); }
 .ss-miniplan svg { animation: plan-swap 280ms var(--ease-out); }
 @keyframes plan-swap { from { opacity: .15; transform: scale(.985); } }
-.dollhouse-actions button { border-color: var(--peach); border-radius: 999px; color: var(--ink); background: var(--peach); transition: background-color var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-out); }
-.dollhouse-actions button:hover { background: var(--peach-hover); transform: translateY(-1px); }
-.dollhouse-actions button:active { transform: translateY(1px) scale(.98); }
+.dollhouse-actions button, .dollhouse-actions a { border-color: var(--peach); border-radius: 999px; color: var(--ink); background: var(--peach); transition: background-color var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-out); }
+.dollhouse-actions button:hover, .dollhouse-actions a:hover { background: var(--peach-hover); transform: translateY(-1px); }
+.dollhouse-actions button:active, .dollhouse-actions a:active { transform: translateY(1px) scale(.98); }
 .ss-way .ar-preview { border: 1px solid rgba(246,239,225,.1); border-radius: var(--radius); }
 .ss-way .ar-arrow { color: var(--ink); background: var(--peach); }
 .ss-prompts { border-top-color: rgba(246,239,225,.14); }

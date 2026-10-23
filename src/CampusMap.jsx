@@ -418,7 +418,7 @@ const STEP_ICONS = {
 };
 
 // Built on each render because staff can rename rooms while the map is open.
-const placeOptions = () => FLOORS.map(({ floor }) => ({
+export const placeOptions = () => FLOORS.map(({ floor }) => ({
   floor,
   places: PLACES.filter((item) => item.floor === floor && item.type !== "stairs" && !(item.unlabeled && item.type === "classroom"))
     .sort((a, b) => (a.type === "exit") - (b.type === "exit") || placeTitle(a).localeCompare(placeTitle(b), undefined, { numeric: true })),

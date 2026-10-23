@@ -125,8 +125,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .mp-exit { fill: #f6d9d4; stroke: var(--red); }
 .mp-outline { fill: none; stroke: var(--ink); stroke-width: 1.8; }
 .dollhouse-actions { margin-top: 14px; }
-.dollhouse-actions button { width: 100%; min-height: 44px; border: 1px solid var(--green); border-radius: 8px; color: #fff; background: var(--green); font-size: 15px; font-weight: 600; }
-.dollhouse-actions button:hover { background: var(--green-hover); }
+.dollhouse-actions button, .dollhouse-actions a { width: 100%; min-height: 44px; border: 1px solid var(--green); border-radius: 8px; color: #fff; background: var(--green); font-size: 15px; font-weight: 600; }
+.dollhouse-actions button:hover, .dollhouse-actions a:hover { background: var(--green-hover); }
+.dollhouse-actions a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; text-decoration: none; }
+.ar-app-note { margin: 10px 0 0; font-size: 13px; line-height: 1.45; opacity: .75; }
+.ar-app-note a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.ss-dollhouse { position: relative; height: 200px; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
+.ss-dollhouse-canvas, .ss-dollhouse-canvas canvas { display: block; width: 100%; height: 100%; }
+.ss-dollhouse-canvas canvas { cursor: grab; }
+.ss-dollhouse-canvas canvas:active { cursor: grabbing; }
+.ss-dollhouse-open { position: absolute; top: 8px; right: 8px; min-height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); background: var(--surface); font-size: 12px; font-weight: 600; }
+.ss-dollhouse-open:hover { border-color: var(--green); }
+.ss-dollhouse-hint { position: absolute; left: 10px; bottom: 8px; color: var(--ink); font-size: 11px; opacity: .6; pointer-events: none; }
 
 .ss-way .ar-preview { height: 260px; border-radius: var(--radius); }
 .ss-way .ar-arrow { color: #fff; background: var(--green); box-shadow: 0 0 0 8px rgba(255,255,255,.12); }

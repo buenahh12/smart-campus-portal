@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import {
   createCampusAccount,
   finishGoogleRedirect,
@@ -20,6 +20,10 @@ import MyCampus from "./MyCampus";
 import CampusMap from "./CampusMap";
 import { FLOORS, PLACES, findPlaceKey, placeByKey, placeTitle, floorLabel as planFloorLabel } from "./floorPlans";
 
+// three.js is large, so the 3D dollhouse loads after the page; the flat mini plan shows meanwhile.
+const Dollhouse3D = lazy(() => import("./Dollhouse3D"));
+const ArLiveView = lazy(() => import("./ArLiveView"));
+
 // Public files live under the site base path (GitHub Pages serves the app from a sub-folder).
 const asset = (file) => `${import.meta.env.BASE_URL}${file}`;
 // Read on each render: staff can rename rooms at any time (see usePlan.js).
@@ -31,6 +35,8 @@ const SCHOOL_MAP_QUERY = "Saint Simon of Cyrene Academy, Carsadang Bago II, Imus
 const MAP_EMBED_URL = `https://www.google.com/maps?q=${encodeURIComponent(SCHOOL_MAP_QUERY)}&output=embed`;
 const MAP_OPEN_URL = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(SCHOOL_MAP_QUERY)}`;
 const MAP_DIRECTIONS_URL = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(SCHOOL_MAP_QUERY)}`;
+// The AR app is a separate Android build, published as a GitHub release by the AR developer.
+const AR_APP_URL = "https://github.com/janlawrencecambayaflorido/SSCA-NAVI-AR-V1/releases/tag/V1.0";
 const SIBOT_PROMPTS = ["Where is the clinic?", "Take me to Room 403", "Show the nearest exit", "What are the school hours?"];
 
 // Small, real outline of the chosen floor; opens the full floor plan.
@@ -575,6 +581,8 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [floor, setFloor] = useState(2);
   const [mapState, setMapState] = useState(null);
+  // A link ending in #ar-live (for example from a printed QR code) opens AR live view directly.
+  const [arOpen, setArOpen] = useState(() => window.location.hash === "#ar-live");
   const [where, setWhere] = useState("");
   const [whereError, setWhereError] = useState("");
   const [scrolled, setScrolled] = useState(false);
@@ -729,7 +737,10 @@ export default function App() {
                   <div className="floor-buttons" role="group" aria-label="Choose a floor">
                     {[1, 2, 3, 4].map((item) => <button key={item} type="button" className={floor === item ? "active" : ""} aria-pressed={floor === item} onClick={() => setFloor(item)}>{item === 1 ? "G" : item}</button>)}
                   </div>
-                  <MiniPlan floor={floor} onOpen={() => setMapState({ floor })} />
+                  <Suspense fallback={<MiniPlan floor={floor} onOpen={() => setMapState({ floor })} />}>
+                    <Dollhouse3D floor={floor} onOpen={() => setMapState({ floor })} label={`3D model of the ${planFloorLabel(floor).toLowerCase()}`}
+                      fallback={<MiniPlan floor={floor} onOpen={() => setMapState({ floor })} />} />
+                  </Suspense>
                 </div>
                 <div className="dollhouse-actions">
                   <button type="button" onClick={() => setMapState({ floor })}><Icon name="route" size={16} /> Open the 2D floor plan</button>
@@ -745,6 +756,10 @@ export default function App() {
                   <div className="ar-arrow">↑</div>
                   <div className="ar-bottom"><span><Icon name="route" size={14} /> Continue straight</span><small>about 1 min</small></div>
                 </div>
+                <div className="dollhouse-actions">
+                  <button type="button" onClick={() => setArOpen(true)}><Icon name="scan" size={16} /> Start AR live view</button>
+                </div>
+                <p className="ar-app-note">Opens your camera, no app needed. Best in Chrome on Android; other phones get a compass guide. Prefer an app? <a href={AR_APP_URL} target="_blank" rel="noopener noreferrer">Get the Android AR app</a> by Jan Lawrence Cambaya Florido.</p>
               </article>
               <article className="ss-way">
                 <span className="ss-way-icon" aria-hidden="true"><Icon name="bot" size={26} /></span>
@@ -825,7 +840,8 @@ export default function App() {
           <a href="#top">Back to top</a>
         </div>
       </footer>
-      {!accountOpen && !loginOpen && !mapState && <SiiBot onSignIn={openLogin} onSignOut={handleSignOut} onOpenAccount={() => setAccountOpen(true)} alreadySignedIn={Boolean(signedInUser)} onNavigate={navigateTo} onOpenMap={setMapState} />}
+      {!accountOpen && !loginOpen && !mapState && !arOpen && <SiiBot onSignIn={openLogin} onSignOut={handleSignOut} onOpenAccount={() => setAccountOpen(true)} alreadySignedIn={Boolean(signedInUser)} onNavigate={navigateTo} onOpenMap={setMapState} />}
+      {arOpen && <Suspense fallback={null}><ArLiveView onClose={() => setArOpen(false)} /></Suspense>}
       {mapState && <CampusMap onClose={() => setMapState(null)} initialFloor={mapState.floor || 2} initialDestination={mapState.destination || null} initialEmergency={Boolean(mapState.emergency)} />}
       {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} onCreate={openCreateAccount} onAdmin={openAdminLogin} onSignedIn={(user) => { setSignedInUser(user); setLoginOpen(false); setAccountOpen(true); }} />}
       {accountOpen && signedInUser && <MyCampus
