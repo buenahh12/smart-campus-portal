@@ -581,8 +581,9 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [floor, setFloor] = useState(2);
   const [mapState, setMapState] = useState(null);
-  // A link ending in #ar-live (for example from a printed QR code) opens AR live view directly.
-  const [arOpen, setArOpen] = useState(() => window.location.hash === "#ar-live");
+  // A link ending in #ar-live or ?ar-live (for example from a printed QR code, or the hand-over
+  // from Messenger to Chrome) opens AR live view directly.
+  const [arOpen, setArOpen] = useState(() => window.location.hash === "#ar-live" || new URLSearchParams(window.location.search).has("ar-live"));
   const [where, setWhere] = useState("");
   const [whereError, setWhereError] = useState("");
   const [scrolled, setScrolled] = useState(false);

@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { usePublicCollection } from "./CampusUpdates";
 import { placeOptions } from "./CampusMap";
 import { CMS_COLLECTIONS, isClosureActive } from "./cms";
+import { inAppBrowserName } from "./firebase";
 import { usePlanVersion } from "./usePlan";
 import { FLOORS, METERS_PER_UNIT as M, blockedAreas, findRoute, floorLabel, graphNode, placeByKey, placeTitle } from "./floorPlans";
 import "./ar.css";
@@ -54,7 +55,7 @@ export function routeLegs(route) {
   });
 }
 
-// Straight stretches of a leg, for the compass guide.
+// Straight stretches of a leg; from is the index of the point each one starts at.
 export function legSegments(leg) {
   const segments = [];
   for (let i = 1; i < leg.points.length; i += 1) {
@@ -69,9 +70,55 @@ export function legSegments(leg) {
       continue;
     }
     const cross = previous ? previous.dir.x * dir.z - previous.dir.z * dir.x : 0;
-    segments.push({ dir, length, turn: !previous || Math.abs(cross) < 0.34 ? "straight" : cross > 0 ? "right" : "left" });
+    segments.push({ from: i - 1, dir, length, turn: !previous || Math.abs(cross) < 0.34 ? "straight" : cross > 0 ? "right" : "left" });
   }
   return segments;
+}
+
+const SHORT_STRETCH = 2.5; // metres; shorter stretches are folded into the next step
+
+// Compass guide steps: one per real turn, so NEXT is only needed at corners. Stepping out of a
+// doorway or a short jog is folded into the next step, and a short final turn into the room is
+// added to the last one.
+export function legSteps(leg, firstLeg) {
+  const segments = legSegments(leg);
+  const phrase = (segment, first) => {
+    const meters = `about ${Math.max(1, Math.round(segment.length))} m`;
+    const short = segment.length < SHORT_STRETCH;
+    if (segment.turn !== "straight") return short ? `turn ${segment.turn}` : `turn ${segment.turn} and walk ${meters}`;
+    if (first) return short ? (firstLeg ? "step out into the hallway" : "step out of the stairway") : `walk ${meters}`;
+    return short ? "go ahead a few steps" : `keep going ${meters}`;
+  };
+  const steps = [];
+  let pending = [];
+  segments.forEach((segment, index) => {
+    pending.push(segment);
+    if (segment.length < SHORT_STRETCH && index < segments.length - 1) return;
+    const text = pending.map((item) => phrase(item, item === segments[0])).join(", then ");
+    const length = pending.reduce((sum, item) => sum + item.length, 0);
+    const previous = steps[steps.length - 1];
+    if (previous && pending.every((item) => item.length < SHORT_STRETCH)) {
+      previous.text += `, then ${text}`;
+      previous.length += length;
+    } else steps.push({ from: pending[0].from, text, length });
+    pending = [];
+  });
+  return steps.map((step) => ({ ...step, text: step.text[0].toUpperCase() + step.text.slice(1) }));
+}
+
+// The rest of the leg from a point index, cut off after a distance so the trail stays readable.
+function trailFrom(points, from, maxLength) {
+  const trail = [points[from]];
+  let length = 0;
+  for (let i = from + 1; i < points.length && length < maxLength; i += 1) {
+    const a = points[i - 1];
+    const b = points[i];
+    const step = Math.hypot(b.x - a.x, b.z - a.z);
+    const keep = Math.min(step, maxLength - length);
+    trail.push(keep < step ? { x: a.x + ((b.x - a.x) * keep) / step, z: a.z + ((b.z - a.z) * keep) / step } : b);
+    length += keep;
+  }
+  return trail;
 }
 
 // The direction you face in the starting doorway: from the door out to the hallway.
@@ -116,7 +163,11 @@ function progressOn(points, x, z) {
   return best;
 }
 
+// ?from=2:room-204&to=3:cr-3-girls in the link picks the rooms (used when handing over to Chrome).
+const linkPlace = (name) => placeByKey(new URLSearchParams(window.location.search).get(name))?.key || "";
+
 const readStart = () => {
+  if (linkPlace("from")) return linkPlace("from");
   try {
     return placeByKey(localStorage.getItem(START_STORAGE))?.key || "";
   } catch {
@@ -124,11 +175,19 @@ const readStart = () => {
   }
 };
 
+// Messenger, Facebook and other in-app browsers on Android have no WebXR; Chrome does.
+function chromeLink(fromKey, toKey) {
+  const params = new URLSearchParams({ "ar-live": "", ...(fromKey && { from: fromKey }), ...(toKey && { to: toKey }) });
+  const path = `${window.location.host}${window.location.pathname}?${params}`;
+  return `intent://${path}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(`https://${path}`)};end`;
+}
+
 export default function ArLiveView({ onClose, initialDestination = "" }) {
   const closures = usePublicCollection(CMS_COLLECTIONS.closures);
   const planVersion = usePlanVersion();
   const [fromKey, setFromKey] = useState(readStart);
-  const [toKey, setToKey] = useState(initialDestination || "");
+  const [toKey, setToKey] = useState(() => linkPlace("to") || initialDestination || "");
+  const inApp = /Android/i.test(navigator.userAgent) ? inAppBrowserName() : "";
   const [mode, setMode] = useState("setup"); // setup | xr | compass
   const [legIndex, setLegIndex] = useState(0);
   const [segmentIndex, setSegmentIndex] = useState(0);
@@ -328,20 +387,21 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
     });
   };
 
-  // Arrows for the current compass stretch, laid out ahead of you from where you stand.
-  const segments = useMemo(() => (leg ? legSegments(leg) : []), [leg]);
+  // Compass guide: the whole path ahead (around the corners too) is laid out from where you
+  // stand, starting at the current step.
+  const segments = useMemo(() => (leg ? legSteps(leg, legIndex === 0) : []), [leg, legIndex]);
   const segment = segments[segmentIndex];
   useEffect(() => {
     if (mode !== "compass" || !leg || !segment) return;
     const state = compass.current;
     state.place = () => {
       const rotate = rotation(legFacing(leg), state.facing);
-      const dir = rotate(segment.dir);
-      const length = Math.min(segment.length, 8);
-      engine.current.placeArrows([{ x: dir.x * 0.6, z: dir.z * 0.6 }, { x: dir.x * (0.6 + length), z: dir.z * (0.6 + length) }], 0, false);
+      const origin = leg.points[segment.from];
+      const trail = trailFrom(leg.points, segment.from, 30).map((point) => rotate({ x: point.x - origin.x, z: point.z - origin.z }));
+      engine.current.placeArrows(trail, 0, lastLeg);
     };
     if (state.facing) state.place();
-  }, [mode, leg, segment]);
+  }, [mode, leg, segment, lastLeg]);
 
   const start = async () => {
     setProblem("");
@@ -434,9 +494,11 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
     } else if (tracking.off) message = "You are off the route. Walk back to the arrows, or tap Clear and start again from a doorway.";
     else message = `Follow the cyan arrows to ${destinationText}. ${tracking.left} m left`;
   } else if (segment) {
-    const turn = segmentIndex === 0 ? (legIndex === 0 ? "Walk" : "From the stairway door, walk") : segment.turn === "straight" ? "Keep going" : `Turn ${segment.turn} and walk`;
-    message = `${turn} about ${Math.max(1, Math.round(segment.length))} m along the arrows.`;
-    if (segmentIndex < segments.length - 1) action = "NEXT";
+    message = `${segment.text}.`;
+    if (segmentIndex < segments.length - 1) {
+      message += " Tap NEXT at the turn.";
+      action = "NEXT";
+    }
     else if (!lastLeg) { message += ` ${leg.stairs}, then stand at the stairway door facing the hallway.`; action = "CONTINUE"; }
     else message += ` You will arrive at ${placeTitle(destination)}.`;
   }
@@ -458,6 +520,10 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
           : <button type="button" className="ar-live-button ar-live-primary" onClick={start} disabled={!ready}>START</button>}
         <button type="button" className="ar-live-button" onClick={clear}>Clear</button>
       </div>
+      {inApp && mode === "setup" && <div className="ar-live-chrome">
+        <span>{inApp} can&apos;t do full AR. Open this in Chrome so the arrows stay on the floor as you walk.</span>
+        <a className="ar-live-button ar-live-small" href={chromeLink(fromKey, toKey)}>Open in Chrome</a>
+      </div>}
       {mode !== "setup" && <p className="ar-live-mode">{mode === "xr" ? "AR tracking on" : "Compass guide: tap NEXT at each turn"}{leg ? ` · ${floorLabel(leg.floor)}` : ""}</p>}
     </div>
     <p className="ar-live-status" aria-live="polite">{message}</p>
