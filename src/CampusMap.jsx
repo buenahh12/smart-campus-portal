@@ -139,12 +139,17 @@ function runArrows(run) {
   return arrows;
 }
 
+// One badge where the route takes the stairs, naming the floor you leave the stairs on (stairs
+// that climb past a floor go straight to the floor where the walk continues).
 function stairBadges(route, floor) {
   if (!route?.via) return [];
   return route.via.flatMap((edge, index) => {
+    if (!edge.stairs || route.via[index - 1]?.stairs) return [];
+    let last = index;
+    while (route.via[last + 1]?.stairs) last += 1;
     const from = graphNode(route.path[index]);
-    const to = graphNode(route.path[index + 1]);
-    return edge.stairs && from.floor === floor ? [{ x: from.x, y: from.y, toFloor: to.floor, up: to.floor > floor }] : [];
+    const to = graphNode(route.path[last + 1]);
+    return from.floor === floor ? [{ x: from.x, y: from.y, toFloor: to.floor, up: to.floor > floor }] : [];
   });
 }
 
@@ -170,12 +175,13 @@ function FloorPlan2D({ plan, route, startKey, destKey, selectedKey, blocked, onP
     const xs = nodes.map((node) => node.x);
     const ys = nodes.map((node) => node.y);
     const pad = 20;
+    const stepperRoom = route.floors?.length > 1 ? 22 : 0; // keep the route clear of the floor stepper
     let w = Math.max(70, Math.max(...xs) - Math.min(...xs) + pad * 2);
-    let h = Math.max(...ys) - Math.min(...ys) + pad * 2;
+    let h = Math.max(...ys) - Math.min(...ys) + pad * 2 + stepperRoom;
     if (h > w * ASPECT) w = h / ASPECT;
     h = w * ASPECT;
     const cx = (Math.max(...xs) + Math.min(...xs)) / 2;
-    const cy = (Math.max(...ys) + Math.min(...ys)) / 2;
+    const cy = (Math.max(...ys) + Math.min(...ys)) / 2 + stepperRoom / 2;
     setView({ x: cx - w / 2, y: cy - h / 2, w, h });
   }, [floor, routeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -439,6 +445,10 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
   const plan = FLOORS.find((item) => item.floor === floor);
   const selected = placeByKey(selectedKey);
   const routeFloors = route?.floors || [];
+  // Route stepper: walk the route floor by floor (floors are in walking order).
+  const stepAt = routeFloors.indexOf(floor);
+  const nextFloor = stepAt === -1 ? routeFloors[0] : routeFloors[stepAt + 1];
+  const previousFloor = stepAt > 0 ? routeFloors[stepAt - 1] : undefined;
 
   useEffect(() => {
     try { localStorage.setItem(START_STORAGE, startKey); } catch { /* storage unavailable */ }
@@ -507,6 +517,15 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
           </div>
           <div className="map-canvas">
             <FloorPlan2D plan={plan} route={route?.path ? route : null} startKey={startKey} destKey={destKey} selectedKey={selectedKey} blocked={blocked} onPick={pickOnMap} onFloor={setFloor} />
+            {route?.path && routeFloors.length > 1 && <div className="map-stepper" role="group" aria-label="Follow the route floor by floor">
+              <button type="button" onClick={() => setFloor(previousFloor)} disabled={previousFloor === undefined} aria-label={previousFloor === undefined ? "Back" : `Back to the ${floorLabel(previousFloor).toLowerCase()}`}>
+                <span className="map-stepper-flip" aria-hidden="true"><Icon name="arrow" size={16} /></span> Back
+              </button>
+              <p aria-live="polite"><small>{stepAt === -1 ? "Not on this route" : `Floor ${stepAt + 1} of ${routeFloors.length}`}</small><b>{floorLabel(floor)}</b></p>
+              {nextFloor !== undefined
+                ? <button type="button" className="primary" onClick={() => setFloor(nextFloor)}>{stepAt === -1 ? "Start" : "Next"}: {floorShort(nextFloor)} <Icon name="arrow" size={16} /></button>
+                : <span className="map-stepper-done">Arrive</span>}
+            </div>}
           </div>
           <div className="map-key" aria-label="Map key">
             <span><i className="key-you" /> You are here</span>

@@ -440,7 +440,10 @@ export function findRoute(startKey, endKey, blocked = new Set()) {
   if (!found) return { blocked: true };
   const start = placeByKey(startKey);
   const end = placeByKey(endKey);
-  return { ...found, ...describe(found.path, found.via, start, end), start, end, floors: [...new Set(found.path.map((id) => GRAPH.nodes.get(id).floor))] };
+  // Floors you walk on, in order. A floor the stairs only pass through (its stairwell is the only
+  // node there) is left out.
+  const floors = [...new Set(found.path.map((id) => GRAPH.nodes.get(id)).filter((node) => node.kind !== "room" || node.room === start.id || node.room === end.id).map((node) => node.floor))];
+  return { ...found, ...describe(found.path, found.via, start, end), start, end, floors };
 }
 
 // Route to whichever exit is closest by walking distance.
