@@ -106,6 +106,19 @@ export function legSteps(leg, firstLeg) {
   return steps.map((step) => ({ ...step, text: step.text[0].toUpperCase() + step.text.slice(1) }));
 }
 
+// The point a given distance along a polyline (x/z), clamped to its ends.
+function pointAlong(points, distance) {
+  let left = Math.max(0, distance);
+  for (let i = 1; i < points.length; i += 1) {
+    const a = points[i - 1];
+    const b = points[i];
+    const length = Math.hypot(b.x - a.x, b.z - a.z);
+    if (left <= length && length > 0) return { x: a.x + ((b.x - a.x) * left) / length, z: a.z + ((b.z - a.z) * left) / length };
+    left -= length;
+  }
+  return points[points.length - 1];
+}
+
 // The rest of the leg from a point index, cut off after a distance so the trail stays readable.
 function trailFrom(points, from, maxLength) {
   const trail = [points[from]];
@@ -237,6 +250,13 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
     const geometry = chevronGeometry();
     const materials = CYAN.map((color) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.92, side: THREE.DoubleSide, depthWrite: false }));
     const pinMaterial = new THREE.MeshBasicMaterial({ color: CYAN[0], transparent: true, opacity: 0.85 });
+    // Drawn on top of everything so walls in the camera image never hide it.
+    const guideMaterial = new THREE.MeshBasicMaterial({ color: "#ffffff", side: THREE.DoubleSide, depthTest: false, transparent: true, opacity: 0.95 });
+    const guide = new THREE.Mesh(geometry, guideMaterial);
+    guide.scale.setScalar(0.45);
+    guide.renderOrder = 10;
+    guide.visible = false;
+    scene.add(guide);
 
     const resize = () => {
       renderer.setSize(window.innerWidth, window.innerHeight, false);
@@ -251,6 +271,8 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
       camera,
       scene,
       arrows,
+      guide,
+      hitSource: null,
       stopCamera: () => {
         stopped = true;
         stream?.getTracks().forEach((track) => track.stop());
@@ -301,7 +323,7 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
       engine.current.stopCamera();
       arrows.traverse((item) => { if (item.geometry !== geometry) item.geometry?.dispose(); });
       geometry.dispose();
-      [...materials, pinMaterial].forEach((material) => material.dispose());
+      [...materials, pinMaterial, guideMaterial].forEach((material) => material.dispose());
       renderer.dispose();
       renderer.domElement.remove();
       engine.current = null;
@@ -309,21 +331,27 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
   }, []);
 
   // Phone tracking (WebXR): calibrate on the first frames, then follow progress along the leg.
+  // The floor starts as an estimate (phone height) and moves to the real floor once ARCore finds
+  // it under the centre of the camera. A guide arrow floats ahead of you, pointing along the route,
+  // so there is always something to follow even when the floor is out of view.
   const startXrLeg = (index) => {
-    const { renderer, camera, scene } = engine.current;
+    const { renderer, camera, scene, arrows, guide } = engine.current;
     const current = legs[index];
     let frames = 0;
     let world = null;
+    let estimatedFloor = 0;
+    let along = 0;
     let lastReport = 0;
     const position = new THREE.Vector3();
     const forward = new THREE.Vector3();
-    renderer.setAnimationLoop((time) => {
+    arrows.position.y = 0;
+    renderer.setAnimationLoop((time, frame) => {
       renderer.render(scene, camera);
       frames += 1;
       const xrCamera = renderer.xr.getCamera();
       xrCamera.getWorldPosition(position);
+      xrCamera.getWorldDirection(forward);
       if (!world && frames > 2) {
-        xrCamera.getWorldDirection(forward);
         const facing = Math.hypot(forward.x, forward.z) > 0.05 ? { x: forward.x, z: forward.z } : { x: 0, z: -1 };
         const length = Math.hypot(facing.x, facing.z);
         const rotate = rotation(legFacing(current), { x: facing.x / length, z: facing.z / length });
@@ -332,15 +360,30 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
           const turned = rotate({ x: point.x - origin.x, z: point.z - origin.z });
           return { x: position.x + turned.x, z: position.z + turned.z };
         });
-        engine.current.placeArrows(world, position.y - PHONE_HEIGHT, index === legs.length - 1);
+        estimatedFloor = position.y - PHONE_HEIGHT;
+        engine.current.placeArrows(world, estimatedFloor, index === legs.length - 1);
       }
-      if (world && time - lastReport > 250) {
+      if (!world) return;
+
+      const hits = frame && engine.current.hitSource ? frame.getHitTestResults(engine.current.hitSource) : [];
+      const floor = hits[0]?.getPose(renderer.xr.getReferenceSpace())?.transform.position.y;
+      if (floor !== undefined && floor < position.y - 0.6) arrows.position.y = floor - estimatedFloor;
+
+      const ahead = pointAlong(world, along + 3);
+      const flat = Math.hypot(forward.x, forward.z) || 1;
+      guide.position.set(position.x + (forward.x / flat) * 1.4, position.y - 0.45, position.z + (forward.z / flat) * 1.4);
+      guide.rotation.y = Math.atan2(-(ahead.x - guide.position.x), -(ahead.z - guide.position.z));
+      guide.visible = true;
+
+      if (time - lastReport > 250) {
         lastReport = time;
-        const { along, off } = progressOn(world, position.x, position.z);
-        engine.current.arrows.children.forEach((arrow) => { arrow.visible = arrow.userData.along === undefined || arrow.userData.along > along - 1; });
+        const progress = progressOn(world, position.x, position.z);
+        along = progress.along;
+        arrows.children.forEach((arrow) => { arrow.visible = arrow.userData.along === undefined || arrow.userData.along > along - 1; });
         const legLeft = Math.max(0, current.length - along);
         const later = legs.slice(index + 1).reduce((sum, item) => sum + item.length, 0);
-        setTracking({ left: Math.round(legLeft + later), off: off > OFF_ROUTE_DISTANCE, atEnd: legLeft < ARRIVE_DISTANCE });
+        guide.visible = legLeft >= ARRIVE_DISTANCE;
+        setTracking({ left: Math.round(legLeft + later), off: progress.off > OFF_ROUTE_DISTANCE, atEnd: legLeft < ARRIVE_DISTANCE });
       }
     });
   };
@@ -412,15 +455,24 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
     if (xrSupported) {
       engine.current.stopCamera();
       try {
-        const session = await navigator.xr.requestSession("immersive-ar", { optionalFeatures: ["dom-overlay"], domOverlay: { root: overlay.current } });
+        const session = await navigator.xr.requestSession("immersive-ar", { optionalFeatures: ["dom-overlay", "hit-test"], domOverlay: { root: overlay.current } });
         const { renderer } = engine.current;
         renderer.xr.setReferenceSpaceType("local");
         await renderer.xr.setSession(session);
+        // Ray from the middle of the camera, used to find the real floor.
+        session.requestReferenceSpace("viewer")
+          .then((space) => session.requestHitTestSource?.({ space }))
+          .then((source) => { if (engine.current) engine.current.hitSource = source || null; })
+          .catch(() => {});
         session.addEventListener("end", () => {
           renderer.setAnimationLoop(null);
-          engine.current?.arrows.clear();
+          if (!engine.current) return;
+          engine.current.hitSource?.cancel?.();
+          engine.current.hitSource = null;
+          engine.current.arrows.clear();
+          engine.current.guide.visible = false;
           setMode("setup");
-          engine.current?.startCamera();
+          engine.current.startCamera();
         });
         setMode("xr");
         startXrLeg(0);
@@ -446,6 +498,13 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
     setTracking((current) => ({ ...current, atEnd: false }));
     if (mode === "xr") startXrLeg(next);
     else { compass.current.facing = null; }
+  };
+
+  // Lay the arrows again from where you stand now (back in the doorway, facing the hallway).
+  const recenter = () => {
+    setTracking((current) => ({ ...current, off: false, atEnd: false }));
+    if (mode === "xr") startXrLeg(legIndex);
+    else compass.current.facing = null;
   };
 
   const stop = () => {
@@ -517,14 +576,16 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
         {select(toKey, setToKey, "To")}
         {action
           ? <button type="button" className="ar-live-button ar-live-primary" onClick={continueRoute}>{action}</button>
-          : <button type="button" className="ar-live-button ar-live-primary" onClick={start} disabled={!ready}>START</button>}
+          : mode === "setup"
+            ? <button type="button" className="ar-live-button ar-live-primary" onClick={start} disabled={!ready}>START</button>
+            : <button type="button" className="ar-live-button" onClick={recenter}>RE-CENTER</button>}
         <button type="button" className="ar-live-button" onClick={clear}>Clear</button>
       </div>
       {inApp && mode === "setup" && <div className="ar-live-chrome">
         <span>{inApp} can&apos;t do full AR. Open this in Chrome so the arrows stay on the floor as you walk.</span>
         <a className="ar-live-button ar-live-small" href={chromeLink(fromKey, toKey)}>Open in Chrome</a>
       </div>}
-      {mode !== "setup" && <p className="ar-live-mode">{mode === "xr" ? "AR tracking on" : "Compass guide: tap NEXT at each turn"}{leg ? ` · ${floorLabel(leg.floor)}` : ""}</p>}
+      {mode !== "setup" && <p className="ar-live-mode">{mode === "xr" ? "AR tracking on · point the camera at the floor ahead" : "Compass guide: tap NEXT at each turn"}{leg ? ` · ${floorLabel(leg.floor)}` : ""}</p>}
     </div>
     <p className="ar-live-status" aria-live="polite">{message}</p>
   </div>;
