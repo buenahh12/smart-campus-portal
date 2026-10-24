@@ -20,7 +20,7 @@ const PHONE_HEIGHT = 1.35; // metres from the floor to a phone held in front of 
 const ARROW_SPACING = 0.8;
 const ARRIVE_DISTANCE = 1.5;
 const OFF_ROUTE_DISTANCE = 4;
-const CYAN = ["#20d8ec", "#10a6c2"];
+const ARROW_COLORS = ["#f1c39a", "#e58a4e"]; // the site's peach, alternating with a deeper clay so the trail reads on light floors
 const START_STORAGE = "campus-map-start"; // shared with the 2D map
 
 const roomName = (floor, id) => FLOORS.find((item) => item.floor === floor)?.rooms.find((item) => item.id === id)?.name || "";
@@ -104,19 +104,6 @@ export function legSteps(leg, firstLeg) {
     pending = [];
   });
   return steps.map((step) => ({ ...step, text: step.text[0].toUpperCase() + step.text.slice(1) }));
-}
-
-// The point a given distance along a polyline (x/z), clamped to its ends.
-function pointAlong(points, distance) {
-  let left = Math.max(0, distance);
-  for (let i = 1; i < points.length; i += 1) {
-    const a = points[i - 1];
-    const b = points[i];
-    const length = Math.hypot(b.x - a.x, b.z - a.z);
-    if (left <= length && length > 0) return { x: a.x + ((b.x - a.x) * left) / length, z: a.z + ((b.z - a.z) * left) / length };
-    left -= length;
-  }
-  return points[points.length - 1];
 }
 
 // The rest of the leg from a point index, cut off after a distance so the trail stays readable.
@@ -206,7 +193,7 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
   const [segmentIndex, setSegmentIndex] = useState(0);
   const [tracking, setTracking] = useState({ left: null, off: false, atEnd: false });
   const [problem, setProblem] = useState("");
-  const [diagnostics, setDiagnostics] = useState("");
+  const [welcome, setWelcome] = useState(true);
   const [xrSupported, setXrSupported] = useState(false);
   const overlay = useRef(null);
   const video = useRef(null);
@@ -249,15 +236,8 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
     const arrows = new THREE.Group();
     scene.add(arrows);
     const geometry = chevronGeometry();
-    const materials = CYAN.map((color) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.92, side: THREE.DoubleSide, depthWrite: false }));
-    const pinMaterial = new THREE.MeshBasicMaterial({ color: CYAN[0], transparent: true, opacity: 0.85 });
-    // Drawn on top of everything so walls in the camera image never hide it.
-    const guideMaterial = new THREE.MeshBasicMaterial({ color: "#ffffff", side: THREE.DoubleSide, depthTest: false, transparent: true, opacity: 0.95 });
-    const guide = new THREE.Mesh(geometry, guideMaterial);
-    guide.scale.setScalar(0.45);
-    guide.renderOrder = 10;
-    guide.visible = false;
-    scene.add(guide);
+    const materials = ARROW_COLORS.map((color) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.92, side: THREE.DoubleSide, depthWrite: false }));
+    const pinMaterial = new THREE.MeshBasicMaterial({ color: ARROW_COLORS[0], transparent: true, opacity: 0.85 });
 
     const resize = () => {
       renderer.setSize(window.innerWidth, window.innerHeight, false);
@@ -272,7 +252,6 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
       camera,
       scene,
       arrows,
-      guide,
       hitSource: null,
       stopCamera: () => {
         stopped = true;
@@ -324,7 +303,7 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
       engine.current.stopCamera();
       arrows.traverse((item) => { if (item.geometry !== geometry) item.geometry?.dispose(); });
       geometry.dispose();
-      [...materials, pinMaterial, guideMaterial].forEach((material) => material.dispose());
+      [...materials, pinMaterial].forEach((material) => material.dispose());
       renderer.dispose();
       renderer.domElement.remove();
       engine.current = null;
@@ -333,39 +312,18 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
 
   // Phone tracking (WebXR): calibrate on the first frames, then follow progress along the leg.
   // The floor starts as an estimate (phone height) and moves to the real floor once ARCore finds
-  // it under the centre of the camera. A guide arrow floats ahead of you, pointing along the route,
-  // so there is always something to follow even when the floor is out of view.
+  // it under the centre of the camera.
   const startXrLeg = (index) => {
-    const { renderer, camera, scene, arrows, guide } = engine.current;
+    const { renderer, camera, scene, arrows } = engine.current;
     const current = legs[index];
     let frames = 0;
     let world = null;
     let estimatedFloor = 0;
-    let along = 0;
     let lastReport = 0;
     const position = new THREE.Vector3();
     const forward = new THREE.Vector3();
     arrows.position.y = 0;
-    let floorFound = null;
-    let lastError = "";
-    let lastDiagnostics = 0;
-    const session = renderer.xr.getSession();
-    const layer = session?.renderState.layers?.length ? "layers" : session?.renderState.baseLayer ? "classic" : "none";
     renderer.setAnimationLoop((time, frame) => {
-      try {
-        step(time, frame);
-      } catch (error) {
-        lastError = error?.message || String(error);
-      }
-      // Diagnostics shown on screen while AR is being tested on phones.
-      if (time - lastDiagnostics > 300) {
-        lastDiagnostics = time;
-        const gl = renderer.getContext();
-        const glError = gl.getError();
-        setDiagnostics(`frames ${frames} · draw ${layer} · arrows ${arrows.children.length}${guide.visible ? " + guide" : ""} · floor ${floorFound === null ? "not found" : floorFound.toFixed(2)} · phone ${position.x.toFixed(1)},${position.y.toFixed(1)},${position.z.toFixed(1)}${glError ? ` · gl ${glError}` : ""}${lastError ? ` · error: ${lastError}` : ""}`);
-      }
-    });
-    function step(time, frame) {
       renderer.render(scene, camera);
       frames += 1;
       const xrCamera = renderer.xr.getCamera();
@@ -387,28 +345,17 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
 
       const hits = frame && engine.current.hitSource ? frame.getHitTestResults(engine.current.hitSource) : [];
       const floor = hits[0]?.getPose(renderer.xr.getReferenceSpace())?.transform.position.y;
-      if (floor !== undefined && floor < position.y - 0.6) {
-        arrows.position.y = floor - estimatedFloor;
-        floorFound = floor;
-      }
-
-      const ahead = pointAlong(world, along + 3);
-      const flat = Math.hypot(forward.x, forward.z) || 1;
-      guide.position.set(position.x + (forward.x / flat) * 1.4, position.y - 0.45, position.z + (forward.z / flat) * 1.4);
-      guide.rotation.y = Math.atan2(-(ahead.x - guide.position.x), -(ahead.z - guide.position.z));
-      guide.visible = true;
+      if (floor !== undefined && floor < position.y - 0.6) arrows.position.y = floor - estimatedFloor;
 
       if (time - lastReport > 250) {
         lastReport = time;
-        const progress = progressOn(world, position.x, position.z);
-        along = progress.along;
+        const { along, off } = progressOn(world, position.x, position.z);
         arrows.children.forEach((arrow) => { arrow.visible = arrow.userData.along === undefined || arrow.userData.along > along - 1; });
         const legLeft = Math.max(0, current.length - along);
         const later = legs.slice(index + 1).reduce((sum, item) => sum + item.length, 0);
-        guide.visible = legLeft >= ARRIVE_DISTANCE;
-        setTracking({ left: Math.round(legLeft + later), off: progress.off > OFF_ROUTE_DISTANCE, atEnd: legLeft < ARRIVE_DISTANCE });
+        setTracking({ left: Math.round(legLeft + later), off: off > OFF_ROUTE_DISTANCE, atEnd: legLeft < ARRIVE_DISTANCE });
       }
-    }
+    });
   };
 
   // Compass guide: the camera turns with the phone; arrows point along the current stretch.
@@ -481,12 +428,12 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
         const session = await navigator.xr.requestSession("immersive-ar", { optionalFeatures: ["dom-overlay", "hit-test"], domOverlay: { root: overlay.current } });
         const { renderer } = engine.current;
         renderer.xr.setReferenceSpaceType("local");
-        // three.js draws through WebXR projection layers when the browser offers them; for phone AR
-        // use the classic XRWebGLLayer, which Chrome on Android composites over the camera.
-        // ?ar-layers in the link keeps the layers path for comparison.
+        // three.js draws through WebXR projection layers when the browser offers them, but on
+        // Android phones nothing drawn that way showed over the camera. Hide that API while the
+        // session starts so three.js uses the classic XRWebGLLayer, which does show.
         const layersApi = window.XRWebGLBinding?.prototype;
         const projectionLayer = layersApi && Object.getOwnPropertyDescriptor(layersApi, "createProjectionLayer");
-        if (projectionLayer && !new URLSearchParams(window.location.search).has("ar-layers")) delete layersApi.createProjectionLayer;
+        if (projectionLayer) delete layersApi.createProjectionLayer;
         try {
           await renderer.xr.setSession(session);
         } finally {
@@ -503,7 +450,6 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
           engine.current.hitSource?.cancel?.();
           engine.current.hitSource = null;
           engine.current.arrows.clear();
-          engine.current.guide.visible = false;
           setMode("setup");
           engine.current.startCamera();
         });
@@ -561,7 +507,8 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
   }, []);
 
   const select = (value, onChange, placeholder) => <label className="ar-live-pick">
-    <span>{placeholder}: {value ? placeTitle(placeByKey(value)) : "Choose…"}</span>
+    <small>{placeholder}</small>
+    <span>{value ? placeTitle(placeByKey(value)) : "Choose a room"}</span>
     <select value={value} onChange={(event) => onChange(event.target.value)} disabled={mode !== "setup"} aria-label={placeholder}>
       <option value="">Choose…</option>
       {placeOptions().map((group) => <optgroup key={group.floor} label={floorLabel(group.floor)}>
@@ -577,18 +524,18 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
   else if (!fromKey || !toKey) message = "Choose where you are (From) and where you want to go (To).";
   else if (fromKey === toKey) message = "You are already there.";
   else if (route?.blocked) message = "No open route right now: a hallway or stairway on the way is closed.";
-  else if (mode === "setup") message = `Stand in the doorway of ${placeTitle(placeByKey(fromKey))} with your back to the room, facing the hallway. Then tap START.`;
+  else if (mode === "setup") message = `Stand in the doorway of ${placeTitle(placeByKey(fromKey))} with your back to the room, facing the hallway. Then tap Start.`;
   else if (mode === "xr") {
     if (tracking.atEnd && lastLeg) message = `You have arrived at ${placeTitle(destination)}.`;
     else if (tracking.atEnd) {
-      message = `${leg.stairs}. At the stairway door there, face the hallway and tap CONTINUE.`;
+      message = `${leg.stairs}. At the stairway door there, face the hallway and tap Continue.`;
       action = "CONTINUE";
     } else if (tracking.off) message = "You are off the route. Walk back to the arrows, or tap Clear and start again from a doorway.";
-    else message = `Follow the cyan arrows to ${destinationText}. ${tracking.left} m left`;
+    else message = `Follow the arrows to ${destinationText}. ${tracking.left} m left`;
   } else if (segment) {
     message = `${segment.text}.`;
     if (segmentIndex < segments.length - 1) {
-      message += " Tap NEXT at the turn.";
+      message += " Tap Next at the turn.";
       action = "NEXT";
     }
     else if (!lastLeg) { message += ` ${leg.stairs}, then stand at the stairway door facing the hallway.`; action = "CONTINUE"; }
@@ -596,31 +543,53 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
   }
 
   const ready = Boolean(route?.path) && mode === "setup";
+  const close = () => { stop(); onClose(); };
   return <div ref={overlay} className={`ar-live ar-live-${mode}`} role="dialog" aria-modal="true" aria-label="AR live view">
     <video ref={video} className="ar-live-video" autoPlay playsInline muted />
     <div ref={canvasHolder} className="ar-live-canvas" aria-hidden="true" />
+    {welcome && <div className="ar-live-welcome">
+      <div className="ar-live-welcome-card">
+        <span className="ar-live-overline">{"// SSCA NAVI"}</span>
+        <h2>Welcome to <span>AR live view</span></h2>
+        <p>Point your phone down the hallway and follow the arrows on the floor to any room in the Main Academic Building.</p>
+        <ol>
+          <li><b>Choose</b> where you are and where you want to go.</li>
+          <li><b>Stand in the doorway</b> with your back to the room, facing the hallway, and tap Start.</li>
+          <li><b>Follow the arrows</b> on the floor. At the stairs, tap Continue at the stairway door.</li>
+        </ol>
+        <p className="ar-live-tip">{xrSupported ? "Hold your phone up and point the camera at the floor ahead." : inApp ? `${inApp} can't track the floor. For the full AR view, open this in Chrome.` : "This phone uses the compass guide: the arrows turn with your phone, and you tap Next at each turn."}</p>
+        <div className="ar-live-welcome-actions">
+          <button type="button" className="ar-live-button ar-live-primary" onClick={() => setWelcome(false)}>Get started</button>
+          {inApp
+            ? <a className="ar-live-button" href={chromeLink(fromKey, toKey)}>Open in Chrome</a>
+            : <button type="button" className="ar-live-button" onClick={close}>Not now</button>}
+        </div>
+      </div>
+    </div>}
     <div className="ar-live-panel">
       <div className="ar-live-title">
-        <b>SSCA NAVI</b>
-        <button type="button" className="ar-live-button ar-live-small" onClick={() => { stop(); onClose(); }}>Close</button>
+        <div>
+          <span className="ar-live-overline">{"// AR live view"}</span>
+          <b>SSCA NAVI</b>
+        </div>
+        <button type="button" className="ar-live-button ar-live-small" onClick={close}>Close</button>
       </div>
       <div className="ar-live-grid">
         {select(fromKey, setFromKey, "From")}
         {select(toKey, setToKey, "To")}
         {action
-          ? <button type="button" className="ar-live-button ar-live-primary" onClick={continueRoute}>{action}</button>
+          ? <button type="button" className="ar-live-button ar-live-primary" onClick={continueRoute}>{action === "NEXT" ? "Next" : "Continue"}</button>
           : mode === "setup"
-            ? <button type="button" className="ar-live-button ar-live-primary" onClick={start} disabled={!ready}>START</button>
-            : <button type="button" className="ar-live-button" onClick={recenter}>RE-CENTER</button>}
+            ? <button type="button" className="ar-live-button ar-live-primary" onClick={start} disabled={!ready}>Start</button>
+            : <button type="button" className="ar-live-button" onClick={recenter}>Re-center</button>}
         <button type="button" className="ar-live-button" onClick={clear}>Clear</button>
       </div>
-      {inApp && mode === "setup" && <div className="ar-live-chrome">
+      {inApp && mode === "setup" && !welcome && <div className="ar-live-chrome">
         <span>{inApp} can&apos;t do full AR. Open this in Chrome so the arrows stay on the floor as you walk.</span>
         <a className="ar-live-button ar-live-small" href={chromeLink(fromKey, toKey)}>Open in Chrome</a>
       </div>}
-      {mode !== "setup" && <p className="ar-live-mode">{mode === "xr" ? "AR tracking on · point the camera at the floor ahead" : "Compass guide: tap NEXT at each turn"}{leg ? ` · ${floorLabel(leg.floor)}` : ""}</p>}
+      {mode !== "setup" && <p className="ar-live-mode">{mode === "xr" ? "AR on · point the camera at the floor ahead" : "Compass guide · tap Next at each turn"}{leg ? ` · ${floorLabel(leg.floor)}` : ""}</p>}
     </div>
-    {mode === "xr" && diagnostics && <p className="ar-live-debug">{diagnostics}</p>}
-    <p className="ar-live-status" aria-live="polite">{message}</p>
+    {!welcome && <p className="ar-live-status" aria-live="polite">{message}</p>}
   </div>;
 }
