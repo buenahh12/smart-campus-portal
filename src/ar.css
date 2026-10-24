@@ -23,7 +23,8 @@
 .ar-live-small { flex: none; width: auto; min-height: 40px; padding: 0 22px; font-size: 16px; }
 .ar-live-pick span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .ar-live-panel, .ar-live-grid { min-width: 0; max-width: 100%; box-sizing: border-box; }
-.ar-live-button, .ar-live-pick { box-sizing: border-box; width: 100%; }
+.ar-live-button, .ar-live-pick { box-sizing: border-box; }
+.ar-live-grid > .ar-live-button, .ar-live-grid > .ar-live-pick { width: 100%; }
 .ar-live-pick select { position: absolute; inset: 0; width: 100%; opacity: 0; font-size: 16px; }
 .ar-live-pick:has(select:disabled) { color: rgba(242,242,242,.7); }
 .ar-live-pick:focus-within, .ar-live-button:focus-visible { outline: 2px solid #20d8ec; outline-offset: 2px; }
