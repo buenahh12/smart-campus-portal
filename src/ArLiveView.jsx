@@ -206,6 +206,7 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
   const [segmentIndex, setSegmentIndex] = useState(0);
   const [tracking, setTracking] = useState({ left: null, off: false, atEnd: false });
   const [problem, setProblem] = useState("");
+  const [diagnostics, setDiagnostics] = useState("");
   const [xrSupported, setXrSupported] = useState(false);
   const overlay = useRef(null);
   const video = useRef(null);
@@ -345,7 +346,26 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
     const position = new THREE.Vector3();
     const forward = new THREE.Vector3();
     arrows.position.y = 0;
+    let floorFound = null;
+    let lastError = "";
+    let lastDiagnostics = 0;
+    const session = renderer.xr.getSession();
+    const layer = session?.renderState.layers?.length ? "layers" : session?.renderState.baseLayer ? "classic" : "none";
     renderer.setAnimationLoop((time, frame) => {
+      try {
+        step(time, frame);
+      } catch (error) {
+        lastError = error?.message || String(error);
+      }
+      // Diagnostics shown on screen while AR is being tested on phones.
+      if (time - lastDiagnostics > 300) {
+        lastDiagnostics = time;
+        const gl = renderer.getContext();
+        const glError = gl.getError();
+        setDiagnostics(`frames ${frames} · draw ${layer} · arrows ${arrows.children.length}${guide.visible ? " + guide" : ""} · floor ${floorFound === null ? "not found" : floorFound.toFixed(2)} · phone ${position.x.toFixed(1)},${position.y.toFixed(1)},${position.z.toFixed(1)}${glError ? ` · gl ${glError}` : ""}${lastError ? ` · error: ${lastError}` : ""}`);
+      }
+    });
+    function step(time, frame) {
       renderer.render(scene, camera);
       frames += 1;
       const xrCamera = renderer.xr.getCamera();
@@ -367,7 +387,10 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
 
       const hits = frame && engine.current.hitSource ? frame.getHitTestResults(engine.current.hitSource) : [];
       const floor = hits[0]?.getPose(renderer.xr.getReferenceSpace())?.transform.position.y;
-      if (floor !== undefined && floor < position.y - 0.6) arrows.position.y = floor - estimatedFloor;
+      if (floor !== undefined && floor < position.y - 0.6) {
+        arrows.position.y = floor - estimatedFloor;
+        floorFound = floor;
+      }
 
       const ahead = pointAlong(world, along + 3);
       const flat = Math.hypot(forward.x, forward.z) || 1;
@@ -385,7 +408,7 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
         guide.visible = legLeft >= ARRIVE_DISTANCE;
         setTracking({ left: Math.round(legLeft + later), off: progress.off > OFF_ROUTE_DISTANCE, atEnd: legLeft < ARRIVE_DISTANCE });
       }
-    });
+    }
   };
 
   // Compass guide: the camera turns with the phone; arrows point along the current stretch.
@@ -458,7 +481,17 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
         const session = await navigator.xr.requestSession("immersive-ar", { optionalFeatures: ["dom-overlay", "hit-test"], domOverlay: { root: overlay.current } });
         const { renderer } = engine.current;
         renderer.xr.setReferenceSpaceType("local");
-        await renderer.xr.setSession(session);
+        // three.js draws through WebXR projection layers when the browser offers them; for phone AR
+        // use the classic XRWebGLLayer, which Chrome on Android composites over the camera.
+        // ?ar-layers in the link keeps the layers path for comparison.
+        const layersApi = window.XRWebGLBinding?.prototype;
+        const projectionLayer = layersApi && Object.getOwnPropertyDescriptor(layersApi, "createProjectionLayer");
+        if (projectionLayer && !new URLSearchParams(window.location.search).has("ar-layers")) delete layersApi.createProjectionLayer;
+        try {
+          await renderer.xr.setSession(session);
+        } finally {
+          if (projectionLayer && !Object.hasOwn(layersApi, "createProjectionLayer")) Object.defineProperty(layersApi, "createProjectionLayer", projectionLayer);
+        }
         // Ray from the middle of the camera, used to find the real floor.
         session.requestReferenceSpace("viewer")
           .then((space) => session.requestHitTestSource?.({ space }))
@@ -587,6 +620,7 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
       </div>}
       {mode !== "setup" && <p className="ar-live-mode">{mode === "xr" ? "AR tracking on · point the camera at the floor ahead" : "Compass guide: tap NEXT at each turn"}{leg ? ` · ${floorLabel(leg.floor)}` : ""}</p>}
     </div>
+    {mode === "xr" && diagnostics && <p className="ar-live-debug">{diagnostics}</p>}
     <p className="ar-live-status" aria-live="polite">{message}</p>
   </div>;
 }
