@@ -9,25 +9,30 @@ import { FLOORS, METERS_PER_UNIT as M, blockedAreas, findRoute, floorLabel, grap
 import "./ar.css";
 
 // AR Live View in the browser. Like the SSCA NAVI AR app, nothing knows where you are by GPS:
-// you pick where you are, stand in that doorway facing the hallway, and tap START. The route
-// from the floor plan is then laid on the floor from that spot and that heading.
-//  - Chrome on Android (WebXR): the phone tracks your steps, so the arrows stay on the floor.
+// you pick where you are, stand in that doorway facing the hallway, and tap Start. The whole
+// route from the floor plan, every floor and the stairs between them, is then laid out as one
+// continuous trail from that spot and that heading.
+//  - Chrome on Android (WebXR): the phone tracks your steps, up the stairs too, so the arrows
+//    stay on the floor and on the steps all the way to the room.
 //  - Other phones (iPhone): the camera shows an arrow trail pointing the way by compass, and
-//    you tap NEXT at each turn, because websites there cannot track position.
-// Each floor is one leg; at the stairs you calibrate again at the stairway door.
+//    you tap Next at each turn and at the top of the stairs, because websites there cannot
+//    track position.
 
 const PHONE_HEIGHT = 1.35; // metres from the floor to a phone held in front of you
+const FLOOR_HEIGHT = 3.5; // metres from one floor to the next (as in the 3D dollhouse)
 const ARROW_SPACING = 0.8;
 const ARRIVE_DISTANCE = 1.5;
 const OFF_ROUTE_DISTANCE = 4;
 const ARROW_COLORS = ["#f1c39a", "#e58a4e"]; // the site's peach, alternating with a deeper clay so the trail reads on light floors
 const START_STORAGE = "campus-map-start"; // shared with the 2D map
 
-const roomName = (floor, id) => FLOORS.find((item) => item.floor === floor)?.rooms.find((item) => item.id === id)?.name || "";
-const stairsName = (floor, id) => roomName(floor, id).replace(/ \(.*\)/, "").toLowerCase();
+const roomOn = (floor, id) => FLOORS.find((item) => item.floor === floor)?.rooms.find((item) => item.id === id);
+const stairsName = (floor, id) => (roomOn(floor, id)?.name || "stairs").replace(/ \(.*\)/, "").toLowerCase();
+const flat = (a, b) => Math.hypot(b.x - a.x, b.z - a.z);
+const distance3 = (a, b) => Math.hypot(b.x - a.x, (b.y || 0) - (a.y || 0), b.z - a.z);
 
 // Splits a route into one walk per floor, in metres, with plan x to the right and z down.
-// Exported (with legSegments) so the leg splitting can be checked outside the browser.
+// Exported (with routePath and routeSteps) so the route building can be checked outside the browser.
 export function routeLegs(route) {
   const legs = [];
   let leg = null;
@@ -40,30 +45,78 @@ export function routeLegs(route) {
     if (!last || last.x !== node.x || last.y !== node.y) leg.nodes.push(node);
   });
   return legs.filter((item) => item.nodes.length > 1).map((item, index, all) => {
-    const points = item.nodes.map((node) => ({ x: node.x * M, z: node.y * M }));
-    const first = item.nodes[0];
     const last = item.nodes[item.nodes.length - 1];
     const next = all[index + 1];
-    const length = points.slice(1).reduce((sum, point, i) => sum + Math.hypot(point.x - points[i].x, point.z - points[i].z), 0);
     return {
       floor: item.floor,
-      points,
-      length,
-      from: index === 0 ? placeTitle(route.start) : `the ${stairsName(item.floor, first.room)}`,
+      points: item.nodes.map((node) => ({ x: node.x * M, z: node.y * M })),
+      stairsRoom: next ? last.room : null,
       stairs: next ? `Take the ${stairsName(item.floor, last.room)} ${next.floor > item.floor ? "up" : "down"} to the ${floorLabel(next.floor).toLowerCase()}` : null,
     };
   });
 }
 
-// Straight stretches of a leg; from is the index of the point each one starts at.
-export function legSegments(leg) {
+// One staircase as you walk it: per floor, two flights along the stairwell with a landing at
+// the far end (a switchback), rising or falling half a storey each.
+function stairFlights(leg, toFloor, y) {
+  const room = roomOn(leg.floor, leg.stairsRoom);
+  if (!room) return [];
+  const [rx, rz, rw, rh] = room.rect.map((value) => value * M);
+  const center = { x: rx + rw / 2, z: rz + rh / 2 };
+  const along = rw >= rh ? { x: 1, z: 0 } : { x: 0, z: 1 };
+  const across = { x: -along.z, z: along.x };
+  const reach = (Math.max(rw, rh) / 2) * 0.45; // a flight is shorter than the stairwell, which includes landings
+  const side = Math.min(rw, rh) / 4;
+  const door = leg.points[leg.points.length - 1];
+  const near = ((door.x - center.x) * along.x + (door.z - center.z) * along.z) >= 0 ? reach : -reach;
+  const at = (t, s, height) => ({ x: center.x + along.x * t + across.x * s, y: height, z: center.z + along.z * t + across.z * s });
+  const rise = Math.sign(toFloor - leg.floor) * FLOOR_HEIGHT;
+  const points = [];
+  for (let flight = 0; flight < Math.abs(toFloor - leg.floor); flight += 1) {
+    const base = y + flight * rise;
+    points.push(at(near, side, base), at(-near, side, base + rise / 2), at(-near, -side, base + rise / 2), at(near, -side, base + rise));
+  }
+  return points;
+}
+
+// The whole route as one path: x/z from the plan, y up from the starting floor. Sections say
+// which part is walking on a floor and which is a staircase; at[i] is the distance to point i.
+export function routePath(route) {
+  const legs = routeLegs(route);
+  const points = [];
+  const sections = [];
+  const push = (point) => {
+    const last = points[points.length - 1];
+    if (!last || distance3(last, point) > 0.05) points.push(point);
+  };
+  legs.forEach((leg, index) => {
+    const y = (leg.floor - legs[0].floor) * FLOOR_HEIGHT;
+    const from = points.length;
+    leg.points.forEach((point) => push({ x: point.x, y, z: point.z }));
+    sections.push({ kind: "walk", floor: leg.floor, from, to: points.length - 1 });
+    const next = legs[index + 1];
+    if (next) {
+      const stairsFrom = points.length - 1;
+      stairFlights(leg, next.floor, y).forEach(push);
+      sections.push({ kind: "stairs", floor: leg.floor, toFloor: next.floor, text: leg.stairs, from: stairsFrom, to: points.length });
+    }
+  });
+  const at = points.map((point, index) => (index ? distance3(points[index - 1], point) : 0));
+  at.forEach((value, index) => { if (index) at[index] += at[index - 1]; });
+  sections.forEach((section) => {
+    section.start = at[section.from];
+    section.end = at[Math.min(section.to, points.length - 1)];
+  });
+  return { points, at, sections, length: at[at.length - 1] || 0 };
+}
+
+// Straight stretches of a walk; from is the index of the point each one starts at.
+function walkSegments(points) {
   const segments = [];
-  for (let i = 1; i < leg.points.length; i += 1) {
-    const a = leg.points[i - 1];
-    const b = leg.points[i];
-    const length = Math.hypot(b.x - a.x, b.z - a.z);
+  for (let i = 1; i < points.length; i += 1) {
+    const length = flat(points[i - 1], points[i]);
     if (length < 0.2) continue;
-    const dir = { x: (b.x - a.x) / length, z: (b.z - a.z) / length };
+    const dir = { x: (points[i].x - points[i - 1].x) / length, z: (points[i].z - points[i - 1].z) / length };
     const previous = segments[segments.length - 1];
     if (previous && previous.dir.x * dir.x + previous.dir.z * dir.z > 0.94) {
       previous.length += length;
@@ -77,59 +130,73 @@ export function legSegments(leg) {
 
 const SHORT_STRETCH = 2.5; // metres; shorter stretches are folded into the next step
 
-// Compass guide steps: one per real turn, so NEXT is only needed at corners. Stepping out of a
-// doorway or a short jog is folded into the next step, and a short final turn into the room is
-// added to the last one.
-export function legSteps(leg, firstLeg) {
-  const segments = legSegments(leg);
-  const phrase = (segment, first) => {
-    const meters = `about ${Math.max(1, Math.round(segment.length))} m`;
-    const short = segment.length < SHORT_STRETCH;
-    if (segment.turn !== "straight") return short ? `turn ${segment.turn}` : `turn ${segment.turn} and walk ${meters}`;
-    if (first) return short ? (firstLeg ? "step out into the hallway" : "step out of the stairway") : `walk ${meters}`;
-    return short ? "go ahead a few steps" : `keep going ${meters}`;
-  };
+// Compass guide steps for the whole route: one per real turn, plus one for each staircase.
+// Stepping out of a doorway or a short jog is folded into the next step, and a short final turn
+// into the room is added to the last one.
+export function routeSteps(path) {
   const steps = [];
-  let pending = [];
-  segments.forEach((segment, index) => {
-    pending.push(segment);
-    if (segment.length < SHORT_STRETCH && index < segments.length - 1) return;
-    const text = pending.map((item) => phrase(item, item === segments[0])).join(", then ");
-    const length = pending.reduce((sum, item) => sum + item.length, 0);
-    const previous = steps[steps.length - 1];
-    if (previous && pending.every((item) => item.length < SHORT_STRETCH)) {
-      previous.text += `, then ${text}`;
-      previous.length += length;
-    } else steps.push({ from: pending[0].from, text, length });
-    pending = [];
+  path.sections.forEach((section, sectionIndex) => {
+    if (section.kind === "stairs") {
+      steps.push({ from: section.from, until: section.to, floor: section.floor, toFloor: section.toFloor, text: section.text, stairs: true });
+      return;
+    }
+    const segments = walkSegments(path.points.slice(section.from, section.to + 1));
+    const phrase = (segment, first) => {
+      const meters = `about ${Math.max(1, Math.round(segment.length))} m`;
+      const short = segment.length < SHORT_STRETCH;
+      if (segment.turn !== "straight") return short ? `turn ${segment.turn}` : `turn ${segment.turn} and walk ${meters}`;
+      if (first) return short ? (sectionIndex === 0 ? "step out into the hallway" : "step out of the stairway") : `walk ${meters}`;
+      return short ? "go ahead a few steps" : `keep going ${meters}`;
+    };
+    const walkSteps = [];
+    let pending = [];
+    segments.forEach((segment, index) => {
+      pending.push(segment);
+      if (segment.length < SHORT_STRETCH && index < segments.length - 1) return;
+      const text = pending.map((item) => phrase(item, item === segments[0])).join(", then ");
+      const previous = walkSteps[walkSteps.length - 1];
+      if (previous && pending.every((item) => item.length < SHORT_STRETCH)) previous.text += `, then ${text}`;
+      else walkSteps.push({ from: section.from + pending[0].from, until: section.to, floor: section.floor, text });
+      pending = [];
+    });
+    steps.push(...walkSteps.map((step) => ({ ...step, text: step.text[0].toUpperCase() + step.text.slice(1) })));
   });
-  return steps.map((step) => ({ ...step, text: step.text[0].toUpperCase() + step.text.slice(1) }));
+  return steps;
 }
 
-// The rest of the leg from a point index, cut off after a distance so the trail stays readable.
-function trailFrom(points, from, maxLength) {
+// The path from a point index, cut off at an index or after a distance so the trail stays readable.
+function trailFrom(points, from, until, maxLength) {
   const trail = [points[from]];
   let length = 0;
-  for (let i = from + 1; i < points.length && length < maxLength; i += 1) {
+  for (let i = from + 1; i <= Math.min(until, points.length - 1) && length < maxLength; i += 1) {
     const a = points[i - 1];
     const b = points[i];
-    const step = Math.hypot(b.x - a.x, b.z - a.z);
+    const step = distance3(a, b);
     const keep = Math.min(step, maxLength - length);
-    trail.push(keep < step ? { x: a.x + ((b.x - a.x) * keep) / step, z: a.z + ((b.z - a.z) * keep) / step } : b);
+    const t = step ? keep / step : 1;
+    trail.push({ x: a.x + (b.x - a.x) * t, y: (a.y || 0) + ((b.y || 0) - (a.y || 0)) * t, z: a.z + (b.z - a.z) * t });
     length += keep;
   }
   return trail;
 }
 
-// The direction you face in the starting doorway: from the door out to the hallway.
-function legFacing(leg) {
-  const [start, ...rest] = leg.points;
-  const target = rest.find((point) => Math.hypot(point.x - start.x, point.z - start.z) > 0.3) || rest[0];
-  const length = Math.hypot(target.x - start.x, target.z - start.z) || 1;
-  return { x: (target.x - start.x) / length, z: (target.z - start.z) / length };
+// The point a distance along the path, and the walking direction there (the next stretch that
+// actually moves across the floor, so standing at a door it points out into the hallway).
+function anchorAt(path, distance) {
+  const { points, at } = path;
+  let i = 1;
+  while (i < points.length - 1 && at[i] < distance) i += 1;
+  const a = points[i - 1];
+  const b = points[i];
+  const t = at[i] > at[i - 1] ? Math.min(1, Math.max(0, (distance - at[i - 1]) / (at[i] - at[i - 1]))) : 0;
+  const point = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t };
+  let j = i;
+  while (j < points.length - 1 && flat(point, points[j]) < 0.3) j += 1;
+  const length = flat(point, points[j]) || 1;
+  return { point, dir: { x: (points[j].x - point.x) / length, z: (points[j].z - point.z) / length } };
 }
 
-// Turns plan directions into the phone's world, given the heading the phone had at START.
+// Turns plan directions into the phone's world, given the heading the phone had at Start.
 function rotation(from, to) {
   const angle = Math.atan2(to.z, to.x) - Math.atan2(from.z, from.x);
   const cos = Math.cos(angle);
@@ -145,20 +212,20 @@ function chevronGeometry() {
   return geometry;
 }
 
-// Distance walked along a polyline (x/z) and how far the point is from it.
-function progressOn(points, x, z) {
-  let walked = 0;
+// Distance walked along a path and how far a point is from it. Height counts for half, so the
+// same hallway on two floors is told apart without phone height changes throwing it off.
+function progressOn(points, at, x, y, z) {
   let best = { along: 0, off: Infinity };
   for (let i = 1; i < points.length; i += 1) {
     const a = points[i - 1];
     const b = points[i];
     const dx = b.x - a.x;
+    const dy = (b.y - a.y) / 2;
     const dz = b.z - a.z;
-    const length = Math.hypot(dx, dz) || 1;
-    const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / (length * length)));
-    const off = Math.hypot(a.x + t * dx - x, a.z + t * dz - z);
-    if (off < best.off) best = { along: walked + t * length, off };
-    walked += length;
+    const lengthSq = dx * dx + dy * dy + dz * dz || 1;
+    const t = Math.max(0, Math.min(1, ((x - a.x) * dx + ((y - a.y) / 2) * dy + (z - a.z) * dz) / lengthSq));
+    const off = Math.hypot(a.x + t * dx - x, a.y / 2 + t * dy - y / 2, a.z + t * dz - z);
+    if (off < best.off) best = { along: at[i - 1] + t * (at[i] - at[i - 1]), off };
   }
   return best;
 }
@@ -189,9 +256,8 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
   const [toKey, setToKey] = useState(() => linkPlace("to") || initialDestination || "");
   const inApp = /Android/i.test(navigator.userAgent) ? inAppBrowserName() : "";
   const [mode, setMode] = useState("setup"); // setup | xr | compass
-  const [legIndex, setLegIndex] = useState(0);
-  const [segmentIndex, setSegmentIndex] = useState(0);
-  const [tracking, setTracking] = useState({ left: null, off: false, atEnd: false });
+  const [stepIndex, setStepIndex] = useState(0);
+  const [tracking, setTracking] = useState({ left: null, off: false, atEnd: false, section: null });
   const [problem, setProblem] = useState("");
   const [welcome, setWelcome] = useState(true);
   const [xrSupported, setXrSupported] = useState(false);
@@ -203,9 +269,9 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
   const activeClosures = closures.items.filter((item) => isClosureActive(item));
   const blockedKey = activeClosures.map((item) => item.mapArea).filter(Boolean).sort().join("|");
   const route = useMemo(() => findRoute(fromKey, toKey, blockedAreas(activeClosures)), [fromKey, toKey, blockedKey, planVersion]); // eslint-disable-line react-hooks/exhaustive-deps
-  const legs = useMemo(() => (route?.path ? routeLegs(route) : []), [route]);
-  const leg = legs[legIndex];
-  const lastLeg = legIndex === legs.length - 1;
+  const path = useMemo(() => (route?.path ? routePath(route) : null), [route]);
+  const steps = useMemo(() => (path ? routeSteps(path) : []), [path]);
+  const step = steps[stepIndex];
   const destination = placeByKey(toKey);
 
   useEffect(() => {
@@ -262,35 +328,38 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
         stopped = false;
         startCamera();
       },
-      // Lays arrows along a path given in world x/z, on the floor at height y.
-      placeArrows(points, y, withPin) {
+      // Lays arrows along a path of world points (x, y, z); y is the floor or step height there.
+      placeArrows(points, withPin) {
         arrows.clear();
-        let carried = ARROW_SPACING / 2;
+        let walked = 0;
+        let next = ARROW_SPACING / 2;
         let count = 0;
         for (let i = 1; i < points.length; i += 1) {
           const a = points[i - 1];
           const b = points[i];
-          const length = Math.hypot(b.x - a.x, b.z - a.z);
-          if (length < 0.01) continue;
-          const yaw = Math.atan2(-(b.x - a.x), -(b.z - a.z));
-          for (let d = carried; d < length; d += ARROW_SPACING) {
-            const arrow = new THREE.Mesh(geometry, materials[count % 2]);
-            arrow.position.set(a.x + ((b.x - a.x) * d) / length, y + 0.02, a.z + ((b.z - a.z) * d) / length);
-            arrow.rotation.y = yaw;
-            arrow.userData.along = count * ARROW_SPACING;
-            arrows.add(arrow);
-            count += 1;
+          const length = distance3(a, b);
+          if (flat(a, b) > 0.01) {
+            const yaw = Math.atan2(-(b.x - a.x), -(b.z - a.z));
+            for (; next < walked + length; next += ARROW_SPACING) {
+              const t = (next - walked) / length;
+              const arrow = new THREE.Mesh(geometry, materials[count % 2]);
+              arrow.position.set(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t + 0.02, a.z + (b.z - a.z) * t);
+              arrow.rotation.y = yaw;
+              arrow.userData.along = next;
+              arrows.add(arrow);
+              count += 1;
+            }
           }
-          carried = (carried - length) % ARROW_SPACING;
-          if (carried < 0) carried += ARROW_SPACING;
+          walked += length;
+          next = Math.max(next, walked);
         }
         if (withPin) {
           const end = points[points.length - 1];
           const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.6, 12), pinMaterial);
-          pin.position.set(end.x, y + 0.8, end.z);
+          pin.position.set(end.x, end.y + 0.8, end.z);
           const ring = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.04, 8, 32), pinMaterial);
           ring.rotation.x = Math.PI / 2;
-          ring.position.set(end.x, y + 0.03, end.z);
+          ring.position.set(end.x, end.y + 0.03, end.z);
           arrows.add(pin, ring);
         }
       },
@@ -310,55 +379,62 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
     };
   }, []);
 
-  // Phone tracking (WebXR): calibrate on the first frames, then follow progress along the leg.
-  // The floor starts as an estimate (phone height) and moves to the real floor once ARCore finds
-  // it under the centre of the camera.
-  const startXrLeg = (index) => {
+  // Phone tracking (WebXR). The whole route is placed once from where you stand: at Start that
+  // is the starting doorway; Re-center places it again from the spot on the route you have
+  // reached, facing the way the arrows go. The floor starts as an estimate (phone height) and
+  // moves to the floor ARCore finds under the camera, while you are still on that level.
+  const startXr = () => {
     const { renderer, camera, scene, arrows } = engine.current;
-    const current = legs[index];
-    let frames = 0;
-    let world = null;
-    let estimatedFloor = 0;
-    let lastReport = 0;
     const position = new THREE.Vector3();
     const forward = new THREE.Vector3();
-    arrows.position.y = 0;
+    const state = { frames: 0, world: null, along: 0, anchorAlong: 0, levelY: 0, lastReport: 0 };
+    engine.current.recenter = () => {
+      state.anchorAlong = state.along;
+      state.world = null;
+      state.frames = 0;
+    };
     renderer.setAnimationLoop((time, frame) => {
       renderer.render(scene, camera);
-      frames += 1;
+      state.frames += 1;
       const xrCamera = renderer.xr.getCamera();
       xrCamera.getWorldPosition(position);
       xrCamera.getWorldDirection(forward);
-      if (!world && frames > 2) {
-        const facing = Math.hypot(forward.x, forward.z) > 0.05 ? { x: forward.x, z: forward.z } : { x: 0, z: -1 };
-        const length = Math.hypot(facing.x, facing.z);
-        const rotate = rotation(legFacing(current), { x: facing.x / length, z: facing.z / length });
-        const origin = current.points[0];
-        world = current.points.map((point) => {
-          const turned = rotate({ x: point.x - origin.x, z: point.z - origin.z });
-          return { x: position.x + turned.x, z: position.z + turned.z };
+      if (!state.world && state.frames > 2) {
+        const length = Math.hypot(forward.x, forward.z);
+        const facing = length > 0.05 ? { x: forward.x / length, z: forward.z / length } : { x: 0, z: -1 };
+        const { point, dir } = anchorAt(path, state.anchorAlong);
+        const rotate = rotation(dir, facing);
+        const base = position.y - PHONE_HEIGHT - point.y;
+        state.world = path.points.map((item) => {
+          const turned = rotate({ x: item.x - point.x, z: item.z - point.z });
+          return { x: position.x + turned.x, y: base + item.y, z: position.z + turned.z };
         });
-        estimatedFloor = position.y - PHONE_HEIGHT;
-        engine.current.placeArrows(world, estimatedFloor, index === legs.length - 1);
+        state.levelY = position.y;
+        arrows.position.y = 0;
+        engine.current.placeArrows(state.world, true);
       }
-      if (!world) return;
+      if (!state.world) return;
 
-      const hits = frame && engine.current.hitSource ? frame.getHitTestResults(engine.current.hitSource) : [];
+      const onStartLevel = Math.abs(position.y - state.levelY) < 1;
+      const hits = onStartLevel && frame && engine.current.hitSource ? frame.getHitTestResults(engine.current.hitSource) : [];
       const floor = hits[0]?.getPose(renderer.xr.getReferenceSpace())?.transform.position.y;
-      if (floor !== undefined && floor < position.y - 0.6) arrows.position.y = floor - estimatedFloor;
+      if (floor !== undefined && floor < position.y - 0.6) arrows.position.y = floor - (state.levelY - PHONE_HEIGHT);
 
-      if (time - lastReport > 250) {
-        lastReport = time;
-        const { along, off } = progressOn(world, position.x, position.z);
+      if (time - state.lastReport > 250) {
+        state.lastReport = time;
+        const feet = position.y - PHONE_HEIGHT - arrows.position.y;
+        const { along, off } = progressOn(state.world, path.at, position.x, feet, position.z);
+        state.along = along;
         arrows.children.forEach((arrow) => { arrow.visible = arrow.userData.along === undefined || arrow.userData.along > along - 1; });
-        const legLeft = Math.max(0, current.length - along);
-        const later = legs.slice(index + 1).reduce((sum, item) => sum + item.length, 0);
-        setTracking({ left: Math.round(legLeft + later), off: off > OFF_ROUTE_DISTANCE, atEnd: legLeft < ARRIVE_DISTANCE });
+        const left = Math.max(0, path.length - along);
+        const section = path.sections.find((item) => item.kind === "stairs" && along >= item.start - 1 && along <= item.end)
+          || path.sections.find((item) => along >= item.start && along <= item.end) || path.sections[0];
+        setTracking({ left: Math.round(left), off: off > OFF_ROUTE_DISTANCE, atEnd: left < ARRIVE_DISTANCE, section });
       }
     });
   };
 
-  // Compass guide: the camera turns with the phone; arrows point along the current stretch.
+  // Compass guide: the camera turns with the phone; the heading at Start lines the plan up.
   const compass = useRef({ quaternion: new THREE.Quaternion(), facing: null, listener: null });
   const startCompass = async () => {
     const Orientation = window.DeviceOrientationEvent;
@@ -385,6 +461,7 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
     };
     window.addEventListener("deviceorientation", state.listener);
     state.facing = null;
+    state.rotate = null;
     const { renderer, camera, scene } = engine.current;
     camera.position.set(0, PHONE_HEIGHT, 0);
     const forward = new THREE.Vector3();
@@ -400,27 +477,27 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
     });
   };
 
-  // Compass guide: the whole path ahead (around the corners too) is laid out from where you
-  // stand, starting at the current step.
-  const segments = useMemo(() => (leg ? legSteps(leg, legIndex === 0) : []), [leg, legIndex]);
-  const segment = segments[segmentIndex];
+  // Compass guide: the trail of the current step (around its corners, or through the stairwell)
+  // is laid out flat from where you stand. The plan is lined up once, with the heading you face
+  // at Start (or Re-center): the way the current step begins.
+  const lastStep = stepIndex === steps.length - 1;
   useEffect(() => {
-    if (mode !== "compass" || !leg || !segment) return;
+    if (mode !== "compass" || !path || !step) return;
     const state = compass.current;
     state.place = () => {
-      const rotate = rotation(legFacing(leg), state.facing);
-      const origin = leg.points[segment.from];
-      const trail = trailFrom(leg.points, segment.from, 30).map((point) => rotate({ x: point.x - origin.x, z: point.z - origin.z }));
-      engine.current.placeArrows(trail, 0, lastLeg);
+      state.rotate ||= rotation(anchorAt(path, path.at[step.from]).dir, state.facing);
+      const { rotate } = state;
+      const origin = path.points[step.from];
+      const trail = trailFrom(path.points, step.from, step.until, 30).map((point) => ({ ...rotate({ x: point.x - origin.x, z: point.z - origin.z }), y: 0 }));
+      engine.current.placeArrows(trail, lastStep);
     };
     if (state.facing) state.place();
-  }, [mode, leg, segment, lastLeg]);
+  }, [mode, path, step, lastStep]);
 
   const start = async () => {
     setProblem("");
-    setLegIndex(0);
-    setSegmentIndex(0);
-    setTracking({ left: Math.round(legs.reduce((sum, item) => sum + item.length, 0)), off: false, atEnd: false });
+    setStepIndex(0);
+    setTracking({ left: Math.round(path.length), off: false, atEnd: false, section: path.sections[0] });
     try { localStorage.setItem(START_STORAGE, fromKey); } catch { /* private mode */ }
     if (xrSupported) {
       engine.current.stopCamera();
@@ -454,7 +531,7 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
           engine.current.startCamera();
         });
         setMode("xr");
-        startXrLeg(0);
+        startXr();
         return;
       } catch {
         engine.current.startCamera(); // AR session refused: use the compass guide instead
@@ -464,26 +541,17 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
     startCompass();
   };
 
-  // Next floor (after the stairs) or next stretch (compass guide).
-  const continueRoute = () => {
-    if (mode === "compass" && segmentIndex < segments.length - 1) {
-      setSegmentIndex(segmentIndex + 1);
-      return;
-    }
-    if (lastLeg) return;
-    const next = legIndex + 1;
-    setLegIndex(next);
-    setSegmentIndex(0);
-    setTracking((current) => ({ ...current, atEnd: false }));
-    if (mode === "xr") startXrLeg(next);
-    else { compass.current.facing = null; }
-  };
+  // Compass guide: on to the next turn or staircase.
+  const nextStep = () => setStepIndex((index) => Math.min(index + 1, steps.length - 1));
 
-  // Lay the arrows again from where you stand now (back in the doorway, facing the hallway).
+  // Lay the arrows again from where you stand now, facing the way they should go.
   const recenter = () => {
-    setTracking((current) => ({ ...current, off: false, atEnd: false }));
-    if (mode === "xr") startXrLeg(legIndex);
-    else compass.current.facing = null;
+    setTracking((current) => ({ ...current, off: false }));
+    if (mode === "xr") engine.current.recenter?.();
+    else {
+      compass.current.facing = null;
+      compass.current.rotate = null;
+    }
   };
 
   const stop = () => {
@@ -499,7 +567,7 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
   const clear = () => {
     if (mode !== "setup") stop();
     setToKey("");
-    setTracking({ left: null, off: false, atEnd: false });
+    setTracking({ left: null, off: false, atEnd: false, section: null });
   };
 
   useEffect(() => () => {
@@ -519,30 +587,30 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
 
   const destinationText = destination ? `${placeTitle(destination)} (${floorLabel(destination.floor)})` : "";
   let message;
-  let action = null;
+  let showNext = false;
   if (problem) message = problem;
   else if (!fromKey || !toKey) message = "Choose where you are (From) and where you want to go (To).";
   else if (fromKey === toKey) message = "You are already there.";
   else if (route?.blocked) message = "No open route right now: a hallway or stairway on the way is closed.";
   else if (mode === "setup") message = `Stand in the doorway of ${placeTitle(placeByKey(fromKey))} with your back to the room, facing the hallway. Then tap Start.`;
   else if (mode === "xr") {
-    if (tracking.atEnd && lastLeg) message = `You have arrived at ${placeTitle(destination)}.`;
-    else if (tracking.atEnd) {
-      message = `${leg.stairs}. At the stairway door there, face the hallway and tap Continue.`;
-      action = "CONTINUE";
-    } else if (tracking.off) message = "You are off the route. Walk back to the arrows, or tap Clear and start again from a doorway.";
+    const { section } = tracking;
+    if (tracking.atEnd) message = `You have arrived at ${placeTitle(destination)}.`;
+    else if (tracking.off) message = "You are off the route. Walk back to the arrows, or stand where they are, face the way they point and tap Re-center.";
+    else if (section?.kind === "stairs") message = `${section.text}, following the arrows on the steps. ${tracking.left} m left`;
     else message = `Follow the arrows to ${destinationText}. ${tracking.left} m left`;
-  } else if (segment) {
-    message = `${segment.text}.`;
-    if (segmentIndex < segments.length - 1) {
-      message += " Tap Next at the turn.";
-      action = "NEXT";
+  } else if (step) {
+    message = `${step.text}.`;
+    if (lastStep) message += ` You will arrive at ${placeTitle(destination)}.`;
+    else {
+      message += step.stairs ? ` Tap Next on the ${floorLabel(step.toFloor).toLowerCase()}.` : " Tap Next at the turn.";
+      showNext = true;
     }
-    else if (!lastLeg) { message += ` ${leg.stairs}, then stand at the stairway door facing the hallway.`; action = "CONTINUE"; }
-    else message += ` You will arrive at ${placeTitle(destination)}.`;
   }
 
-  const ready = Boolean(route?.path) && mode === "setup";
+  const floorNow = mode === "xr" ? tracking.section : step;
+  const floorText = floorNow ? (floorNow.toFloor ? `${floorLabel(floorNow.floor)} → ${floorLabel(floorNow.toFloor)}` : floorLabel(floorNow.floor)) : "";
+  const ready = Boolean(path) && mode === "setup";
   const close = () => { stop(); onClose(); };
   return <div ref={overlay} className={`ar-live ar-live-${mode}`} role="dialog" aria-modal="true" aria-label="AR live view">
     <video ref={video} className="ar-live-video" autoPlay playsInline muted />
@@ -555,7 +623,7 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
         <ol>
           <li><b>Choose</b> where you are and where you want to go.</li>
           <li><b>Stand in the doorway</b> with your back to the room, facing the hallway, and tap Start.</li>
-          <li><b>Follow the arrows</b> on the floor. At the stairs, tap Continue at the stairway door.</li>
+          <li><b>Follow the arrows</b> along the hallways and up or down the stairs, all the way to the room.</li>
         </ol>
         <p className="ar-live-tip">{xrSupported ? "Hold your phone up and point the camera at the floor ahead." : inApp ? `${inApp} can't track the floor. For the full AR view, open this in Chrome.` : "This phone uses the compass guide: the arrows turn with your phone, and you tap Next at each turn."}</p>
         <div className="ar-live-welcome-actions">
@@ -577,8 +645,8 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
       <div className="ar-live-grid">
         {select(fromKey, setFromKey, "From")}
         {select(toKey, setToKey, "To")}
-        {action
-          ? <button type="button" className="ar-live-button ar-live-primary" onClick={continueRoute}>{action === "NEXT" ? "Next" : "Continue"}</button>
+        {showNext
+          ? <button type="button" className="ar-live-button ar-live-primary" onClick={nextStep}>Next</button>
           : mode === "setup"
             ? <button type="button" className="ar-live-button ar-live-primary" onClick={start} disabled={!ready}>Start</button>
             : <button type="button" className="ar-live-button" onClick={recenter}>Re-center</button>}
@@ -588,7 +656,7 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
         <span>{inApp} can&apos;t do full AR. Open this in Chrome so the arrows stay on the floor as you walk.</span>
         <a className="ar-live-button ar-live-small" href={chromeLink(fromKey, toKey)}>Open in Chrome</a>
       </div>}
-      {mode !== "setup" && <p className="ar-live-mode">{mode === "xr" ? "AR on · point the camera at the floor ahead" : "Compass guide · tap Next at each turn"}{leg ? ` · ${floorLabel(leg.floor)}` : ""}</p>}
+      {mode !== "setup" && <p className="ar-live-mode">{mode === "xr" ? "AR on · point the camera at the floor ahead" : "Compass guide · tap Next at each turn"}{floorText ? ` · ${floorText}` : ""}</p>}
     </div>
     {!welcome && <p className="ar-live-status" aria-live="polite">{message}</p>}
   </div>;
