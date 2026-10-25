@@ -129,6 +129,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .dollhouse-actions button:hover, .dollhouse-actions a:hover { background: var(--green-hover); }
 .dollhouse-actions a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; text-decoration: none; }
 .ar-app-note { margin: 10px 0 0; font-size: 13px; line-height: 1.45; opacity: .75; }
+.screen-loading { position: fixed; z-index: 250; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; color: var(--ink); background: rgba(245,239,226,.92); font-weight: 600; }
+.screen-loading i { width: 28px; height: 28px; border: 3px solid var(--line); border-top-color: var(--green); border-radius: 50%; animation: screen-spin .9s linear infinite; }
+@keyframes screen-spin { to { transform: rotate(360deg); } }
+.screen-loading[role="alert"] { padding: 24px; text-align: center; }
+.screen-loading-actions { display: flex; gap: 8px; }
+.screen-loading-actions button { min-height: 44px; padding: 0 18px; border: 1px solid var(--line-strong, var(--line)); border-radius: 999px; color: var(--ink); background: var(--surface); font-weight: 700; }
+.screen-loading-actions button:first-child { border-color: var(--green); color: #fff; background: var(--green); }
+@media (prefers-reduced-motion: reduce) { .screen-loading i { animation: none; } }
 .ar-app-note a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .ss-dollhouse { position: relative; height: 200px; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
 .ss-dollhouse-canvas, .ss-dollhouse-canvas canvas { display: block; width: 100%; height: 100%; }
@@ -247,6 +255,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .mc-place-actions button { border-color: var(--line-strong); color: var(--ink); font-size: 14px; }
 .mc-place-actions button.saved { border-color: var(--green); color: #fff; background: var(--green); }
 .mc-toggle { border-color: var(--line); }
+.mc-confirm-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.mc-confirm-actions button { min-height: 40px; padding: 0 14px; border: 1px solid var(--line-strong, var(--line)); border-radius: 999px; color: var(--ink); background: var(--surface); font-weight: 600; }
+.mc-confirm-actions button:first-child { border-color: var(--green); color: #fff; background: var(--green); }
 .mc-field select, .directory-search { border-color: var(--line-strong); font-size: 16px; }
 .student-footer-account > div b { color: var(--ink); font-size: 15px; }
 .student-footer-account > div span { font-size: 13px; }

@@ -18,7 +18,9 @@ service cloud.firestore {
 
     // The one and only administrator account (username admin1).
     function isAdmin() {
-      return request.auth != null && request.auth.token.email == "admin1@sscai-portal.invalid";
+      return request.auth != null
+        && request.auth.token.email == "admin1@sscai-portal.invalid"
+        && request.auth.token.firebase.sign_in_provider == "password";
     }
 
     function data() {
@@ -164,10 +166,13 @@ service cloud.firestore {
     }
 
     // Email updates: people subscribe or unsubscribe themselves, with the email on their own
-    // verified account. Only the administrator can read the whole list (to send updates).
+    // account, once that email is verified (Google accounts are; email-and-password accounts
+    // verify through the link Firebase sends). Without that, anyone could sign up with someone
+    // else's address and have the school email them. Only the administrator can read the list.
     match /subscribers/{uid} {
       allow read: if isAdmin() || (request.auth != null && request.auth.uid == uid);
       allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.auth.token.email_verified == true
         && data().keys().hasOnly(['email', 'name', 'updatedAt'])
         && data().email == request.auth.token.email
         && data().name is string && data().name.size() <= 80

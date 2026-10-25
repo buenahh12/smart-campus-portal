@@ -10,19 +10,56 @@ import {
   requestPasswordReset,
 } from "./firebase";
 import Icon from "./Icon";
-import AdminCms from "./AdminCms";
 import CampusUpdates, { usePublicCollection } from "./CampusUpdates";
 import { CMS_COLLECTIONS, USER_ROLES, isClosureActive, recordSignIn, recordVisit, todayKey, watchSession } from "./cms";
-import AdminAnalytics from "./AdminAnalytics";
-import AdminSignIns from "./AdminSignIns";
 import { usePlanVersion } from "./usePlan";
-import MyCampus from "./MyCampus";
-import CampusMap from "./CampusMap";
 import { FLOORS, PLACES, findPlaceKey, placeByKey, placeTitle, floorLabel as planFloorLabel } from "./floorPlans";
 
-// three.js is large, so the 3D dollhouse loads after the page; the flat mini plan shows meanwhile.
-const Dollhouse3D = lazy(() => import("./Dollhouse3D"));
-const ArLiveView = lazy(() => import("./ArLiveView"));
+// three.js is large, so the 3D dollhouse loads after the page; the flat mini plan shows meanwhile,
+// and stays if the 3D part cannot be downloaded (connection dropped).
+const Dollhouse3D = lazy(() => import("./Dollhouse3D").catch(() => ({ default: ({ fallback }) => fallback })));
+
+function ScreenLoading() {
+  return <div className="screen-loading" role="status"><i aria-hidden="true" />Loading…</div>;
+}
+
+// Shown in place of a screen whose code could not be downloaded, instead of crashing the page.
+function ScreenUnavailable({ onClose }) {
+  return <div className="screen-loading" role="alert">
+    <b>This screen couldn&apos;t load.</b>
+    <span>Check your internet connection, then reload the page.</span>
+    <div className="screen-loading-actions">
+      <button type="button" onClick={() => window.location.reload()}>Reload</button>
+      <button type="button" onClick={onClose}>Close</button>
+    </div>
+  </div>;
+}
+
+// Screens opened from a button download when first opened, so the home page shows sooner on
+// slow connections. Every one of them takes onClose.
+const lazyScreen = (load) => lazy(() => load().catch(() => ({ default: ScreenUnavailable })));
+const loadCampusMap = () => import("./CampusMap");
+const loadMyCampus = () => import("./MyCampus");
+const ArLiveView = lazyScreen(() => import("./ArLiveView"));
+const CampusMap = lazyScreen(loadCampusMap);
+const MyCampus = lazyScreen(loadMyCampus);
+const AdminCms = lazyScreen(() => import("./AdminCms"));
+const AdminAnalytics = lazyScreen(() => import("./AdminAnalytics"));
+const AdminSignIns = lazyScreen(() => import("./AdminSignIns"));
+
+// Fetch the screens visitors use most once the page is idle, so they still open if the
+// connection drops later.
+function usePrefetchScreens() {
+  useEffect(() => {
+    const prefetch = () => { loadCampusMap().catch(() => {}); loadMyCampus().catch(() => {}); };
+    if ("requestIdleCallback" in window) {
+      const handle = window.requestIdleCallback(prefetch, { timeout: 5000 });
+      return () => window.cancelIdleCallback(handle);
+    }
+    const timer = window.setTimeout(prefetch, 3000);
+    return () => window.clearTimeout(timer);
+  }, []);
+}
 
 // Public files live under the site base path (GitHub Pages serves the app from a sub-folder).
 const asset = (file) => `${import.meta.env.BASE_URL}${file}`;
@@ -264,8 +301,13 @@ function CreateAccountModal({ onClose, onCreated }) {
   const handleCreate = async (event) => {
     event.preventDefault();
     setError("");
-    if (!["name", "email", "role", "password", "confirmPassword"].every((field) => form[field])) {
+    if (!["name", "email", "role", "password", "confirmPassword"].every((field) => form[field].trim())) {
       setError("Complete every field before creating your account.");
+      return;
+    }
+    // Same limit as the profile in firestore.rules, so the profile always saves.
+    if (form.name.trim().length > 80) {
+      setError("Please shorten your name to 80 characters or fewer.");
       return;
     }
     if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{12,}$/.test(form.password)) {
@@ -278,7 +320,7 @@ function CreateAccountModal({ onClose, onCreated }) {
     }
     setSaving(true);
     try {
-      const user = await createCampusAccount(form);
+      const user = await createCampusAccount({ ...form, name: form.name.trim(), email: form.email.trim() });
       onCreated(user);
     } catch (createError) {
       setError(createError.code === "auth/email-already-in-use"
@@ -298,14 +340,14 @@ function CreateAccountModal({ onClose, onCreated }) {
         <h2 id="create-account-title">Create your account</h2>
         <p className="modal-copy">Save the rooms and offices you visit and get alerts when a hallway on your way is closed.</p>
         <div className="account-fields">
-          <input name="name" value={form.name} onChange={updateField} placeholder="Full name" autoComplete="name" />
-          <input name="email" type="email" value={form.email} onChange={updateField} placeholder="Email address" autoComplete="email" />
+          <input name="name" value={form.name} onChange={updateField} placeholder="Full name" autoComplete="name" maxLength={80} />
+          <input name="email" type="email" value={form.email} onChange={updateField} placeholder="Email address" autoComplete="email" maxLength={254} />
           <select name="role" value={form.role} onChange={updateField} aria-label="I am a"><option value="">I am a…</option>{USER_ROLES.map((item) => <option key={item}>{item}</option>)}</select>
-          <div className="password-field"><input name="password" type={showPassword ? "text" : "password"} value={form.password} onChange={updateField} placeholder="Password (12+ characters)" autoComplete="new-password" aria-describedby="password-strength" /><button type="button" className="password-visibility" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "Hide password" : "Show password"}><Icon name={showPassword ? "eyeOff" : "eye"} size={18} /></button></div>
+          <div className="password-field"><input name="password" type={showPassword ? "text" : "password"} value={form.password} onChange={updateField} placeholder="Password (12+ characters)" autoComplete="new-password" aria-describedby="password-strength" maxLength={128} /><button type="button" className="password-visibility" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "Hide password" : "Show password"}><Icon name={showPassword ? "eyeOff" : "eye"} size={18} /></button></div>
           {passwordStrength && <div className={`password-strength ${passwordStrength.toLowerCase()}`} id="password-strength" aria-live="polite"><div className="strength-meter"><i /><i /><i /></div><span>Password strength: <b>{passwordStrength}</b></span></div>}
-          <div className="password-field"><input name="confirmPassword" type={showConfirmPassword ? "text" : "password"} value={form.confirmPassword} onChange={updateField} placeholder="Confirm password" autoComplete="new-password" /><button type="button" className="password-visibility" onClick={() => setShowConfirmPassword((visible) => !visible)} aria-label={showConfirmPassword ? "Hide confirmation password" : "Show confirmation password"}><Icon name={showConfirmPassword ? "eyeOff" : "eye"} size={18} /></button></div>
+          <div className="password-field"><input name="confirmPassword" type={showConfirmPassword ? "text" : "password"} value={form.confirmPassword} onChange={updateField} placeholder="Confirm password" autoComplete="new-password" maxLength={128} /><button type="button" className="password-visibility" onClick={() => setShowConfirmPassword((visible) => !visible)} aria-label={showConfirmPassword ? "Hide confirmation password" : "Show confirmation password"}><Icon name={showConfirmPassword ? "eyeOff" : "eye"} size={18} /></button></div>
         </div>
-        <label className="email-updates-check"><input type="checkbox" checked={form.emailUpdates} onChange={(event) => setForm((current) => ({ ...current, emailUpdates: event.target.checked }))} /><span>Email me new school announcements and closed hallways. You can turn this off anytime in My Campus.</span></label>
+        <label className="email-updates-check"><input type="checkbox" checked={form.emailUpdates} onChange={(event) => setForm((current) => ({ ...current, emailUpdates: event.target.checked }))} /><span>Email me new school announcements and closed hallways once I confirm my email. You can turn this off anytime in My Campus.</span></label>
         {error && <p className="auth-error" role="alert">{error}</p>}
         <button className="visitor-button" type="submit" disabled={saving}>{saving ? "Creating account..." : "Create account"}</button>
         <p className="terms password-policy">Password policy: at least 12 characters, including uppercase and lowercase letters, a number, and a symbol.</p>
@@ -577,6 +619,7 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
 }
 
 export default function App() {
+  usePrefetchScreens();
   const [loginOpen, setLoginOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [floor, setFloor] = useState(2);
@@ -842,7 +885,8 @@ export default function App() {
         </div>
       </footer>
       {!accountOpen && !loginOpen && !mapState && !arOpen && <SiiBot onSignIn={openLogin} onSignOut={handleSignOut} onOpenAccount={() => setAccountOpen(true)} alreadySignedIn={Boolean(signedInUser)} onNavigate={navigateTo} onOpenMap={setMapState} />}
-      {arOpen && <Suspense fallback={null}><ArLiveView onClose={() => setArOpen(false)} /></Suspense>}
+      <Suspense fallback={<ScreenLoading />}>
+      {arOpen && <ArLiveView onClose={() => setArOpen(false)} />}
       {mapState && <CampusMap onClose={() => setMapState(null)} initialFloor={mapState.floor || 2} initialDestination={mapState.destination || null} initialEmergency={Boolean(mapState.emergency)} />}
       {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} onCreate={openCreateAccount} onAdmin={openAdminLogin} onSignedIn={(user) => { setSignedInUser(user); setLoginOpen(false); setAccountOpen(true); }} />}
       {accountOpen && signedInUser && <MyCampus
@@ -857,6 +901,7 @@ export default function App() {
       {isAdmin && adminView === "analytics" && <AdminAnalytics onClose={() => setAdminView(null)} onOpenContent={() => setAdminView("content")} onOpenSignIns={() => setAdminView("signins")} />}
       {isAdmin && adminView === "signins" && <AdminSignIns onClose={() => setAdminView(null)} onOpenContent={() => setAdminView("content")} onOpenVisits={() => setAdminView("analytics")} />}
       {isAdmin && adminView === "content" && <AdminCms onClose={() => setAdminView(null)} onOpenAnalytics={() => setAdminView("analytics")} onOpenSignIns={() => setAdminView("signins")} />}
+      </Suspense>
     </div>
   );
 }

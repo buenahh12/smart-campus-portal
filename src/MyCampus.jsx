@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Icon from "./Icon";
 import { usePublicCollection, visibleAnnouncements } from "./CampusUpdates";
 import { CMS_COLLECTIONS, MAX_SAVED_PLACES, USER_ROLES, isClosureActive, placeKey, saveProfile, setEmailUpdates, watchProfile, watchSubscription } from "./cms";
+import { refreshEmailConfirmed, sendConfirmationEmail, wantsEmailUpdates, wishForEmailUpdates } from "./firebase";
 
 const floorLabel = (floor) => (floor === 0 ? "Ground floor" : `Floor ${floor}`);
 const statusTone = (status) => (status === "Available" ? "good" : status === "In use" ? "warn" : "bad");
@@ -20,6 +21,30 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, renderAs
   const announcements = usePublicCollection(CMS_COLLECTIONS.announcements);
 
   useEffect(() => watchSubscription(user.uid, setEmailUpdatesState), [user.uid]);
+
+  // Email updates need a confirmed email (firestore.rules). Check again on open, since they may
+  // have just clicked the link, and start the updates they asked for at sign-up once confirmed.
+  const [confirmed, setConfirmed] = useState(user.emailVerified);
+  const [confirmNote, setConfirmNote] = useState("");
+  useEffect(() => {
+    if (!user.email || user.emailVerified) return undefined;
+    let live = true;
+    refreshEmailConfirmed(user).then((ok) => { if (live) setConfirmed(ok); }).catch(() => {});
+    return () => { live = false; };
+  }, [user]);
+  useEffect(() => {
+    if (!confirmed || !wantsEmailUpdates(user.uid)) return;
+    setEmailUpdates(user, user.displayName || "", true).then(() => wishForEmailUpdates(user.uid, false)).catch(() => {});
+  }, [confirmed, user]);
+  const checkConfirmed = () => refreshEmailConfirmed(user)
+    .then((ok) => {
+      setConfirmed(ok);
+      setConfirmNote(ok ? "" : "It isn't confirmed yet. Check your inbox and spam folder.");
+    })
+    .catch(() => setConfirmNote("Couldn't check right now. Check your connection and try again."));
+  const resendConfirmation = () => sendConfirmationEmail(user)
+    .then(() => setConfirmNote("A new link is on its way."))
+    .catch((error) => setConfirmNote(error.code === "auth/too-many-requests" ? "Please wait a few minutes before asking for another link." : "The link couldn't be sent. Try again later."));
   useEffect(() => watchProfile(user.uid, setProfile, () => setProfileError("Your saved places could not be loaded. Check your connection and try again.")), [user.uid]);
 
   useEffect(() => {
@@ -145,7 +170,11 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, renderAs
             <label className="mc-field">I am a<select value={role} onChange={(event) => update({ role: event.target.value })}>{USER_ROLES.map((item) => <option key={item}>{item}</option>)}</select></label>
             <label className="mc-toggle"><input type="checkbox" checked={prefs.speakAnswers} onChange={(event) => update({ prefs: { ...prefs, speakAnswers: event.target.checked } })} /><span><b>Read SiBot answers aloud</b><small>SiBot speaks every answer, not only voice questions.</small></span></label>
             <label className="mc-toggle"><input type="checkbox" checked={prefs.allClosureAlerts} onChange={(event) => update({ prefs: { ...prefs, allClosureAlerts: event.target.checked } })} /><span><b>Show closures across the whole campus</b><small>Turn off to only see closures near your saved places.</small></span></label>
-            {user.email && <label className="mc-toggle"><input type="checkbox" checked={emailUpdates} onChange={(event) => {
+            {user.email && !confirmed && <div className="mc-toggle mc-confirm" role="group" aria-label="Confirm your email">
+              <span><b>Confirm your email to get updates</b><small>We sent a link to {user.email}. Open it, then tap &ldquo;I&apos;ve confirmed&rdquo;.{confirmNote && ` ${confirmNote}`}</small>
+                <span className="mc-confirm-actions"><button type="button" onClick={checkConfirmed}>I&apos;ve confirmed</button><button type="button" onClick={resendConfirmation}>Send the link again</button></span></span>
+            </div>}
+            {user.email && confirmed && <label className="mc-toggle"><input type="checkbox" checked={emailUpdates} onChange={(event) => {
               const enabled = event.target.checked;
               setEmailUpdatesState(enabled);
               setEmailUpdates(user, name, enabled).catch(() => {

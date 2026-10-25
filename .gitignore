@@ -1,5 +1,9 @@
 
 node_modules
-.env.local
+dist
+# Secrets: every env file stays local (Vercel holds the real values). Only the example is shared.
+.env
+.env.*
+!.env.example
 serviceAccountKey.json
 *-firebase-adminsdk-*.json

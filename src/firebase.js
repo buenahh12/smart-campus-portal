@@ -1,4 +1,5 @@
 import { initializeApp } from 'firebase/app';
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 import { doc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
 import { 
   getAuth, 
@@ -11,8 +12,8 @@ import {
   signInWithEmailAndPassword,
   getIdTokenResult,
   updateProfile,
-  signInAnonymously, 
-  signOut 
+  sendEmailVerification,
+  signOut
 } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -27,6 +28,13 @@ const firebaseConfig = {
 const hasFirebaseConfig = Object.values(firebaseConfig).every(Boolean);
 
 const app = hasFirebaseConfig ? initializeApp(firebaseConfig) : null;
+// App Check: only this website may use the database, so scripts cannot flood the visit
+// counters or sign-in records. Turned on by VITE_APPCHECK_SITE_KEY (a reCAPTCHA v3 site key);
+// then enforce App Check for Cloud Firestore in the Firebase console.
+const APP_CHECK_SITE_KEY = import.meta.env.VITE_APPCHECK_SITE_KEY;
+if (app && APP_CHECK_SITE_KEY) {
+  initializeAppCheck(app, { provider: new ReCaptchaV3Provider(APP_CHECK_SITE_KEY), isTokenAutoRefreshEnabled: true });
+}
 export const db = app ? getFirestore(app) : null;
 export const auth = app ? getAuth(app) : null;
 export const googleProvider = new GoogleAuthProvider();
@@ -103,14 +111,35 @@ export const createCampusAccount = async ({ email, password, name, role, emailUp
     // The account itself was created; My Campus creates the profile on the first save.
     console.warn('Campus profile could not be saved yet:', profileError);
   }
-  if (emailUpdates) {
-    try {
-      await setDoc(doc(db, 'subscribers', credential.user.uid), { email: credential.user.email, name, updatedAt: serverTimestamp() });
-    } catch (subscribeError) {
-      console.warn('Email updates could not be turned on yet:', subscribeError);
-    }
+  // Proves the address is theirs. Email updates only start for a confirmed address
+  // (firestore.rules), so a wish for them is kept until My Campus sees it confirmed.
+  try {
+    await sendEmailVerification(credential.user);
+  } catch (verifyError) {
+    console.warn('The confirmation email could not be sent yet:', verifyError);
   }
+  if (emailUpdates) wishForEmailUpdates(credential.user.uid, true);
   return credential.user;
 };
-export const loginAsVisitor = () => signInAnonymously(auth);
+export const sendConfirmationEmail = (user) => sendEmailVerification(user);
+// Reloads the account and refreshes its token, so a just-confirmed email counts in the rules.
+export const refreshEmailConfirmed = async (user) => {
+  await user.reload();
+  if (user.emailVerified) await user.getIdToken(true);
+  return user.emailVerified;
+};
+// Sign-up's "email me updates" choice, kept on this device until the email is confirmed.
+export function wishForEmailUpdates(uid, wanted) {
+  try {
+    if (wanted) localStorage.setItem(`campus-email-updates:${uid}`, '1');
+    else localStorage.removeItem(`campus-email-updates:${uid}`);
+  } catch { /* storage unavailable: they can turn updates on in My Campus */ }
+}
+export function wantsEmailUpdates(uid) {
+  try {
+    return localStorage.getItem(`campus-email-updates:${uid}`) === '1';
+  } catch {
+    return false;
+  }
+}
 export const logoutUser = () => signOut(auth);

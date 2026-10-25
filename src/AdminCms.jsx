@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import Icon from "./Icon";
 import { CMS_COLLECTIONS, deleteItem, isClosureActive, saveItem, todayKey, watchCollection } from "./cms";
 import { MAP_AREAS, mapAreaLabel } from "./floorPlans";
-import { emailConfigured, emailSubscribers } from "./notify";
+import { emailSubscribers } from "./notify";
 import AdminFloorPlan from "./AdminFloorPlan";
 import { auth } from "./firebase";
 import { AnnouncementArt, ClosureArt, generateAiPicture, useDebounced } from "./EventArt";
@@ -259,14 +259,19 @@ export default function AdminCms({ onClose, onOpenAnalytics, onOpenSignIns }) {
       resetForm();
       if (!mail) {
         setNotice(saved);
-      } else if (!emailConfigured) {
-        setNotice(`${saved} No email was sent because the email service isn't set up yet (see src/notify.js).`);
       } else {
         setNotice(`${saved} Sending email updates…`);
-        const result = await emailSubscribers(mail);
-        setNotice(result.total === 0
-          ? `${saved} No one has turned on email updates yet, so no email was sent.`
-          : `${saved} Email sent to ${result.sent} of ${result.total} subscriber${result.total === 1 ? "" : "s"}${result.failed ? ` (${result.failed} failed)` : ""}.`);
+        try {
+          const result = await emailSubscribers(mail);
+          setNotice(!result.configured
+            ? `${saved} No email was sent because the email service isn't set up yet (see api/email-subscribers.mjs).`
+            : result.total === 0
+              ? `${saved} No one has turned on email updates yet, so no email was sent.`
+              : `${saved} Email sent to ${result.sent} of ${result.total} subscriber${result.total === 1 ? "" : "s"}${result.failed ? ` (${result.failed} failed)` : ""}${result.notSent ? ` (${result.notSent} not sent: time ran out, save again to retry)` : ""}.`);
+        } catch (mailError) {
+          // The change itself is saved; only the emails failed.
+          setNotice(`${saved} The email updates were not sent: ${mailError.message}`);
+        }
       }
     } catch (error) {
       setFormError(friendlyError(error));

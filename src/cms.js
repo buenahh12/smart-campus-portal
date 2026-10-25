@@ -5,7 +5,6 @@ import {
   doc,
   documentId,
   getDoc,
-  getDocs,
   increment,
   limit,
   onSnapshot,
@@ -262,10 +261,4 @@ export function setEmailUpdates(user, name, enabled) {
   if (!db) return Promise.reject(notConfigured());
   const ref = doc(db, 'subscribers', user.uid);
   return enabled ? setDoc(ref, { email: user.email, name: name || '', updatedAt: serverTimestamp() }) : deleteDoc(ref);
-}
-
-export async function listSubscribers() {
-  if (!db) throw notConfigured();
-  const snapshot = await getDocs(collection(db, 'subscribers'));
-  return snapshot.docs.map((item) => item.data()).filter((item) => item.email);
 }
