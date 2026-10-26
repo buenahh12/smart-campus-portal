@@ -82,6 +82,41 @@ function InstallPrompt({ offlineApp, hidden }) {
   </aside>;
 }
 
+// Fourth panel of "Three ways to find your way": offline mode, always visible. Says whether the
+// site is saved on this device, what works without internet, and how to get the app here.
+function OfflinePanel({ offlineApp }) {
+  const inApp = /Android/i.test(navigator.userAgent) ? inAppBrowserName() : "";
+  const status = offlineApp.savedOffline
+    ? { tone: "ready", text: "Ready offline on this device" }
+    : offlineApp.offlineSupported
+      ? { tone: "saving", text: offlineApp.online ? "Saving for offline use…" : "Open once with internet to save it" }
+      : { tone: "off", text: "Saves itself on the published site" };
+  let action;
+  if (offlineApp.installed) action = <p className="ss-offline-done"><Icon name="download" size={16} /> You&apos;re using the app. It opens from your home screen, even offline.</p>;
+  else if (offlineApp.canInstall) action = <div className="dollhouse-actions"><button type="button" onClick={offlineApp.install}><Icon name="download" size={16} /> Download the app</button></div>;
+  else if (offlineApp.iosInstallTip) action = <ol className="ss-offline-steps"><li>Tap <b>Share</b> <span aria-hidden="true">⬆</span> at the bottom of Safari.</li><li>Tap <b>Add to Home Screen</b>.</li></ol>;
+  else if (inApp) action = <div className="dollhouse-actions"><a href={chromeIntentFor(window.location.href.split("#")[0])}>Open in Chrome to download</a></div>;
+  else action = <p className="ss-offline-hint">To add an icon, open this page in Chrome or Edge and choose <b>Install</b> from the menu. Even without it, this browser keeps the offline copy.</p>;
+  return <article className="ss-way ss-way-offline" id="offline">
+    <div className="ss-offline-intro">
+      <span className="ss-way-icon" aria-hidden="true"><Icon name="download" size={26} /></span>
+      <h3>Offline mode <span className={`ss-offline-status is-${status.tone}`}>{status.text}</span></h3>
+      <p>No Wi-Fi at school? Open the portal once with internet and it saves itself on your phone. After that you can find your way with no Wi-Fi or data.</p>
+      {action}
+    </div>
+    <div className="ss-offline-lists">
+      <div>
+        <h4>Works offline</h4>
+        <ul><li>2D floor plans and directions</li><li>Routes across floors and stairs</li><li>3D dollhouse</li><li>AR live view</li><li>Nearest exit and SiBot&apos;s answers</li></ul>
+      </div>
+      <div>
+        <h4>Needs internet</h4>
+        <ul><li>Signing in</li><li>New announcements and closures (the last ones seen still show)</li><li>The street map and voice questions</li></ul>
+      </div>
+    </div>
+  </article>;
+}
+
 function ScreenLoading() {
   return <div className="screen-loading" role="status"><i aria-hidden="true" />Loading…</div>;
 }
@@ -882,6 +917,7 @@ export default function App() {
                   {SIBOT_PROMPTS.map((prompt) => <li key={prompt}><button type="button" onClick={() => window.dispatchEvent(new CustomEvent("sibot:ask", { detail: prompt }))}><span>{prompt}</span><Icon name="arrow" size={16} /></button></li>)}
                 </ul>
               </article>
+              <OfflinePanel offlineApp={offlineApp} />
             </div>
           </div>
         </section>

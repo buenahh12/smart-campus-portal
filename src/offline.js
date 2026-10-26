@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react';
 
 let installEvent = null;
 let waitingWorker = null;
+let savedOffline = false; // the whole site is saved on this device
+const supported = import.meta.env.PROD && typeof navigator !== 'undefined' && 'serviceWorker' in navigator;
 const listeners = new Set();
 const notify = () => listeners.forEach((listener) => listener());
 
@@ -24,17 +26,28 @@ if (typeof window !== 'undefined') {
 }
 
 // Not in development (files change on every save) and only where browsers allow it (HTTPS).
+// The service worker saves everything before it activates, so an active one means it is saved.
+async function checkSaved() {
+  try {
+    const keys = await caches.keys();
+    savedOffline = keys.some((key) => key.startsWith('ssca-app-'));
+    notify();
+  } catch { /* caches unavailable */ }
+}
+
 export function registerOfflineApp() {
-  if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
+  if (!supported) return;
   window.addEventListener('load', async () => {
     try {
       const registration = await navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`);
+      if (registration.active) checkSaved();
       const watch = (worker) => worker?.addEventListener('statechange', () => {
         // A new version finished saving while an older one runs this page.
         if (worker.state === 'installed' && navigator.serviceWorker.controller) {
           waitingWorker = worker;
           notify();
         }
+        if (worker.state === 'activated') checkSaved();
       });
       if (registration.waiting && navigator.serviceWorker.controller) {
         waitingWorker = registration.waiting;
@@ -70,6 +83,9 @@ export function useOfflineApp() {
   }, []);
   return {
     online: navigator.onLine,
+    offlineSupported: supported,
+    savedOffline,
+    installed: isInstalled(),
     updateReady: Boolean(waitingWorker),
     applyUpdate: () => waitingWorker?.postMessage('skip-waiting'),
     // Android/desktop Chrome: a real install button. iPhone: Safari has no prompt, so explain.

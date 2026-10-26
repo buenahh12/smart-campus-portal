@@ -136,6 +136,31 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .app-status { position: fixed; z-index: 300; left: 50%; bottom: max(12px, env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 12px; width: max-content; max-width: calc(100% - 24px); padding: 10px 12px 10px 16px; transform: translateX(-50%); border-radius: var(--radius, 14px); color: var(--cream, #f6efe1); background: var(--forest, #1c3a2a); box-shadow: 0 12px 32px rgba(10,20,14,.35); font-size: 14px; line-height: 1.35; }
 .app-status button { flex: none; min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; color: var(--ink); background: var(--peach, #f1c39a); font-weight: 700; }
 .app-status-offline { padding-right: 16px; }
+/* Offline mode: the fourth panel, full width under the three ways. */
+.ss-ways > .ss-way:nth-child(3) { border-right: 0; }
+.ss-way-offline { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 32px; border-right: 0; border-top: 1px solid rgba(246,239,225,.12); }
+.ss-offline-intro > p { margin: 0 0 18px; color: #cfdacb; font-size: 16px; line-height: 1.55; }
+.ss-offline-status { padding: 3px 10px; border-radius: 999px; font: 700 12px/1.4 var(--mono, monospace); letter-spacing: .02em; text-transform: none; }
+.ss-offline-status.is-ready { color: var(--ink); background: var(--sage, #a4bd9c); }
+.ss-offline-status.is-ready::before { content: "✓ "; }
+.ss-offline-status.is-saving, .ss-offline-status.is-off { color: var(--ink); background: var(--peach, #f1c39a); }
+.ss-offline-lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-content: start; }
+.ss-offline-lists > div { padding: 18px; border-radius: var(--radius, 14px); color: var(--ink); background: var(--cream, #f6efe1) var(--grain, none); }
+.ss-offline-lists h4 { margin: 0 0 10px; font: 700 11px/1.2 var(--mono, monospace); letter-spacing: .06em; text-transform: uppercase; color: var(--moss, #3b6347); }
+.ss-offline-lists ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; font-size: 15px; line-height: 1.35; }
+.ss-offline-lists li { position: relative; padding-left: 22px; }
+.ss-offline-lists > div:first-child li::before { content: "✓"; position: absolute; left: 0; color: var(--green); font-weight: 800; }
+.ss-offline-lists > div:last-child li::before { content: "•"; position: absolute; left: 4px; color: var(--clay, #8a4c30); font-weight: 800; }
+.ss-offline-steps, .ss-offline-hint, .ss-offline-done { margin: 0; color: #cfdacb; font-size: 15px; line-height: 1.5; }
+.ss-offline-steps { padding-left: 20px; }
+.ss-offline-done { display: flex; align-items: center; gap: 8px; color: var(--sage, #a4bd9c); }
+.ss-ways.is-visible > :nth-child(4) { transition-delay: 240ms, 240ms, 0ms; }
+@media (max-width: 900px) {
+  .ss-way-offline { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+}
+@media (max-width: 480px) {
+  .ss-offline-lists { grid-template-columns: minmax(0, 1fr); }
+}
 /* "Download the app?" offer: a card at the bottom of the screen, in the site's cream and peach. */
 .install-prompt { position: fixed; z-index: 290; left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); display: flex; gap: 14px; max-width: 460px; margin: 0 auto; padding: 16px; border-radius: var(--radius-lg, 24px); color: var(--ink); background: var(--cream, #f6efe1) var(--grain, none); box-shadow: 0 2px 6px rgba(20,30,20,.1), 0 24px 60px rgba(20,30,20,.28); animation: install-rise .35s var(--ease-out, ease-out); }
 .install-prompt img { flex: none; width: 56px; height: 56px; border-radius: 14px; }
