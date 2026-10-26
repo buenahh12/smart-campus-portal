@@ -1,0 +1,54 @@
+/* Easy for young users: big picture buttons for common places, taps of at least 44-48 px, and
+   no text smaller than 13 px. Loaded last (see main.jsx), so these sizes win over the theme. */
+
+/* ---------- Home: "Or tap a place" ---------- */
+.ss-quick { display: block; margin-top: 22px; }
+.ss-quick > p { margin: 0 0 10px; color: var(--cream); font-size: 16px; font-weight: 600; }
+.ss-quick-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.ss-quick-grid button { display: flex; align-items: center; gap: 10px; min-height: 64px; padding: 10px 12px; border: 1.5px solid rgba(246,239,225,.28); border-radius: var(--radius, 14px); color: var(--cream); background: rgba(246,239,225,.08); text-align: left; transition: background-color var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-out); }
+.ss-quick-grid button:hover, .ss-quick-grid button:focus-visible { border-color: var(--peach); background: rgba(241,195,154,.16); }
+.ss-quick-grid button:active { transform: scale(.97); }
+.ss-quick-icon { display: grid; flex: none; place-items: center; width: 42px; height: 42px; border-radius: 50%; color: var(--ink); background: var(--peach); }
+.ss-quick-grid b { display: block; font-size: 17px; font-weight: 700; line-height: 1.15; }
+.ss-quick-grid small { display: block; margin-top: 2px; color: var(--cream-soft, #d7e0d1); font-size: 13px; line-height: 1.2; }
+.ss-quick-grid .is-exit .ss-quick-icon { color: #fff; background: var(--red, #b42318); }
+@media (max-width: 760px) {
+  .ss-quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* "Did you mean…?" choices under the search box. */
+.ss-suggestions { display: grid; gap: 8px; margin-top: 10px; }
+.ss-suggestions button { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-height: 52px; padding: 10px 16px; border: 0; border-radius: var(--radius-sm, 8px); color: var(--ink); background: var(--cream, #f6efe1); text-align: left; }
+.ss-suggestions b { font-size: 16px; }
+.ss-suggestions small { flex: none; color: var(--muted); font-size: 14px; }
+.ss-field-error { font-size: 15px; }
+.ss-search .ss-btn { min-height: 52px; font-size: 16px; }
+
+/* ---------- Bigger taps everywhere else ---------- */
+.ss-menu { width: 48px; min-width: 48px; height: 48px; }
+.directory-map { min-height: 44px; padding: 0 16px; font-size: 15px; }
+.ss-dollhouse-open { min-height: 44px; padding: 0 16px; font-size: 14px; }
+.ar-app-note a { display: inline-block; padding: 10px 0; }
+.map-stepper button, .map-stepper-done { min-height: 48px; font-size: 15px; }
+
+/* ---------- Easier reading ---------- */
+.ss-way > p, .ss-lead { line-height: 1.55; }
+.ss-dollhouse-hint { font-size: 13px; }
+.ss-offline-lists h4, .ss-offline-status, .ar-app-note { font-size: 13px; }
+.ss-visit-note { font-size: 15px; }
+.ss-brand small, .ss-facts dt, .ss-footer h2 { font-size: 13px; }
+/* Route steps on other floors stay readable: grey #8a928c on white was about 3:1; this is 7:1. */
+.map-steps li:not(.on-floor) .step-text { color: #4f5852; }
+.map-steps li button { min-height: 48px; font-size: 16px; }
+/* Footer links and the small "Install the app" link. */
+.ss-social a, .ss-footer-bottom a { display: inline-flex; align-items: center; min-height: 44px; }
+.ss-offline-tip button { min-height: 44px; padding: 0 4px; }
+.kicker { font-size: 13px; }
+/* "Did you mean…?" is a question, not an error: no red. */
+.ss-field-hint { margin: 10px 0 0; color: var(--cream); font-size: 16px; font-weight: 600; }
+/* On phones SiBot's floating button is a round icon (it keeps its label for screen readers),
+   so it does not cover the place buttons. */
+@media (max-width: 480px) {
+  .siibot-launcher { width: 56px; height: 56px; min-height: 56px; padding: 0; justify-content: center; }
+  .siibot-launcher > span { display: none; }
+}

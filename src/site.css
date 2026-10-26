@@ -81,9 +81,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .ss-search .ss-btn { min-height: 52px; padding: 0 22px; font-size: 16px; }
 .ss-field-error { margin: 8px 0 0; color: var(--red); font-size: 14px; }
 .ss-quick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 18px; }
-.ss-quick span { margin-right: 4px; color: var(--muted); font-size: 14px; }
-.ss-quick button { min-height: 36px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); color: var(--ink); background: var(--surface); font-size: 14px; font-weight: 500; transition: border-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease); }
-.ss-quick button:hover { border-color: var(--green); color: var(--green); }
 .ss-hero-figure { margin: 0; }
 .ss-hero-figure img { display: block; width: 100%; height: auto; aspect-ratio: 1192 / 896; object-fit: cover; border: 1px solid var(--line); border-radius: 12px; background: var(--green-tint); }
 .ss-hero-figure figcaption { margin-top: 10px; color: var(--muted); font-size: 13px; }

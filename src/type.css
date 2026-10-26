@@ -24,7 +24,7 @@ h1, h2 { font-family: var(--display); font-weight: 800; font-stretch: 112%; lett
 .t-stripe { background-image: repeating-linear-gradient(180deg, currentColor 0 2px, transparent 2px 3.5px); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
 
 /* ---------- Mono labels ---------- */
-.ss-overline, .ss-facts dt, .ss-quick span, .ss-hero-figure figcaption, .ss-footer h2, .ss-tag, .kicker,
+.ss-overline, .ss-facts dt, .ss-hero-figure figcaption, .ss-footer h2, .ss-tag, .kicker,
 .ss-way .floor-head span, .ss-brand small, .siibot-label, .map-route-form label > span, .map-floors > span {
   font-family: var(--mono);
   font-weight: 700;
@@ -33,7 +33,7 @@ h1, h2 { font-family: var(--display); font-weight: 800; font-stretch: 112%; lett
   text-transform: uppercase;
 }
 .ss-overline { font-size: 13px; }
-.ss-facts dt, .ss-quick span, .ss-hero-figure figcaption, .ss-way .floor-head span { font-size: 12px; }
+.ss-facts dt, .ss-hero-figure figcaption, .ss-way .floor-head span { font-size: 13px; }
 .ss-footer h2 { font-size: 13px; }
 .ss-brand small { font-size: 12px; letter-spacing: .06em; }
 .ss-tag { font-size: 12px; }
@@ -79,10 +79,11 @@ h1, h2 { font-family: var(--display); font-weight: 800; font-stretch: 112%; lett
 @media (max-width: 900px) {
   .ss-hero { --h1-size: clamp(34px, 9.6vw, 72px); }
   .ss-hero-grid { grid-template-columns: minmax(0, 1fr); }
-  /* Headline stays on top; the picture comes right after it, before the paragraph. */
+  /* Headline, then the search and the place buttons, then the picture: on a phone the first
+     thing to see is "Where do you want to go?". */
   .ss-hero .ss-overline, .ss-hero h1.ss-display, .ss-lead, .ss-search, .ss-quick, .ss-hero-figure { grid-column: 1; grid-row: auto; }
   .ss-hero h1.ss-display { margin-bottom: 24px; }
-  .ss-hero-figure { order: 1; margin: 0 0 28px; }
+  .ss-hero-figure { order: 3; margin: 28px 0 0; }
   .ss-hero .ss-overline, .ss-hero h1.ss-display { order: 0; }
   .ss-lead, .ss-search, .ss-quick { order: 2; }
 }

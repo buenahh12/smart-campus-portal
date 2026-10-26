@@ -11,6 +11,13 @@ export default function Icon({ name, size = 20 }) {
     close: <path d="m6 6 12 12M18 6 6 18" />,
     cube: <path d="m12 2 9 5-9 5-9-5 9-5Zm9 5v10l-9 5-9-5V7m9 5v10" />,
     download: <path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />,
+    // Quick places on the home page.
+    heart: <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Zm0-11v5m-2.5-2.5h5" />,
+    restroom: <><circle cx="7.5" cy="4.5" r="1.5" /><circle cx="16.5" cy="4.5" r="1.5" /><path d="M7.5 8v12M5 9h5v6H5zM16.5 8l-3 7h6l-3-7Zm-1.2 7v5m2.4-5v5M12 3v18" /></>,
+    book: <path d="M4 5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2V5Zm0 15a2 2 0 0 0 2 2h13v-4M8 7h7" />,
+    monitor: <path d="M3 5h18v11H3zM8 20h8m-4-4v4" />,
+    chat: <path d="M4 5h16v11H9l-5 4V5Zm4 5h.01M12 10h.01M16 10h.01" />,
+    door: <path d="M14 3H6v18h8m-1-9h8m-3-3 3 3-3 3M10 12h.01" />,
     eye: <><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></>,
     eyeOff: <><path d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8" /><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a16 16 0 0 1-3 3.8M6.2 6.2C3.5 8 2 12 2 12s3.6 7 10 7a10 10 0 0 0 4-.8" /></>,
     info: <><circle cx="12" cy="12" r="9" /><path d="M12 11v5m0-8h.01" /></>,

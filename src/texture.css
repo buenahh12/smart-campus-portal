@@ -90,9 +90,6 @@ body { background: var(--paper) var(--grain); }
 .ss-search .ss-btn-primary { color: var(--ink); background: var(--peach); border-color: var(--peach); }
 .ss-search .ss-btn-primary:hover { background: var(--peach-hover); border-color: var(--peach-hover); }
 .ss-field-error { display: inline-block; padding: 6px 10px; border-radius: 8px; color: #fff; background: rgba(180,35,24,.85); }
-.ss-quick span { color: var(--cream-soft); }
-.ss-quick button { border-color: rgba(246,239,225,.32); border-radius: 999px; color: var(--cream); background: rgba(246,239,225,.06); transition: background-color var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-out); }
-.ss-quick button:hover { border-color: var(--peach); color: var(--cream); background: rgba(241,195,154,.16); transform: translateY(-1px); }
 .ss-hero-figure img { border: 6px solid rgba(246,239,225,.1); border-radius: var(--radius-lg); box-shadow: 0 30px 70px rgba(5,15,9,.45); }
 .ss-hero-figure figcaption { color: var(--cream-soft); }
 

@@ -15,6 +15,16 @@ import { CMS_COLLECTIONS, USER_ROLES, isClosureActive, recordSignIn, recordVisit
 import { usePlanVersion } from "./usePlan";
 import { useOfflineApp } from "./offline";
 import { FLOORS, PLACES, findPlaceKey, placeByKey, placeTitle, floorLabel as planFloorLabel } from "./floorPlans";
+import { searchPlace } from "./placeSearch";
+
+// Where the person said they are, last time they used the floor plan (to pick the nearest CR).
+const savedStart = () => {
+  try {
+    return localStorage.getItem("campus-map-start") || "";
+  } catch {
+    return "";
+  }
+};
 
 // three.js is large, so the 3D dollhouse loads after the page; the flat mini plan shows meanwhile,
 // and stays if the 3D part cannot be downloaded (connection dropped).
@@ -164,7 +174,16 @@ const asset = (file) => `${import.meta.env.BASE_URL}${file}`;
 // Read on each render: staff can rename rooms at any time (see usePlan.js).
 const mappedPlaces = () => PLACES.filter((item) => item.type !== "exit" && item.type !== "stairs" && !item.unlabeled);
 const EXIT_COUNT = PLACES.filter((item) => item.type === "exit").length;
-const QUICK_PLACES = ["2:clinic", "2:guidance", "3:library-hs", "2:computer-room", "4:room-403"];
+// Big picture buttons on the home page for the places people look for most. "CR" opens the
+// one nearest to where the person said they are (searchPlace), and "Way out" the nearest exit.
+const QUICK_PLACES = [
+  { label: "Clinic", icon: "heart", search: "clinic" },
+  { label: "CR", hint: "Comfort room", icon: "restroom", search: "cr" },
+  { label: "Library", icon: "book", search: "library" },
+  { label: "Guidance", icon: "chat", search: "guidance" },
+  { label: "Computer Room", icon: "monitor", search: "computer" },
+  { label: "Way out", hint: "Nearest exit", icon: "door", exit: true },
+];
 // School location. Google Maps finds the school by name, so no exact coordinates are hard-coded.
 const SCHOOL_MAP_QUERY = "Saint Simon of Cyrene Academy, Carsadang Bago II, Imus, Cavite";
 const MAP_EMBED_URL = `https://www.google.com/maps?q=${encodeURIComponent(SCHOOL_MAP_QUERY)}&output=embed`;
@@ -568,7 +587,7 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
     const place = [...liveOffices, ...liveRooms]
       .filter((item) => item.name && normalized.includes(item.name.toLowerCase()))
       .sort((first, second) => second.name.length - first.name.length)[0];
-    const planPlace = placeByKey(findPlaceKey(normalized));
+    const planPlace = placeByKey(findPlaceKey(normalized)) || placeByKey(searchPlace(normalized, savedStart())?.key);
     let answer;
     if (place) {
       const closedNearby = activeClosures.filter((item) => item.building === place.building && item.floor === place.floor);
@@ -612,7 +631,7 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
     } else if (hasAny(["emergency", "fire exit", "nearest exit", "safest route", "evacuate", "safety route", "earthquake", "way out"])) {
       answer = "I’m showing the nearest exit on the floor plan. In a real emergency, stay calm and follow your teacher and school staff first.";
       onOpenMap?.({ emergency: true });
-    } else if (planPlace && hasAny(["where", "take me", "go to", "find", "how do i get", "directions", "room", "office", "clinic", "library", "guidance", "laboratory", "lab"])) {
+    } else if (planPlace && hasAny(["where", "take me", "go to", "find", "how do i get", "directions", "room", "office", "clinic", "library", "guidance", "laboratory", "lab", "cr", "c.r.", "comfort", "restroom", "toilet", "bathroom", "banyo", "nasaan", "saan", "grade"])) {
       answer = `${placeTitle(planPlace)} is on the ${planFloorLabel(planPlace.floor).toLowerCase()} of the Main Academic Building. I’ve opened the floor plan with directions.`;
       onOpenMap?.({ destination: planPlace.key, floor: planPlace.floor });
     } else if (hasAny(["2d", "floor plan", "floor map", "directions", "navigate"])) {
@@ -732,6 +751,7 @@ export default function App() {
   const [arOpen, setArOpen] = useState(() => window.location.hash === "#ar-live" || new URLSearchParams(window.location.search).has("ar-live"));
   const [where, setWhere] = useState("");
   const [whereError, setWhereError] = useState("");
+  const [whereSuggestions, setWhereSuggestions] = useState([]);
   const [scrolled, setScrolled] = useState(false);
   useReveal();
   useEffect(() => {
@@ -762,18 +782,28 @@ export default function App() {
   const submitWhere = (event) => {
     event.preventDefault();
     const query = where.trim();
+    setWhereSuggestions([]);
     if (!query) {
-      setWhereError("Type a room number or name, for example Room 204 or Clinic.");
+      setWhereError("Type where you want to go, like clinic, CR or 204. Or tap a place below.");
       return;
     }
     const lower = query.toLowerCase();
     const exact = mappedPlaces().find((item) => [placeTitle(item), item.name, item.code].some((value) => value && value.toLowerCase() === lower));
-    const key = exact?.key || findPlaceKey(query);
-    if (!key) {
-      setWhereError(`No room called “${query}” is on the floor plan yet. Try a room number such as 204, or pick from the list.`);
+    const found = exact ? { key: exact.key } : searchPlace(query, savedStart());
+    if (found?.exit) {
+      setMapState({ emergency: true });
       return;
     }
-    setMapState({ destination: key, floor: placeByKey(key).floor });
+    if (found?.key) {
+      setMapState({ destination: found.key, floor: placeByKey(found.key).floor });
+      return;
+    }
+    if (found?.suggestions?.length) {
+      setWhereSuggestions(found.suggestions);
+      setWhereError(`Did you mean one of these?`);
+      return;
+    }
+    setWhereError(`We couldn’t find “${query}” in the building. Try a room number like 204, or tap a place below.`);
   };
 
   const handleSignOut = async () => {
@@ -836,19 +866,35 @@ export default function App() {
             <div className="ss-hero-copy">
               <p className="ss-overline" data-reveal style={{ "--delay": "0ms" }}>// Main Academic Building · Imus, Cavite</p>
               <h1 id="ss-hero-title" className="ss-display" data-reveal style={{ "--delay": "80ms" }}><span>Find any room</span> <span className="t-outline">at Saint Simon</span> <span className="t-stripe">of Cyrene Academy</span></h1>
-              <p className="ss-lead" data-reveal style={{ "--delay": "160ms" }}>Search for a classroom, office, or lab and get step-by-step directions across all four floors, including the nearest way out.</p>
+              <p className="ss-lead" data-reveal style={{ "--delay": "160ms" }}>Type a room or tap a place. We&apos;ll show you the way, step by step.</p>
               <form className={`ss-search ${whereError ? "has-error" : ""}`} onSubmit={submitWhere} role="search" data-reveal style={{ "--delay": "240ms" }}>
-                <label htmlFor="ss-where">Where do you need to go?</label>
+                <label htmlFor="ss-where">Where do you want to go?</label>
                 <div className="ss-search-row">
-                  <input id="ss-where" list="ss-places" value={where} onChange={(event) => { setWhere(event.target.value); setWhereError(""); }} placeholder="Room 204, Clinic, Computer Room…" autoComplete="off" aria-describedby={whereError ? "ss-where-error" : undefined} aria-invalid={Boolean(whereError)} />
-                  <button type="submit" className="ss-btn ss-btn-primary">Get directions</button>
+                  <input id="ss-where" list="ss-places" value={where} onChange={(event) => { setWhere(event.target.value); setWhereError(""); setWhereSuggestions([]); }} placeholder="Try: clinic, CR, 204, library" autoComplete="off" enterKeyHint="go" aria-describedby={whereError ? "ss-where-error" : undefined} aria-invalid={Boolean(whereError && !whereSuggestions.length)} />
+                  <button type="submit" className="ss-btn ss-btn-primary">Show me the way</button>
                 </div>
                 <datalist id="ss-places">{mappedPlaces().map((item) => <option key={item.key} value={placeTitle(item)} />)}</datalist>
-                {whereError && <p id="ss-where-error" className="ss-field-error" role="alert">{whereError}</p>}
+                {whereError && (whereSuggestions.length
+                  ? <p id="ss-where-error" className="ss-field-hint" role="status">{whereError}</p>
+                  : <p id="ss-where-error" className="ss-field-error" role="alert">{whereError}</p>)}
+                {whereSuggestions.length > 0 && <div className="ss-suggestions">
+                  {whereSuggestions.map((key) => placeByKey(key)).map((item) => <button key={item.key} type="button" onClick={() => setMapState({ destination: item.key, floor: item.floor })}>
+                    <b>{placeTitle(item)}</b><small>{planFloorLabel(item.floor)}</small>
+                  </button>)}
+                </div>}
               </form>
-              <div className="ss-quick" aria-label="Common places" data-reveal style={{ "--delay": "320ms" }}>
-                <span>Often searched:</span>
-                {QUICK_PLACES.map((key) => placeByKey(key)).filter(Boolean).map((item) => <button key={item.key} type="button" onClick={() => setMapState({ destination: item.key, floor: item.floor })}>{item.code && item.code !== item.name ? item.code : item.name}</button>)}
+              <div className="ss-quick" data-reveal style={{ "--delay": "320ms" }}>
+                <p id="ss-quick-label">Or tap a place:</p>
+                <div className="ss-quick-grid" role="group" aria-labelledby="ss-quick-label">
+                  {QUICK_PLACES.map((item) => <button key={item.label} type="button" className={item.exit ? "is-exit" : ""} onClick={() => {
+                    const found = item.exit ? { exit: true } : searchPlace(item.search, savedStart());
+                    if (found?.exit) setMapState({ emergency: true });
+                    else if (found?.key) setMapState({ destination: found.key, floor: placeByKey(found.key).floor });
+                  }}>
+                    <span className="ss-quick-icon" aria-hidden="true"><Icon name={item.icon} size={24} /></span>
+                    <span><b>{item.label}</b>{item.hint && <small>{item.hint}</small>}</span>
+                  </button>)}
+                </div>
               </div>
             </div>
             <figure className="ss-hero-figure" data-reveal style={{ "--delay": "200ms" }}>
@@ -870,13 +916,13 @@ export default function App() {
           <div className="ss-container">
             <div className="ss-section-head" data-reveal>
               <h2 id="ss-explore-title" className="ss-display"><span>Three ways to</span> <span className="t-outline">find your way</span></h2>
-              <p>Use the plan you&apos;re most comfortable with. They all share the same room list, so directions match.</p>
+              <p>Pick the way that&apos;s easiest for you. They all show the same rooms.</p>
             </div>
             <div className="ss-ways" data-reveal>
               <article className="ss-way" id="features">
                 <span className="ss-way-icon" aria-hidden="true"><Icon name="cube" size={26} /></span>
                 <h3>3D dollhouse</h3>
-                <p>Look at the building one floor at a time, then open the flat floor plan for turn-by-turn directions.</p>
+                <p>See the school in 3D. Tap a floor number to look inside, then open the map to get directions.</p>
                 <div className="floor-selector">
                   <div className="floor-head">
                     <span>Floor</span>
@@ -896,8 +942,8 @@ export default function App() {
               </article>
               <article className="ss-way">
                 <span className="ss-way-icon" aria-hidden="true"><Icon name="scan" size={26} /></span>
-                <h3>AR live view <span className="ss-tag">Preview</span></h3>
-                <p>Point your phone down a hallway and follow arrows to the room, with the distance left to walk.</p>
+                <h3>AR live view</h3>
+                <p>Hold up your phone and follow the arrows on the floor all the way to your room.</p>
                 <div className="ar-preview" aria-hidden="true">
                   <div className="corridor"><i /><i /><i /></div>
                   <div className="ar-header"><span>AR</span><b>Room 204 · 38 m</b></div>
@@ -907,12 +953,12 @@ export default function App() {
                 <div className="dollhouse-actions">
                   <button type="button" onClick={() => setArOpen(true)}><Icon name="scan" size={16} /> Start AR live view</button>
                 </div>
-                <p className="ar-app-note">Opens your camera, no app needed. Best in Chrome on Android; other phones get a compass guide. Prefer an app? <a href={AR_APP_URL} target="_blank" rel="noopener noreferrer">Get the Android AR app</a> by Jan Lawrence Cambaya Florido.</p>
+                <p className="ar-app-note">Uses your phone&apos;s camera. Works best in Chrome on Android. Prefer an app? <a href={AR_APP_URL} target="_blank" rel="noopener noreferrer">Get the Android AR app</a> by Jan Lawrence Cambaya Florido.</p>
               </article>
               <article className="ss-way">
                 <span className="ss-way-icon" aria-hidden="true"><Icon name="bot" size={26} /></span>
                 <h3>Ask SiBot</h3>
-                <p>Type or say what you need. SiBot answers common school questions and opens the floor plan for you.</p>
+                <p>Ask by typing or talking, like &ldquo;Where is the clinic?&rdquo; SiBot answers and shows you the way.</p>
                 <ul className="ss-prompts">
                   {SIBOT_PROMPTS.map((prompt) => <li key={prompt}><button type="button" onClick={() => window.dispatchEvent(new CustomEvent("sibot:ask", { detail: prompt }))}><span>{prompt}</span><Icon name="arrow" size={16} /></button></li>)}
                 </ul>

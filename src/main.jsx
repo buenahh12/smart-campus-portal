@@ -6,6 +6,7 @@ import './style.css';
 import './site.css';
 import './texture.css';
 import './type.css';
+import './friendly.css';
 
 registerOfflineApp();
 
