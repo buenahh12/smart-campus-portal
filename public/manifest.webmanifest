@@ -1,0 +1,18 @@
+{
+  "name": "SSCA Campus Portal",
+  "short_name": "SSCA Portal",
+  "description": "Find any room at Saint Simon of Cyrene Academy: floor plans, AR directions, the nearest exit, and campus updates. Works without internet after the first visit.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5efe2",
+  "theme_color": "#1f4a35",
+  "categories": ["education", "navigation"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

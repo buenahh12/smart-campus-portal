@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
-import { doc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, serverTimestamp, setDoc } from 'firebase/firestore';
 import { 
   getAuth, 
   GoogleAuthProvider, 
@@ -35,7 +35,17 @@ const APP_CHECK_SITE_KEY = import.meta.env.VITE_APPCHECK_SITE_KEY;
 if (app && APP_CHECK_SITE_KEY) {
   initializeAppCheck(app, { provider: new ReCaptchaV3Provider(APP_CHECK_SITE_KEY), isTokenAutoRefreshEnabled: true });
 }
-export const db = app ? getFirestore(app) : null;
+// Offline copy on the phone: announcements, closures and room names last seen online still show
+// without internet, and visit counts made offline are sent when the connection is back. Where the
+// browser cannot store it (some private modes), Firestore keeps working online only.
+function openDatabase() {
+  try {
+    return initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
+  } catch {
+    return getFirestore(app);
+  }
+}
+export const db = app ? openDatabase() : null;
 export const auth = app ? getAuth(app) : null;
 export const googleProvider = new GoogleAuthProvider();
 // Always show Google's account chooser instead of silently using the last account,

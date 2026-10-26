@@ -13,11 +13,74 @@ import Icon from "./Icon";
 import CampusUpdates, { usePublicCollection } from "./CampusUpdates";
 import { CMS_COLLECTIONS, USER_ROLES, isClosureActive, recordSignIn, recordVisit, todayKey, watchSession } from "./cms";
 import { usePlanVersion } from "./usePlan";
+import { useOfflineApp } from "./offline";
 import { FLOORS, PLACES, findPlaceKey, placeByKey, placeTitle, floorLabel as planFloorLabel } from "./floorPlans";
 
 // three.js is large, so the 3D dollhouse loads after the page; the flat mini plan shows meanwhile,
 // and stays if the 3D part cannot be downloaded (connection dropped).
 const Dollhouse3D = lazy(() => import("./Dollhouse3D").catch(() => ({ default: ({ fallback }) => fallback })));
+
+// Sign-in and account changes need Firebase online; everything for finding rooms does not.
+const NEEDS_INTERNET = "This needs an internet connection. Floor plans, directions and AR live view still work offline.";
+const isOfflineError = (error) => error?.code === "auth/network-request-failed" || !navigator.onLine;
+
+// Offline notice, and the button for a new version saved in the background.
+function AppStatus({ online, updateReady, onUpdate }) {
+  if (updateReady) {
+    return <div className="app-status" role="status"><span>A new version of the portal is ready.</span><button type="button" onClick={onUpdate}>Update</button></div>;
+  }
+  if (!online) {
+    return <div className="app-status app-status-offline" role="status"><span><b>You&apos;re offline.</b> Floor plans, directions and AR live view still work. New announcements show when you&apos;re back online.</span></div>;
+  }
+  return null;
+}
+
+// "Download the app?" offer, a few seconds after the page opens. Android Chrome installs for real;
+// iPhone Safari has no install button, so it shows the two steps; Messenger and other in-app
+// browsers cannot install, so it hands the page to Chrome first. "Not now" waits a week.
+const INSTALL_SNOOZE_KEY = "campus-install-snoozed-until";
+const installSnoozed = () => {
+  try {
+    return Number(localStorage.getItem(INSTALL_SNOOZE_KEY) || 0) > Date.now();
+  } catch {
+    return false;
+  }
+};
+
+function InstallPrompt({ offlineApp, hidden }) {
+  const [ready, setReady] = useState(false);
+  const [closed, setClosed] = useState(installSnoozed);
+  const inApp = /Android/i.test(navigator.userAgent) ? inAppBrowserName() : "";
+  useEffect(() => {
+    const timer = window.setTimeout(() => setReady(true), 4000);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const kind = offlineApp.canInstall ? "android" : offlineApp.iosInstallTip ? "ios" : inApp ? "inapp" : "";
+  if (!ready || closed || hidden || !kind) return null;
+  const notNow = () => {
+    try { localStorage.setItem(INSTALL_SNOOZE_KEY, String(Date.now() + 7 * 24 * 60 * 60 * 1000)); } catch { /* storage unavailable */ }
+    setClosed(true);
+  };
+  // Close the card at once; the browser's own install window takes over from here.
+  const download = () => {
+    setClosed(true);
+    offlineApp.install();
+  };
+  return <aside className="install-prompt" role="dialog" aria-labelledby="install-prompt-title">
+    <img src={asset("icon-192.png")} alt="" width="56" height="56" />
+    <div>
+      <h2 id="install-prompt-title">Download the SSCA Portal app?</h2>
+      <p>Floor plans, directions and AR live view work at school even without Wi-Fi. About 1 MB.</p>
+      {kind === "ios" && <ol><li>Tap <b>Share</b> <span aria-hidden="true">⬆</span> at the bottom of Safari.</li><li>Tap <b>Add to Home Screen</b>.</li></ol>}
+      {kind === "inapp" && <p className="install-prompt-note">{inApp} can&apos;t install apps. Open this page in Chrome, then tap Download.</p>}
+      <div className="install-prompt-actions">
+        {kind === "android" && <button type="button" className="primary" onClick={download}>Download app</button>}
+        {kind === "inapp" && <a className="primary" href={chromeIntentFor(window.location.href.split("#")[0])}>Open in Chrome</a>}
+        <button type="button" onClick={notNow}>{kind === "ios" ? "Got it" : "Not now"}</button>
+      </div>
+    </div>
+  </aside>;
+}
 
 function ScreenLoading() {
   return <div className="screen-loading" role="status"><i aria-hidden="true" />Loading…</div>;
@@ -88,13 +151,15 @@ function MiniPlan({ floor, onOpen }) {
   </button>;
 }
 
+// Android: an intent link hands the page from an in-app browser to Chrome. iOS has no equivalent.
+const chromeIntentFor = (url) => `intent://${url.replace(/^https?:\/\//, "")}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(url)};end`;
+
 // Shown instead of the Google button inside Messenger/Facebook and other in-app browsers.
 function OpenInBrowser({ app }) {
   const [copied, setCopied] = useState(false);
   const url = window.location.href.split("#")[0];
   const android = /Android/i.test(navigator.userAgent);
-  // Android: an intent link hands the page to Chrome. iOS has no equivalent, so give steps.
-  const chromeIntent = `intent://${url.replace(/^https?:\/\//, "")}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(url)};end`;
+  const chromeIntent = chromeIntentFor(url);
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(url);
@@ -153,7 +218,7 @@ function LoginModal({ onClose, onCreate, onAdmin, onSignedIn = () => {} }) {
       const credential = await loginWithEmail({ email: loginEmail, password: loginPassword });
       onSignedIn(credential.user);
     } catch (signInError) {
-      setError(signInError.code === "auth/invalid-credential" || signInError.code === "auth/user-not-found" || signInError.code === "auth/wrong-password"
+      setError(isOfflineError(signInError) ? NEEDS_INTERNET : signInError.code === "auth/invalid-credential" || signInError.code === "auth/user-not-found" || signInError.code === "auth/wrong-password"
         ? "Email or password is incorrect. Check both and try again."
         : signInError.code === "auth/too-many-requests"
           ? "Too many sign-in attempts. Wait a little and try again, or reset your password."
@@ -172,7 +237,7 @@ function LoginModal({ onClose, onCreate, onAdmin, onSignedIn = () => {} }) {
       const result = await loginWithGoogle();
       onSignedIn(result.user);
     } catch (signInError) {
-      setError(
+      setError(isOfflineError(signInError) ? NEEDS_INTERNET :
         signInError.code === "auth/popup-closed-by-user"
           ? "The Google sign-in window was closed."
           : signInError.code ===
@@ -194,7 +259,7 @@ function LoginModal({ onClose, onCreate, onAdmin, onSignedIn = () => {} }) {
       await requestPasswordReset(resetEmail);
       setResetSent(true);
     } catch (resetError) {
-      setError(resetError.code === "auth/invalid-email"
+      setError(isOfflineError(resetError) ? NEEDS_INTERNET : resetError.code === "auth/invalid-email"
         ? "Enter a valid email address."
         : resetError.code === "auth/too-many-requests"
           ? "Too many attempts. Please wait a while and try again."
@@ -323,7 +388,7 @@ function CreateAccountModal({ onClose, onCreated }) {
       const user = await createCampusAccount({ ...form, name: form.name.trim(), email: form.email.trim() });
       onCreated(user);
     } catch (createError) {
-      setError(createError.code === "auth/email-already-in-use"
+      setError(isOfflineError(createError) ? NEEDS_INTERNET : createError.code === "auth/email-already-in-use"
         ? "That email already has an account. Use Google sign-in or sign in with email."
         : createError.message || "Account creation failed.");
     } finally {
@@ -379,7 +444,7 @@ function AdminLogin({ onClose, onSuccess }) {
       const user = await loginAsAdmin({ email: adminEmail, password });
       onSuccess(user);
     } catch (loginError) {
-      setError(loginError.code === "auth/invalid-credential" ? "The administrator username or password is incorrect." : loginError.message || "Staff sign-in failed.");
+      setError(isOfflineError(loginError) ? NEEDS_INTERNET : loginError.code === "auth/invalid-credential" ? "The administrator username or password is incorrect." : loginError.message || "Staff sign-in failed.");
     } finally {
       setBusy(false);
     }
@@ -441,7 +506,9 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
         ? "Please allow microphone access in your browser to use voice commands."
         : event.error === "no-speech"
           ? "I didn’t hear anything. Tap the microphone and try again."
-          : "Voice input had a problem. You can type your question instead.");
+          : event.error === "network" || !navigator.onLine
+            ? "Voice questions need internet. You can type your question instead."
+            : "Voice input had a problem. You can type your question instead.");
     };
     recognition.onend = () => setListening(false);
     try {
@@ -620,6 +687,7 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
 
 export default function App() {
   usePrefetchScreens();
+  const offlineApp = useOfflineApp();
   const [loginOpen, setLoginOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [floor, setFloor] = useState(2);
@@ -714,7 +782,8 @@ export default function App() {
             <a className="ss-nav-link" href="#updates" onClick={() => setMenuOpen(false)}>Campus updates</a>
             <a className="ss-nav-link" href="#visit" onClick={() => setMenuOpen(false)}>Visit</a>
             <div className="ss-nav-actions">
-              {isAdmin && <button type="button" className="ss-btn ss-btn-quiet" onClick={() => { setMenuOpen(false); setAdminView("content"); }}>Admin</button>}
+              {offlineApp.canInstall && <button type="button" className="ss-btn ss-btn-quiet" onClick={() => { setMenuOpen(false); offlineApp.install(); }}>Install app</button>}
+              {isAdmin &&<button type="button" className="ss-btn ss-btn-quiet" onClick={() => { setMenuOpen(false); setAdminView("content"); }}>Admin</button>}
               {signedInUser
                 ? <button type="button" className="ss-btn ss-btn-primary" onClick={() => { setMenuOpen(false); setAccountOpen(true); }}>My Campus</button>
                 : <button type="button" className="ss-btn ss-btn-primary" onClick={openLogin}>Sign in</button>}
@@ -827,7 +896,9 @@ export default function App() {
             </div>
             <div className="ss-visit-grid" data-reveal>
               <div className="ss-map-frame">
-                <iframe title="Map showing Saint Simon of Cyrene Academy in Imus, Cavite" src={MAP_EMBED_URL} loading="lazy" referrerPolicy="no-referrer-when-downgrade" allowFullScreen />
+                {offlineApp.online
+                  ? <iframe title="Map showing Saint Simon of Cyrene Academy in Imus, Cavite" src={MAP_EMBED_URL} loading="lazy" referrerPolicy="no-referrer-when-downgrade" allowFullScreen />
+                  : <p className="ss-map-offline">The street map needs internet. The school is on N.I.A. Road, Carsadang Bago II, Imus, Cavite.</p>}
               </div>
               <aside className="ss-visit-card" aria-label="Address and directions">
                 <h3>Saint Simon of Cyrene Academy, Inc.</h3>
@@ -862,6 +933,7 @@ export default function App() {
           <div className="ss-footer-school" id="about">
             <a className="ss-brand" href="#top"><img src={asset("logologooo.jpg")} alt="" width="44" height="44" /><span><b>Saint Simon of Cyrene Academy, Inc.</b><small>Since 2006</small></span></a>
             <p>A private, non-stock, non-profit school in Imus, Cavite, teaching learners from nursery through senior high school.</p>
+            <p className="ss-offline-tip"><b>No Wi-Fi at school?</b> Open this portal once with internet and the floor plans, directions and AR keep working offline.{offlineApp.canInstall && <> <button type="button" onClick={offlineApp.install}>Install the app</button></>}{offlineApp.iosInstallTip && " On iPhone, tap Share, then Add to Home Screen."}</p>
           </div>
           <div>
             <h2>Visit</h2>
@@ -885,6 +957,8 @@ export default function App() {
         </div>
       </footer>
       {!accountOpen && !loginOpen && !mapState && !arOpen && <SiiBot onSignIn={openLogin} onSignOut={handleSignOut} onOpenAccount={() => setAccountOpen(true)} alreadySignedIn={Boolean(signedInUser)} onNavigate={navigateTo} onOpenMap={setMapState} />}
+      <AppStatus online={offlineApp.online} updateReady={offlineApp.updateReady} onUpdate={offlineApp.applyUpdate} />
+      <InstallPrompt offlineApp={offlineApp} hidden={Boolean(mapState || arOpen || loginOpen || accountOpen || createAccountOpen || adminLoginOpen || adminView || offlineApp.updateReady)} />
       <Suspense fallback={<ScreenLoading />}>
       {arOpen && <ArLiveView onClose={() => setArOpen(false)} />}
       {mapState && <CampusMap onClose={() => setMapState(null)} initialFloor={mapState.floor || 2} initialDestination={mapState.destination || null} initialEmergency={Boolean(mapState.emergency)} />}
