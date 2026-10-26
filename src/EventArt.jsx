@@ -1,4 +1,4 @@
-﻿import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 // Pictures generated from what the admin types, with no image files to upload.
 //  - AnnouncementArt: picks a scene from keywords in the title (Halloween, Christmas,
@@ -400,7 +400,7 @@ function wrap(text, width, lines) {
   if (line) out.push(line);
   if (out.length > lines) {
     out.length = lines;
-    out[lines - 1] = `${out[lines - 1].slice(0, width - 1)}â€¦`;
+    out[lines - 1] = `${out[lines - 1].slice(0, width - 1)}…`;
   }
   return out;
 }
