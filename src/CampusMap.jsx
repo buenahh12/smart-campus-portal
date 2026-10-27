@@ -4,7 +4,6 @@ import { usePublicCollection } from "./CampusUpdates";
 import { CMS_COLLECTIONS, isClosureActive } from "./cms";
 import { usePlanVersion } from "./usePlan";
 import {
-  BUILDING_NAME,
   FLOORS,
   PLACES,
   PLAN_HEIGHT,
@@ -12,7 +11,9 @@ import {
   blockedAreas,
   findNearestExit,
   findRoute,
+  buildingOf,
   floorLabel,
+  floorShort,
   graphNode,
   placeByKey,
   placeTitle,
@@ -26,7 +27,6 @@ const isNarrow = () => typeof window !== "undefined" && window.innerWidth <= 900
 const homeView = () => (isNarrow() ? { x: -4, y: -4, w: PLAN_WIDTH + 8, h: (PLAN_WIDTH + 8) * ASPECT } : { x: -17, y: -5, w: PLAN_WIDTH + 22, h: (PLAN_WIDTH + 22) * ASPECT });
 const MIN_WIDTH = 28;
 const DOOR = 2.8; // door leaf width in plan units
-const floorShort = (floor) => (floor === 1 ? "G" : String(floor));
 
 const readStart = () => {
   try {
@@ -263,7 +263,7 @@ function FloorPlan2D({ plan, route, startKey, destKey, selectedKey, blocked, onP
         viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
         preserveAspectRatio="xMidYMid meet"
         role="img"
-        aria-label={`${floorLabel(floor)} plan of the ${BUILDING_NAME}`}
+        aria-label={`${floorLabel(floor)} plan of the ${buildingOf(floor)}`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -396,7 +396,7 @@ function FloorPlan2D({ plan, route, startKey, destKey, selectedKey, blocked, onP
         {/* Title block, like the posted floor plan signs */}
         <g className="plan-title-block">
           <text x="0" y={PLAN_HEIGHT + 6.5} className="title">{floorLabel(floor).toUpperCase()} PLAN</text>
-          <text x="0" y={PLAN_HEIGHT + 10.5} className="sub">{BUILDING_NAME.toUpperCase()} · SCALE: NTS</text>
+          <text x="0" y={PLAN_HEIGHT + 10.5} className="sub">{buildingOf(floor).toUpperCase()} · SCALE: NTS</text>
           <line x1="86" y1={PLAN_HEIGHT + 8} x2={PLAN_WIDTH - 2} y2={PLAN_HEIGHT + 8} />
           <circle cx={PLAN_WIDTH - 5} cy={PLAN_HEIGHT + 8} r="2.6" />
         </g>
@@ -421,6 +421,7 @@ const STEP_ICONS = {
   down: <path d="M4 8h4v4h4v4h4v4h4M4 4v5h5" />,
   arrive: <path d="M6 21V4h11l-2 4 2 4H6" />,
   exit: <path d="M10 4H5v16h5M14 8l4 4-4 4M18 12H9" />,
+  walkway: <path d="M4 18h16M7 18l3-12M17 18l-3-12M12 7v2m0 3v2" />,
 };
 
 // Built on each render because staff can rename rooms while the map is open.
@@ -503,7 +504,7 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
       <header className="map-header">
         <div className="map-title">
           <h2 id="campus-map-title">Floor plan</h2>
-          <span>{BUILDING_NAME}</span>
+          <span>{buildingOf(floor)}</span>
         </div>
         <button className="map-close" onClick={onClose} aria-label="Close floor plan"><Icon name="close" size={20} /></button>
       </header>
@@ -570,7 +571,7 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
                   {emergency && <p className="map-alert">In a real emergency, stay calm and follow your teacher and school staff.</p>}
                   <ol className="map-steps">
                     {route.steps.map((step, index) => <li key={`${route.start.key}-${route.end.key}-${index}`} style={{ "--i": index }} className={`kind-${step.kind} ${step.floor === floor ? "on-floor" : ""}`}>
-                      <button type="button" onClick={() => setFloor(step.stairs ? step.toFloor : step.floor)}>
+                      <button type="button" onClick={() => setFloor(step.stairs || step.link ? step.toFloor : step.floor)}>
                         <span className="step-icon"><svg viewBox="0 0 24 24" aria-hidden="true">{STEP_ICONS[step.kind] || STEP_ICONS.straight}</svg></span>
                         <span className="step-text">{step.text}<small>{floorLabel(step.floor)}{step.meters ? ` · ${step.meters} m` : ""}</small></span>
                       </button>

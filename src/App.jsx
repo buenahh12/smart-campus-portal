@@ -14,7 +14,7 @@ import CampusUpdates, { usePublicCollection } from "./CampusUpdates";
 import { CMS_COLLECTIONS, USER_ROLES, isClosureActive, recordSignIn, recordVisit, todayKey, watchSession } from "./cms";
 import { usePlanVersion } from "./usePlan";
 import { useOfflineApp } from "./offline";
-import { FLOORS, PLACES, findPlaceKey, placeByKey, placeTitle, floorLabel as planFloorLabel } from "./floorPlans";
+import { BUILDING_NAME, FLOORS, PLACES, findPlaceKey, floorShort, placeByKey, placeTitle, floorLabel as planFloorLabel } from "./floorPlans";
 import { searchPlace } from "./placeSearch";
 
 // Where the person said they are, last time they used the floor plan (to pick the nearest CR).
@@ -173,7 +173,9 @@ function usePrefetchScreens() {
 const asset = (file) => `${import.meta.env.BASE_URL}${file}`;
 // Read on each render: staff can rename rooms at any time (see usePlan.js).
 const mappedPlaces = () => PLACES.filter((item) => item.type !== "exit" && item.type !== "stairs" && !item.unlabeled);
-const EXIT_COUNT = PLACES.filter((item) => item.type === "exit").length;
+const exitCount = () => PLACES.filter((item) => item.type === "exit").length;
+// Floors of the main building (the 3D dollhouse and its floor buttons); added floors included.
+const mainFloors = () => FLOORS.filter((plan) => plan.building === BUILDING_NAME).map((plan) => plan.floor);
 // Big picture buttons on the home page for the places people look for most. "CR" opens the
 // one nearest to where the person said they are (searchPlace), and "Way out" the nearest exit.
 const QUICK_PLACES = [
@@ -760,7 +762,7 @@ export default function App() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-  usePlanVersion(); // re-render when staff rename a room on the floor plan
+  const planVersion = usePlanVersion(); // re-render when staff rename rooms or add floors
   const [signedInUser, setSignedInUser] = useState(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [createAccountOpen, setCreateAccountOpen] = useState(false);
@@ -904,9 +906,9 @@ export default function App() {
           </div>
           <div className="ss-container">
             <dl className="ss-facts" data-reveal style={{ "--delay": "120ms" }}>
-              <div><dt>Floors mapped</dt><dd>4</dd></div>
+              <div><dt>Floors mapped</dt><dd>{FLOORS.length}</dd></div>
               <div><dt>Rooms &amp; offices</dt><dd>{mappedPlaces().length}</dd></div>
-              <div><dt>Exits &amp; fire stairs</dt><dd>{EXIT_COUNT}</dd></div>
+              <div><dt>Exits &amp; fire stairs</dt><dd>{exitCount()}</dd></div>
               <div><dt>Office hours</dt><dd className="ss-facts-text">Mon–Fri, 7 AM–5 PM</dd></div>
             </dl>
           </div>
@@ -928,11 +930,11 @@ export default function App() {
                     <span>Floor</span>
                     <b>{planFloorLabel(floor)}</b>
                   </div>
-                  <div className="floor-buttons" role="group" aria-label="Choose a floor">
-                    {[1, 2, 3, 4].map((item) => <button key={item} type="button" className={floor === item ? "active" : ""} aria-pressed={floor === item} onClick={() => setFloor(item)}>{item === 1 ? "G" : item}</button>)}
+                  <div className="floor-buttons" role="group" aria-label="Choose a floor" style={{ gridTemplateColumns: `repeat(${mainFloors().length}, minmax(0, 1fr))` }}>
+                    {mainFloors().map((item) => <button key={item} type="button" className={floor === item ? "active" : ""} aria-pressed={floor === item} onClick={() => setFloor(item)}>{floorShort(item)}</button>)}
                   </div>
                   <Suspense fallback={<MiniPlan floor={floor} onOpen={() => setMapState({ floor })} />}>
-                    <Dollhouse3D floor={floor} onOpen={() => setMapState({ floor })} label={`3D model of the ${planFloorLabel(floor).toLowerCase()}`}
+                    <Dollhouse3D key={planVersion} floor={floor} onOpen={() => setMapState({ floor })} label={`3D model of the ${planFloorLabel(floor).toLowerCase()}`}
                       fallback={<MiniPlan floor={floor} onOpen={() => setMapState({ floor })} />} />
                   </Suspense>
                 </div>

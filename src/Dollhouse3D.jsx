@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { FLOORS, METERS_PER_UNIT as M, PLAN_HEIGHT, PLAN_WIDTH } from "./floorPlans";
+import { BUILDING_NAME, FLOORS, METERS_PER_UNIT as M, PLAN_HEIGHT, PLAN_WIDTH } from "./floorPlans";
 
 // 3D dollhouse of the Main Academic Building, built from the same rectangles as the 2D
 // floor plan. The building method (floor slabs, 2.5 m walls with door gaps, stacked floors)
@@ -125,7 +125,8 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback }) {
     world.add(sun);
 
     // Each floor gets its own materials so lower floors can be faded independently.
-    const floors = FLOORS.map((plan) => {
+    // Only the main building: floors added there stack on top; other buildings are not drawn.
+    const floors = FLOORS.filter((plan) => plan.building === BUILDING_NAME).map((plan) => {
       const materials = new Map();
       const materialFor = (color, line = false) => {
         const key = `${color}${line}`;

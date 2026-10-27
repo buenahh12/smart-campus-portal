@@ -1,4 +1,5 @@
 import { useState } from "react";
+import AdminBlueprint from "./AdminBlueprint";
 import Icon from "./Icon";
 import { CMS_COLLECTIONS, deleteItem, setItem } from "./cms";
 import { EDITABLE_TYPES, FLOORS, floorLabel, isEditableSpot, mapRoomDocId, placeTitle } from "./floorPlans";
@@ -12,7 +13,20 @@ const typeLabel = (value) => EDITABLE_TYPES.find((type) => type.value === value)
 
 const formFor = (item) => ({ name: item.unlabeled ? "" : item.name, code: item.code === "EXIT" ? "" : item.code || "", type: item.type, notes: item.notes || "" });
 
+// Two jobs share the Floor plan tab: renaming rooms that are already mapped, and adding new
+// floors or buildings from a contractor's blueprint.
 export default function AdminFloorPlan() {
+  const [mode, setMode] = useState("rename");
+  return <>
+    <div className="va-segment fp-mode" role="tablist" aria-label="Floor plan tools">
+      <button type="button" role="tab" aria-selected={mode === "rename"} className={mode === "rename" ? "active" : ""} onClick={() => setMode("rename")}>Rename rooms</button>
+      <button type="button" role="tab" aria-selected={mode === "add"} className={mode === "add" ? "active" : ""} onClick={() => setMode("add")}>Add floors from blueprints</button>
+    </div>
+    {mode === "rename" ? <RenameRooms /> : <AdminBlueprint />}
+  </>;
+}
+
+function RenameRooms() {
   usePlanVersion();
   const [floor, setFloor] = useState(1);
   const [selectedId, setSelectedId] = useState(null);

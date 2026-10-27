@@ -46,3 +46,59 @@
   .fp-admin-plan { padding: 12px; }
   .fp-admin-list { grid-template-columns: 1fr; }
 }
+
+/* Floor plan tab: switch between renaming rooms and adding floors from blueprints. */
+.fp-mode { margin-bottom: 16px; flex-wrap: wrap; border-radius: 14px; }
+
+/* Blueprint editor (src/AdminBlueprint.jsx). */
+.bp-home { display: grid; gap: 14px; max-width: 760px; }
+.bp-intro h3 { margin: 0 0 6px; }
+.bp-intro p { margin: 0 0 12px; color: var(--muted, #5d6a5e); font-size: 14px; line-height: 1.5; }
+.bp-intro .attendance-save { display: inline-flex; align-items: center; gap: 6px; height: 42px; font-size: 13px; }
+.bp-create { max-width: 420px; }
+.bp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.bp-list { display: grid; gap: 8px; }
+.bp-list > button { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid var(--line, #e2d7c2); border-radius: 10px; background: var(--surface, #fffcf5); text-align: left; }
+.bp-list > button:hover { border-color: #10b95c; }
+.bp-list b { display: block; font-size: 14px; }
+.bp-list small { color: var(--muted, #5d6a5e); font-size: 12px; }
+.bp-title { display: flex; align-items: center; gap: 8px; margin: 4px 0 0; font-size: 17px; }
+.bp-upload { position: relative; cursor: pointer; }
+.bp-upload input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.bp-upload:focus-within { outline: 2px solid #10b95c; outline-offset: 2px; }
+.bp-tools { margin-top: 10px; flex-wrap: wrap; border-radius: 14px; }
+.bp-tools button { padding: 0 14px; }
+.bp-canvas { touch-action: none; user-select: none; }
+.bp-canvas.tool-room, .bp-canvas.tool-hall, .bp-canvas.tool-stairs { cursor: crosshair; }
+.bp-canvas.tool-door { cursor: cell; }
+.bp-image { opacity: .55; pointer-events: none; }
+.bp-grid { stroke: #8aa395; stroke-width: .1; opacity: .5; pointer-events: none; }
+.bp-hall { fill: rgba(250, 204, 21, .28); stroke: #b98b00; stroke-width: .3; }
+.bp-hall.selected { stroke: #087c3e; stroke-width: .7; }
+.bp-room rect { fill: rgba(255, 255, 255, .78); stroke: #2f3d34; stroke-width: .4; }
+.bp-room.type-stairs rect { fill: rgba(147, 197, 253, .7); }
+.bp-room.type-cr rect { fill: rgba(233, 213, 255, .75); }
+.bp-room.type-exit rect { fill: rgba(134, 239, 172, .8); }
+.bp-room.selected rect { stroke: #087c3e; stroke-width: .9; }
+.bp-room text { fill: #1b2a21; font-size: 2.4px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.bp-door { fill: #e11d48; stroke: #fff; stroke-width: .3; }
+.bp-walk { fill: none; stroke: #10b95c; stroke-width: .5; stroke-dasharray: 1.2 .8; pointer-events: none; }
+.bp-preview { fill: rgba(16, 185, 92, .15); stroke: #10b95c; stroke-width: .4; stroke-dasharray: 1 .6; pointer-events: none; }
+.bp-key-hall { background: #fdf0b5; border-color: #b98b00; }
+.bp-key-stairs { background: #bfdbfe; }
+.bp-key-door { display: inline-block; width: 10px; height: 10px; margin-right: -8px; border-radius: 50%; background: #e11d48; vertical-align: middle; }
+.bp-key-walk { display: inline-block; width: 16px; margin-right: -8px; border-top: 2px dashed #10b95c; vertical-align: middle; }
+.bp-panel { display: grid; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid var(--line, #e2d7c2); }
+.bp-panel:last-child { border-bottom: 0; }
+.bp-panel h3 { margin: 0; font-size: 15px; }
+.bp-panel p { margin: 0; font-size: 13px; }
+.bp-grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.bp-grid4 input { min-width: 0; }
+.bp-ok { color: #087c3e; }
+.bp-warn { color: #a3470b; }
+.bp-danger { color: #b42318; }
+.bp-link { display: grid; grid-template-columns: 1fr 1fr auto auto; align-items: center; gap: 6px; }
+.bp-link select { min-width: 0; }
+.cms-form .bp-meters { display: flex; flex-direction: row; white-space: nowrap; align-items: center; gap: 4px; font-size: 12px; }
+.bp-meters input { width: 64px; }
+@media (max-width: 760px) { .bp-link { grid-template-columns: 1fr 1fr; } }

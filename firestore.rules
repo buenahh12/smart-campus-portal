@@ -108,11 +108,39 @@ service cloud.firestore {
     match /mapRooms/{id} {
       allow read: if true;
       allow create, update: if isAdmin() && stamped()
-        && id.matches('^[1-9]-[a-z0-9-]{1,40}$')
+        && id.matches('^[1-9][0-9]{0,2}-[a-z0-9-]{1,40}$')
         && data().keys().hasOnly(['name', 'code', 'type', 'notes', 'updatedAt', 'updatedBy'])
         && text('name', true, 50) && text('code', false, 20) && text('notes', false, 300)
         && data().type in ['classroom', 'office', 'lab', 'facility', 'cr'];
       allow delete: if isAdmin();
+    }
+
+    // Floors added from blueprints (Content manager → Floor plan → Add floors). Visitors see the
+    // published ones; drafts stay with the administrator. The app also cleans every room and
+    // ignores a floor that clashes with a built-in one (normalizeFloor in src/floorPlans.js).
+    match /planFloors/{id} {
+      allow read: if resource.data.published == true || isAdmin();
+      allow create, update: if isAdmin() && stamped()
+        && id.matches('^[a-z0-9-]{1,40}$')
+        && data().keys().hasOnly(['floor', 'level', 'building', 'label', 'rooms', 'halls', 'links', 'published', 'updatedAt', 'updatedBy'])
+        && data().floor is int && data().floor >= 5 && data().floor <= 999
+        && data().level is int && data().level >= 1 && data().level <= 20
+        && text('building', true, 80) && text('label', false, 60)
+        && data().rooms is list && data().rooms.size() <= 300
+        && data().halls is list && data().halls.size() <= 100
+        && data().links is list && data().links.size() <= 20
+        && data().published is bool;
+      allow delete: if isAdmin();
+    }
+
+    // The blueprint picture behind an added floor, only needed while editing: admin only.
+    match /planBlueprints/{id} {
+      allow read, delete: if isAdmin();
+      allow create, update: if isAdmin() && stamped()
+        && id.matches('^[a-z0-9-]{1,40}$')
+        && data().keys().hasOnly(['image', 'updatedAt', 'updatedBy'])
+        && data().image is string && data().image.size() <= 900000
+        && data().image.matches('data:image/jpeg;base64,[A-Za-z0-9+/=]+');
     }
 
     // Drafts stay hidden from everyone except administrators.

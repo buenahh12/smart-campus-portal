@@ -5,7 +5,7 @@ import { placeOptions } from "./CampusMap";
 import { CMS_COLLECTIONS, isClosureActive } from "./cms";
 import { inAppBrowserName } from "./firebase";
 import { usePlanVersion } from "./usePlan";
-import { FLOORS, METERS_PER_UNIT as M, blockedAreas, findRoute, floorLabel, graphNode, placeByKey, placeTitle } from "./floorPlans";
+import { FLOORS, METERS_PER_UNIT as M, blockedAreas, buildingOf, findRoute, floorLabel, graphNode, placeByKey, placeTitle } from "./floorPlans";
 import "./ar.css";
 
 // AR Live View in the browser. Like the SSCA NAVI AR app, nothing knows where you are by GPS:
@@ -269,7 +269,9 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
   const activeClosures = closures.items.filter((item) => isClosureActive(item));
   const blockedKey = activeClosures.map((item) => item.mapArea).filter(Boolean).sort().join("|");
   const route = useMemo(() => findRoute(fromKey, toKey, blockedAreas(activeClosures)), [fromKey, toKey, blockedKey, planVersion]); // eslint-disable-line react-hooks/exhaustive-deps
-  const path = useMemo(() => (route?.path ? routePath(route) : null), [route]);
+  // Routes through a walkway into another building cannot be one AR trail (see the message below).
+  const crossesBuildings = Boolean(route?.via?.some((edge) => edge.link));
+  const path = useMemo(() => (route?.path && !crossesBuildings ? routePath(route) : null), [route, crossesBuildings]);
   const steps = useMemo(() => (path ? routeSteps(path) : []), [path]);
   const step = steps[stepIndex];
   const destination = placeByKey(toKey);
@@ -592,6 +594,8 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
   else if (!fromKey || !toKey) message = "Choose where you are (From) and where you want to go (To).";
   else if (fromKey === toKey) message = "You are already there.";
   else if (route?.blocked) message = "No open route right now: a hallway or stairway on the way is closed.";
+  // Two buildings' plans have no shared position to lay one trail across, so AR stays inside one.
+  else if (crossesBuildings) message = `This route goes to another building. Use the floor plan to walk to ${buildingOf(destination.floor)}, then start AR from a room there.`;
   else if (mode === "setup") message = `Stand in the doorway of ${placeTitle(placeByKey(fromKey))} with your back to the room, facing the hallway. Then tap Start.`;
   else if (mode === "xr") {
     const { section } = tracking;
@@ -610,7 +614,7 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
 
   const floorNow = mode === "xr" ? tracking.section : step;
   const floorText = floorNow ? (floorNow.toFloor ? `${floorLabel(floorNow.floor)} → ${floorLabel(floorNow.toFloor)}` : floorLabel(floorNow.floor)) : "";
-  const ready = Boolean(path) && mode === "setup";
+  const ready = Boolean(path) && !crossesBuildings && mode === "setup";
   const close = () => { stop(); onClose(); };
   return <div ref={overlay} className={`ar-live ar-live-${mode}`} role="dialog" aria-modal="true" aria-label="AR live view">
     <video ref={video} className="ar-live-video" autoPlay playsInline muted />

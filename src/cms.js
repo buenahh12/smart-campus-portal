@@ -26,6 +26,9 @@ export const CMS_COLLECTIONS = {
   announcements: 'announcements',
   closures: 'pathwayClosures',
   mapRooms: 'mapRooms',
+  // Floors added from blueprints (drafts are admin-only) and their blueprint images (admin-only).
+  planFloors: 'planFloors',
+  planBlueprints: 'planBlueprints',
 };
 
 const notConfigured = () => new Error('Firebase is not configured. Add the VITE_FIREBASE_* values to your .env file.');
@@ -39,7 +42,7 @@ export function watchCollection(name, onData, onError = () => {}, { publicOnly =
     onError(notConfigured());
     return () => {};
   }
-  const source = publicOnly && name === CMS_COLLECTIONS.announcements
+  const source = publicOnly && (name === CMS_COLLECTIONS.announcements || name === CMS_COLLECTIONS.planFloors)
     ? query(collection(db, name), where('published', '==', true))
     : collection(db, name);
   return onSnapshot(
@@ -64,6 +67,13 @@ export async function saveItem(name, id, data) {
 export function setItem(name, id, data) {
   if (!db) return Promise.reject(notConfigured());
   return setDoc(doc(db, name, id), { ...data, updatedAt: serverTimestamp(), updatedBy: auth.currentUser?.email || auth.currentUser?.uid || '' });
+}
+
+// One document, or null when it does not exist.
+export async function readItem(name, id) {
+  if (!db) throw notConfigured();
+  const snapshot = await getDoc(doc(db, name, id));
+  return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
 }
 
 export const deleteItem = (name, id) => {

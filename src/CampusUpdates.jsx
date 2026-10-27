@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import Icon from "./Icon";
 import { CMS_COLLECTIONS, isClosureActive, todayKey, watchCollection } from "./cms";
-import { BUILDING_NAME, PLACES, findPlaceKey, floorLabel as planFloorLabel } from "./floorPlans";
+import { PLACES, buildingOf, findPlaceKey, floorLabel as planFloorLabel } from "./floorPlans";
 import { usePlanVersion } from "./usePlan";
 import { AnnouncementArt, ClosureArt } from "./EventArt";
 
@@ -30,7 +30,7 @@ const PLAN_KINDS = { classroom: "Classroom", office: "Office", lab: "Laboratory"
 function buildDirectory(rooms, offices) {
   const entries = new Map(PLACES
     .filter((item) => !item.unlabeled && PLAN_KINDS[item.type])
-    .map((item) => [item.key, { id: item.key, mapKey: item.key, name: item.name, room: item.code, kind: PLAN_KINDS[item.type], building: BUILDING_NAME, floorText: planFloorLabel(item.floor), notes: item.notes }]));
+    .map((item) => [item.key, { id: item.key, mapKey: item.key, name: item.name, room: item.code, kind: PLAN_KINDS[item.type], building: buildingOf(item.floor), floorText: planFloorLabel(item.floor), notes: item.notes }]));
   const extra = [];
   [...offices.map((item) => ({ ...item, kind: "Office" })), ...rooms.map((item) => ({ ...item, kind: item.type || "Room" }))].forEach((item) => {
     const mapKey = findPlaceKey(item.room, item.name);

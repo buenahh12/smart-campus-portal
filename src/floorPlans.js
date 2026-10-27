@@ -15,7 +15,28 @@ export const METERS_PER_UNIT = 0.4; // estimate: the building is roughly 64 m wi
 const STAIR_COST = 25; // one flight of stairs counts like ~10 m of walking
 const WALK_SPEED = 1.2; // metres per second
 
-export const floorLabel = (floor) => (floor === 1 ? "Ground floor" : `${floor}${floor === 2 ? "nd" : floor === 3 ? "rd" : "th"} floor`);
+const levelLabel = (level) => (level === 1 ? "Ground floor" : `${level}${level === 2 ? "nd" : level === 3 ? "rd" : "th"} floor`);
+const planOf = (floor) => FLOORS.find((plan) => plan.floor === floor);
+// The building a floor belongs to; floors added from blueprints can be in another building.
+export const buildingOf = (floor) => planOf(floor)?.building || BUILDING_NAME;
+// "Ground floor", "5th floor", or "Science Annex · Ground floor" for another building.
+export const floorLabel = (floor) => {
+  const plan = planOf(floor);
+  if (!plan) return levelLabel(floor);
+  return plan.building === BUILDING_NAME ? levelLabel(plan.level) : `${plan.building} · ${levelLabel(plan.level)}`;
+};
+// In a sentence: "ground floor" (stairs stay inside one building, so no building name) …
+const levelPhrase = (floor) => levelLabel(planOf(floor)?.level ?? floor).toLowerCase();
+// … and "Science Annex ground floor" when saying where a place is in another building.
+const floorPhrase = (floor) => (buildingOf(floor) === BUILDING_NAME ? levelPhrase(floor) : `${buildingOf(floor)} ${levelPhrase(floor)}`);
+// Tab label: "G", "2" … in the main building; "SA1", "SA2" (building initials) elsewhere.
+export const floorShort = (floor) => {
+  const plan = planOf(floor);
+  const level = plan?.level ?? floor;
+  if (!plan || plan.building === BUILDING_NAME) return level === 1 ? "G" : String(level);
+  const initials = plan.building.split(/\s+/).filter(Boolean).map((word) => word[0].toUpperCase()).join("").slice(0, 3);
+  return `${initials}${level}`;
+};
 
 const room = (id, name, code, type, rect, door, extra = {}) => ({ id, name, code, type, rect, door, ...extra });
 
@@ -27,7 +48,7 @@ const frameHalls = (topFrom) => [
   { id: "bottom-hall", name: "Bottom hallway", rect: [32, 66, 109, 10] },
 ];
 
-export const FLOORS = [
+const BUILT_IN_FLOORS = [
   {
     floor: 1,
     note: "Room names on the ground floor are pending; only Room 109 is labeled on the posted exit plan.",
@@ -162,11 +183,14 @@ export const FLOORS = [
     ],
   },
 ];
+for (const plan of BUILT_IN_FLOORS) Object.assign(plan, { building: BUILDING_NAME, level: plan.floor, builtIn: true });
+
+// Every floor on the site: the built-in floors above, plus floors the administrator added from
+// blueprints (setCustomFloors). These arrays are updated in place, so every import stays current.
+export const FLOORS = [...BUILT_IN_FLOORS];
 
 // Places people can pick as a start or destination.
-export const PLACES = FLOORS.flatMap(({ floor, rooms }) => rooms
-  .filter((item) => item.door)
-  .map((item) => ({ ...item, floor, key: `${floor}:${item.id}` })));
+export const PLACES = [];
 
 // ---------- Room details edited by the administrator ----------
 // The walls, doors, and hallways above are fixed, but what each room is called and used
@@ -182,13 +206,8 @@ export const EDITABLE_TYPES = [
 export const isEditableSpot = (item) => Boolean(item.door) && EDITABLE_TYPES.some((type) => type.value === item.base?.type);
 export const mapRoomDocId = (key) => key.replace(":", "-");
 
-const allRooms = () => [...FLOORS.flatMap(({ rooms }) => rooms), ...PLACES];
-allRooms().forEach((item) => {
-  item.base = { name: item.name, code: item.code, type: item.type, unlabeled: Boolean(item.unlabeled) };
-  item.notes = "";
-});
-
 let planVersion = 0;
+let lastOverrides = {};
 const planListeners = new Set();
 export const getPlanVersion = () => planVersion;
 export const subscribePlan = (listener) => {
@@ -198,6 +217,7 @@ export const subscribePlan = (listener) => {
 
 // overrides: { "2-clinic": { name, code, type, notes }, ... }
 export function applyMapOverrides(overrides) {
+  lastOverrides = overrides;
   for (const { floor, rooms } of FLOORS) {
     for (const item of rooms) {
       const custom = overrides[mapRoomDocId(`${floor}:${item.id}`)];
@@ -217,10 +237,7 @@ export const placeByKey = (key) => PLACES.find((item) => item.key === key) || nu
 export const placeTitle = (place) => (place.code && place.code !== "EXIT" && place.code !== place.name ? `${place.code} · ${place.name}` : place.name);
 
 // Closable map areas for the Content Manager: every hallway and staircase.
-export const MAP_AREAS = FLOORS.flatMap(({ floor, halls, rooms }) => [
-  ...halls.map((hall) => ({ value: `${floor}:${hall.id}`, label: `${floorLabel(floor)} · ${hall.name}`, floor })),
-  ...rooms.filter((item) => item.type === "stairs").map((item) => ({ value: `${floor}:${item.id}`, label: `${floorLabel(floor)} · ${item.name}`, floor })),
-]);
+export const MAP_AREAS = [];
 export const mapAreaLabel = (value) => MAP_AREAS.find((item) => item.value === value)?.label || "";
 
 // Finds the plan room that best matches a name such as "Room 204", "204" or "Clinic".
@@ -251,7 +268,7 @@ function project(point, a, b) {
   return { t, x: a.x + t * dx, y: a.y + t * dy };
 }
 
-function buildGraph() {
+export function buildGraph(floors = FLOORS) {
   const nodes = new Map();
   const edges = new Map();
   const addNode = (id, data) => {
@@ -267,7 +284,7 @@ function buildGraph() {
     edges.get(b).push({ to: a, w, tags });
   };
 
-  for (const { floor, walks, rooms } of FLOORS) {
+  for (const { floor, walks, rooms } of floors) {
     const pointId = (x, y) => addNode(`${floor}:p:${x},${y}`, { floor, x, y, kind: "hall" });
     const segments = [];
     for (const walk of walks) {
@@ -305,23 +322,147 @@ function buildGraph() {
     }
   }
 
-  // Stairs with the same stair id connect neighbouring floors.
-  for (const { floor, rooms } of FLOORS) {
-    for (const item of rooms.filter((entry) => entry.stair)) {
-      const above = FLOORS.find((entry) => entry.floor === floor + 1)?.rooms.find((entry) => entry.stair === item.stair);
-      if (above) {
-        const a = `${floor}:${item.id}`;
-        const b = `${floor + 1}:${above.id}`;
+  // Stairs with the same stair id connect neighbouring floors of the same building.
+  for (const plan of floors) {
+    const upstairs = floors.find((entry) => entry.building === plan.building && entry.level === plan.level + 1);
+    for (const item of plan.rooms.filter((entry) => entry.stair)) {
+      const above = upstairs?.rooms.find((entry) => entry.stair === item.stair);
+      const a = `${plan.floor}:${item.id}`;
+      const b = above && `${upstairs.floor}:${above.id}`;
+      if (b && nodes.has(a) && nodes.has(b)) {
         edges.get(a).push({ to: b, w: STAIR_COST, tags: [a, b], stairs: true });
         edges.get(b).push({ to: a, w: STAIR_COST, tags: [a, b], stairs: true });
       }
     }
   }
+
+  // Walkways the administrator drew between a room on an added floor and a place elsewhere
+  // (usually one building's entrance to another's), with the walking distance in metres.
+  for (const plan of floors) {
+    for (const item of plan.links || []) {
+      const a = `${plan.floor}:${item.from}`;
+      if (!nodes.has(a) || !nodes.has(item.to) || a === item.to) continue;
+      const w = Math.max(1, Number(item.meters) || 30) / METERS_PER_UNIT;
+      edges.get(a).push({ to: item.to, w, tags: [], link: true });
+      edges.get(item.to).push({ to: a, w, tags: [], link: true });
+    }
+  }
   return { nodes, edges };
 }
 
-const GRAPH = buildGraph();
+const GRAPH = { nodes: new Map(), edges: new Map() };
 export const graphNode = (id) => GRAPH.nodes.get(id);
+
+// Rebuilds everything derived from FLOORS: places, closable areas and the route graph.
+function rebuild() {
+  for (const item of FLOORS.flatMap(({ rooms }) => rooms)) {
+    item.base ||= { name: item.name, code: item.code, type: item.type, unlabeled: Boolean(item.unlabeled) };
+    item.notes ??= "";
+  }
+  PLACES.splice(0, PLACES.length, ...FLOORS.flatMap(({ floor, rooms }) => rooms
+    .filter((item) => item.door)
+    .map((item) => ({ ...item, floor, key: `${floor}:${item.id}` }))));
+  MAP_AREAS.splice(0, MAP_AREAS.length, ...FLOORS.flatMap(({ floor, halls, rooms }) => [
+    ...halls.map((hall) => ({ value: `${floor}:${hall.id}`, label: `${floorLabel(floor)} · ${hall.name}`, floor })),
+    ...rooms.filter((item) => item.type === "stairs").map((item) => ({ value: `${floor}:${item.id}`, label: `${floorLabel(floor)} · ${item.name}`, floor })),
+  ]));
+  Object.assign(GRAPH, buildGraph(FLOORS));
+}
+rebuild();
+
+// ---------- Floors added from blueprints ----------
+// Saved in the planFloors collection by the Content manager's blueprint editor. Built-in floors
+// can never be replaced: a saved floor that clashes with one (or with another saved floor) is
+// skipped, so a mistake on a new floor cannot break the existing map.
+
+export const ROOM_TYPES = ["classroom", "office", "lab", "facility", "cr", "stairs", "exit"];
+const cleanId = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9-]/g, "-").slice(0, 40);
+const num = (value, min, max) => Math.min(max, Math.max(min, Math.round((Number(value) || 0) * 2) / 2));
+const cleanRect = (rect) => {
+  const [x, y, w, h] = (Array.isArray(rect) ? rect : []).map(Number);
+  const left = num(x, 0, PLAN_WIDTH - 1);
+  const top = num(y, 0, PLAN_HEIGHT - 1);
+  return [left, top, num(w, 1, PLAN_WIDTH - left), num(h, 1, PLAN_HEIGHT - top)];
+};
+
+// A centre line for every hallway, along its long side, with shared points where hallways meet,
+// so the route finder can walk from one hallway into the next.
+export function hallWalks(halls) {
+  const round = (value) => Math.round(value * 2) / 2;
+  const lines = halls.map((hall) => {
+    const [x, y, w, h] = hall.rect;
+    return w >= h
+      ? { hall: hall.id, horizontal: true, fixed: round(y + h / 2), from: x, to: x + w, rect: hall.rect, stops: [] }
+      : { hall: hall.id, horizontal: false, fixed: round(x + w / 2), from: y, to: y + h, rect: hall.rect, stops: [] };
+  });
+  const touch = (a, b) => a.rect[0] <= b.rect[0] + b.rect[2] + 1 && b.rect[0] <= a.rect[0] + a.rect[2] + 1
+    && a.rect[1] <= b.rect[1] + b.rect[3] + 1 && b.rect[1] <= a.rect[1] + a.rect[3] + 1;
+  const connectors = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    for (let j = i + 1; j < lines.length; j += 1) {
+      const a = lines[i];
+      const b = lines[j];
+      if (!touch(a, b)) continue;
+      if (a.horizontal !== b.horizontal) {
+        // Crossing or T: both centre lines meet at one shared point.
+        const across = a.horizontal ? a : b;
+        const along = a.horizontal ? b : a;
+        across.stops.push(along.fixed);
+        along.stops.push(across.fixed);
+      } else {
+        // Two hallways side by side or end to end: a short connector between their centre lines.
+        const start = Math.max(a.from, b.from);
+        const end = Math.min(a.to, b.to);
+        const at = round(start <= end ? (start + end) / 2 : (a.to < b.from ? a.to : b.to));
+        a.stops.push(at);
+        b.stops.push(at);
+        if (a.fixed !== b.fixed) connectors.push({ hall: a.hall, points: a.horizontal ? [[at, a.fixed], [at, b.fixed]] : [[a.fixed, at], [b.fixed, at]] });
+      }
+    }
+  }
+  return [...lines.map((line) => {
+    const along = [...new Set([round(line.from), round(line.to), ...line.stops.map(round)])].sort((p, q) => p - q);
+    return { hall: line.hall, points: along.map((value) => (line.horizontal ? [value, line.fixed] : [line.fixed, value])) };
+  }), ...connectors];
+}
+
+// A saved planFloors document -> a floor in the same shape as the built-in ones, or null.
+export function normalizeFloor(doc) {
+  const floor = Math.round(Number(doc?.floor));
+  const level = Math.round(Number(doc?.level));
+  const building = String(doc?.building || "").trim().slice(0, 80);
+  if (!Number.isFinite(floor) || floor < 1 || floor > 999 || !Number.isFinite(level) || level < 1 || level > 20 || !building) return null;
+  const halls = (Array.isArray(doc.halls) ? doc.halls : []).slice(0, 100)
+    .map((hall, index) => ({ id: cleanId(hall.id) || `hall-${index + 1}`, name: String(hall.name || "Hallway").slice(0, 50), rect: cleanRect(hall.rect) }));
+  const rooms = (Array.isArray(doc.rooms) ? doc.rooms : []).slice(0, 300).map((item, index) => {
+    const rect = cleanRect(item.rect);
+    const type = ROOM_TYPES.includes(item.type) ? item.type : "classroom";
+    const door = Array.isArray(item.door) && item.door.length === 2 ? [num(item.door[0], 0, PLAN_WIDTH), num(item.door[1], 0, PLAN_HEIGHT)] : null;
+    return room(cleanId(item.id) || `room-${index + 1}`, String(item.name || "Room").slice(0, 50), String(item.code || "").slice(0, 20), type, rect, door,
+      type === "stairs" && item.stair ? { stair: cleanId(item.stair) } : {});
+  });
+  const links = (Array.isArray(doc.links) ? doc.links : []).slice(0, 20)
+    .map((item) => ({ from: cleanId(item.from), to: String(item.to || ""), meters: num(item.meters, 1, 2000) }))
+    .filter((item) => item.from && /^\d{1,3}:[a-z0-9-]+$/.test(item.to));
+  return { floor, level, building, label: String(doc.label || "").slice(0, 60), halls, walks: hallWalks(halls), rooms, links, added: true, id: doc.id };
+}
+
+// Puts the published added floors on the map (or, in the editor, a draft being checked).
+export function setCustomFloors(docs) {
+  const taken = new Set(BUILT_IN_FLOORS.map((plan) => plan.floor));
+  const levels = new Set(BUILT_IN_FLOORS.map((plan) => `${plan.building}|${plan.level}`));
+  const custom = [];
+  for (const plan of docs.map(normalizeFloor).filter(Boolean).sort((a, b) => a.floor - b.floor)) {
+    const level = `${plan.building}|${plan.level}`;
+    if (taken.has(plan.floor) || levels.has(level)) continue;
+    taken.add(plan.floor);
+    levels.add(level);
+    custom.push(plan);
+  }
+  FLOORS.splice(0, FLOORS.length, ...BUILT_IN_FLOORS, ...custom);
+  rebuild();
+  applyMapOverrides(lastOverrides);
+}
 
 // Dijkstra from one place. blocked is a Set of "floor:areaId" strings.
 function shortestFrom(startKey, blocked) {
@@ -388,11 +529,21 @@ function describe(path, via, start, end) {
     }
     current = null;
   };
-  steps.push({ floor: start.floor, kind: "start", text: start.type === "exit" ? `Start at the ${start.name.toLowerCase()} on the ${floorLabel(start.floor).toLowerCase()}` : `Leave ${placeTitle(start)} (${floorLabel(start.floor).toLowerCase()})` });
+  steps.push({ floor: start.floor, kind: "start", text: start.type === "exit" ? `Start at the ${start.name.toLowerCase()} on the ${floorPhrase(start.floor)}` : `Leave ${placeTitle(start)} (${floorPhrase(start.floor)})` });
   for (let index = 0; index < via.length; index += 1) {
     const a = GRAPH.nodes.get(path[index]);
     const b = GRAPH.nodes.get(path[index + 1]);
     const edge = via[index];
+    if (edge.link) {
+      // Walkway to another building (or another part of the campus).
+      flush();
+      const target = placeByKey(path[index + 1]);
+      const otherBuilding = buildingOf(b.floor) !== buildingOf(a.floor);
+      steps.push({ floor: a.floor, toFloor: b.floor, link: true, kind: "walkway", text: `Walk to ${target ? placeTitle(target) : "the next building"}${otherBuilding ? ` in the ${buildingOf(b.floor)}` : ""}`, meters: Math.round(edge.w * METERS_PER_UNIT) });
+      walked += edge.w * METERS_PER_UNIT;
+      lastDirection = null;
+      continue;
+    }
     if (edge.stairs) {
       flush();
       const stairsRoom = FLOORS.find((entry) => entry.floor === a.floor).rooms.find((item) => item.id === a.room);
@@ -401,12 +552,12 @@ function describe(path, via, start, end) {
       if (previousStep?.stairs && previousStep.stairsName === stairsName) {
         previousStep.toFloor = b.floor;
         previousStep.kind = b.floor > previousStep.floor ? "up" : "down";
-        previousStep.text = `Take the ${stairsName} ${b.floor > previousStep.floor ? "up" : "down"} to the ${floorLabel(b.floor).toLowerCase()}`;
+        previousStep.text = `Take the ${stairsName} ${b.floor > previousStep.floor ? "up" : "down"} to the ${levelPhrase(b.floor)}`;
         walked += STAIR_COST * METERS_PER_UNIT;
         lastDirection = null;
         continue;
       }
-      steps.push({ floor: a.floor, stairsName, text: `Take the ${stairsName} ${b.floor > a.floor ? "up" : "down"} to the ${floorLabel(b.floor).toLowerCase()}`, stairs: true, kind: b.floor > a.floor ? "up" : "down", toFloor: b.floor });
+      steps.push({ floor: a.floor, stairsName, text: `Take the ${stairsName} ${b.floor > a.floor ? "up" : "down"} to the ${levelPhrase(b.floor)}`, stairs: true, kind: b.floor > a.floor ? "up" : "down", toFloor: b.floor });
       walked += STAIR_COST * METERS_PER_UNIT;
       lastDirection = null;
       continue;
