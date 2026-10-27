@@ -166,7 +166,7 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, renderAs
             </div>
           </section>
           <section className="student-card mc-prefs-card">
-            <div className="student-card-heading"><div><p className="kicker">PREFERENCES</p><h2>How the portal helps you</h2></div></div>
+            <div className="student-card-heading"><div><p className="kicker">PREFERENCES</p><h2>How SSCA NAVI helps you</h2></div></div>
             <label className="mc-field">I am a<select value={role} onChange={(event) => update({ role: event.target.value })}>{USER_ROLES.map((item) => <option key={item}>{item}</option>)}</select></label>
             <label className="mc-toggle"><input type="checkbox" checked={prefs.speakAnswers} onChange={(event) => update({ prefs: { ...prefs, speakAnswers: event.target.checked } })} /><span><b>Read SiBot answers aloud</b><small>SiBot speaks every answer, not only voice questions.</small></span></label>
             <label className="mc-toggle"><input type="checkbox" checked={prefs.allClosureAlerts} onChange={(event) => update({ prefs: { ...prefs, allClosureAlerts: event.target.checked } })} /><span><b>Show closures across the whole campus</b><small>Turn off to only see closures near your saved places.</small></span></label>

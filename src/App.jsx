@@ -37,7 +37,7 @@ const isOfflineError = (error) => error?.code === "auth/network-request-failed" 
 // Offline notice, and the button for a new version saved in the background.
 function AppStatus({ online, updateReady, onUpdate }) {
   if (updateReady) {
-    return <div className="app-status" role="status"><span>A new version of the portal is ready.</span><button type="button" onClick={onUpdate}>Update</button></div>;
+    return <div className="app-status" role="status"><span>A new version of SSCA NAVI is ready.</span><button type="button" onClick={onUpdate}>Update</button></div>;
   }
   if (!online) {
     return <div className="app-status app-status-offline" role="status"><span><b>You&apos;re offline.</b> Floor plans, directions and AR live view still work. New announcements show when you&apos;re back online.</span></div>;
@@ -79,7 +79,7 @@ function InstallPrompt({ offlineApp, hidden }) {
   return <aside className="install-prompt" role="dialog" aria-labelledby="install-prompt-title">
     <img src={asset("icon-192.png")} alt="" width="56" height="56" />
     <div>
-      <h2 id="install-prompt-title">Download the SSCA Portal app?</h2>
+      <h2 id="install-prompt-title">Download the SSCA NAVI app?</h2>
       <p>Floor plans, directions and AR live view work at school even without Wi-Fi. About 1 MB.</p>
       {kind === "ios" && <ol><li>Tap <b>Share</b> <span aria-hidden="true">⬆</span> at the bottom of Safari.</li><li>Tap <b>Add to Home Screen</b>.</li></ol>}
       {kind === "inapp" && <p className="install-prompt-note">{inApp} can&apos;t install apps. Open this page in Chrome, then tap Download.</p>}
@@ -111,7 +111,7 @@ function OfflinePanel({ offlineApp }) {
     <div className="ss-offline-intro">
       <span className="ss-way-icon" aria-hidden="true"><Icon name="download" size={26} /></span>
       <h3>Offline mode <span className={`ss-offline-status is-${status.tone}`}>{status.text}</span></h3>
-      <p>No Wi-Fi at school? Open the portal once with internet and it saves itself on your phone. After that you can find your way with no Wi-Fi or data.</p>
+      <p>No Wi-Fi at school? Open SSCA NAVI once with internet and it saves itself on your phone. After that you can find your way with no Wi-Fi or data.</p>
       {action}
     </div>
     <div className="ss-offline-lists">
@@ -347,7 +347,7 @@ function LoginModal({ onClose, onCreate, onAdmin, onSignedIn = () => {} }) {
         <button
           className="modal-close"
           onClick={onClose}
-          aria-label="Close portal access"
+          aria-label="Close sign in"
         >
           <Icon name="close" />
         </button>
@@ -355,7 +355,7 @@ function LoginModal({ onClose, onCreate, onAdmin, onSignedIn = () => {} }) {
           <Icon name="building" size={26} />
         </div>
         <p className="kicker">SECURE ACCESS</p>
-        <h2 id="login-title">{resetMode ? "Reset your password" : "Access Campus Portal"}</h2>
+        <h2 id="login-title">{resetMode ? "Reset your password" : "Sign in to SSCA NAVI"}</h2>
         {resetMode ? (
           <>
             <p className="modal-copy">Enter the email address on your campus account. Firebase will email you a secure link to reset your password.</p>
@@ -387,7 +387,7 @@ function LoginModal({ onClose, onCreate, onAdmin, onSignedIn = () => {} }) {
             <button className="staff-access-link" onClick={onAdmin}>Staff / administrator access</button>
             <p className="auth-security-note"><Icon name="shield" size={15} /> Sign-in is handled by Firebase. Your password is not shared with Google.</p>
             <p className="auth-security-note"><Icon name="info" size={15} /> When you sign in, the school can see your account email, how you signed in, and your device type and browser.</p>
-            <p className="terms">By continuing, you agree to the campus portal&apos;s <a href="#terms">Terms</a> and <a href="#privacy">Privacy Policy</a>.</p>
+            <p className="terms">By continuing, you agree to SSCA NAVI&apos;s <a href="#terms">Terms</a> and <a href="#privacy">Privacy Policy</a>.</p>
           </>
         )}
       </div>
@@ -624,7 +624,7 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
       if (alreadySignedIn) {
         answer = "You’re signed in already. Choose My Account in the top menu to open your student portal.";
       } else {
-        answer = "Choose Sign In / Portal Access in the top menu. I’ll open it for you now.";
+        answer = "Choose Sign in in the top menu. I’ll open it for you now.";
         onSignIn?.();
       }
     } else if (hasAny(["ar live", "ar view", "augmented reality", "camera guide", "live view"])) {
@@ -670,6 +670,8 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
         ? "Your saved places are in My Campus. Search for a room or office there and tap Save. I’ll open it for you."
         : "Sign in to save rooms and offices to your account and get alerts when a hallway near them is closed.";
       if (alreadySignedIn) onOpenAccount?.(); else onSignIn?.();
+    } else if (hasAny(["ssca navi", "what is navi", "what is this app", "what is this website", "what is this site"])) {
+      answer = "SSCA NAVI is the campus navigation system of Saint Simon of Cyrene Academy. It shows the floor plans, gives step-by-step directions and AR guidance to any room, finds the nearest exit, and shares campus updates, even with no Wi-Fi once you have opened it.";
     } else if (hasAny(["who is saint simon", "tell me about the school", "about the school", "what is this school", "what does sscai mean", "what kind of school"])) {
       answer = "Saint Simon of Cyrene Academy, Inc. (SSCAI) is a private, non-stock, non-profit school in Imus, Cavite. It provides basic education from early childhood through Senior High School and is recognized by the DepEd Division of City of Imus.";
       onNavigate("about");
@@ -841,7 +843,7 @@ export default function App() {
         <div className="ss-container ss-header-inner">
           <a className="ss-brand" href="#top" onClick={() => setMenuOpen(false)}>
             <img src={asset("logologooo.jpg")} alt="" width="44" height="44" />
-            <span><b>Saint Simon of Cyrene Academy</b><small>Campus Portal</small></span>
+            <span><b>Saint Simon of Cyrene Academy</b><small>SSCA NAVI</small></span>
           </a>
           <nav id="ss-nav" className={`ss-nav ${menuOpen ? "open" : ""}`} aria-label="Main">
             <button type="button" className="ss-nav-link" onClick={() => { setMenuOpen(false); setMapState({ floor: 2 }); }}>Floor plan</button>
@@ -1017,7 +1019,7 @@ export default function App() {
           <div className="ss-footer-school" id="about">
             <a className="ss-brand" href="#top"><img src={asset("logologooo.jpg")} alt="" width="44" height="44" /><span><b>Saint Simon of Cyrene Academy, Inc.</b><small>Since 2006</small></span></a>
             <p>A private, non-stock, non-profit school in Imus, Cavite, teaching learners from nursery through senior high school.</p>
-            <p className="ss-offline-tip"><b>No Wi-Fi at school?</b> Open this portal once with internet and the floor plans, directions and AR keep working offline.{offlineApp.canInstall && <> <button type="button" onClick={offlineApp.install}>Install the app</button></>}{offlineApp.iosInstallTip && " On iPhone, tap Share, then Add to Home Screen."}</p>
+            <p className="ss-offline-tip"><b>No Wi-Fi at school?</b> Open SSCA NAVI once with internet and the floor plans, directions and AR keep working offline.{offlineApp.canInstall && <> <button type="button" onClick={offlineApp.install}>Install the app</button></>}{offlineApp.iosInstallTip && " On iPhone, tap Share, then Add to Home Screen."}</p>
           </div>
           <div>
             <h2>Visit</h2>

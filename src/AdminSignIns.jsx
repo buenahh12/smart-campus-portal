@@ -196,7 +196,7 @@ export default function AdminSignIns({ onClose, onOpenContent, onOpenVisits }) {
           </div>}
         </section>
 
-        <p className="va-note">How sign-ins are recorded: one row each time someone signs in, or opens the portal while already signed in, once per browser session. The email comes from their verified account, so it can&apos;t be faked. Device, system, and browser are read from the browser they used. The administrator account is never recorded. People are told on the sign-in screen that this is collected.</p>
+        <p className="va-note">How sign-ins are recorded: one row each time someone signs in, or opens SSCA NAVI while already signed in, once per browser session. The email comes from their verified account, so it can&apos;t be faked. Device, system, and browser are read from the browser they used. The administrator account is never recorded. People are told on the sign-in screen that this is collected.</p>
       </div>
     </div>
   );

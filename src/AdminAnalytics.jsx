@@ -126,7 +126,7 @@ export default function AdminAnalytics({ onClose, onOpenContent, onOpenSignIns }
     <div className="admin-shell" role="dialog" aria-modal="true" aria-labelledby="va-title">
       <div className="admin-dashboard va-dashboard">
         <header className="admin-dashboard-header">
-          <div><p className="kicker">SSCAI ADMINISTRATION</p><h2 id="va-title">Site visits</h2><p>How many people used the campus portal, and who they were.</p></div>
+          <div><p className="kicker">SSCAI ADMINISTRATION</p><h2 id="va-title">Site visits</h2><p>How many people used SSCA NAVI, and who they were.</p></div>
           <div className="admin-header-actions">
             {onOpenContent && <button onClick={onOpenContent}>Content manager</button>}
             {onOpenSignIns && <button onClick={onOpenSignIns}>Sign-ins</button>}

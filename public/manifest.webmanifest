@@ -1,6 +1,6 @@
 {
-  "name": "SSCA Campus Portal",
-  "short_name": "SSCA Portal",
+  "name": "SSCA NAVI",
+  "short_name": "SSCA NAVI",
   "description": "Find any room at Saint Simon of Cyrene Academy: floor plans, AR directions, the nearest exit, and campus updates. Works without internet after the first visit.",
   "id": "./",
   "start_url": "./",

@@ -255,7 +255,7 @@ export default function AdminCms({ onClose, onOpenAnalytics, onOpenSignIns }) {
     const mail = sendEmail ? section.email?.(record, previous) : null;
     try {
       await saveItem(section.collection, editingId, record);
-      const saved = `${section.title(record)} was ${editingId ? "updated" : "added"}. The change is live on the portal.`;
+      const saved = `${section.title(record)} was ${editingId ? "updated" : "added"}. The change is live on SSCA NAVI.`;
       resetForm();
       if (!mail) {
         setNotice(saved);
@@ -298,7 +298,7 @@ export default function AdminCms({ onClose, onOpenAnalytics, onOpenSignIns }) {
     <div className="admin-shell" role="dialog" aria-modal="true" aria-labelledby="cms-title">
       <div className="admin-dashboard cms-dashboard">
         <header className="admin-dashboard-header">
-          <div><p className="kicker">SSCAI ADMINISTRATION</p><h2 id="cms-title">Content manager</h2><p>Update announcements, pathway restrictions, rooms, offices, and the names on the floor plan. Changes go live on the portal right away.</p></div>
+          <div><p className="kicker">SSCAI ADMINISTRATION</p><h2 id="cms-title">Content manager</h2><p>Update announcements, pathway restrictions, rooms, offices, and the names on the floor plan. Changes go live on SSCA NAVI right away.</p></div>
           <div className="admin-header-actions">
             {onOpenAnalytics && <button onClick={onOpenAnalytics}>Site visits</button>}
             {onOpenSignIns && <button onClick={onOpenSignIns}>Sign-ins</button>}
@@ -330,7 +330,7 @@ export default function AdminCms({ onClose, onOpenAnalytics, onOpenSignIns }) {
             <button className="attendance-save" type="submit" disabled={saving}><Icon name={editingId ? "arrow" : "plus"} size={16} /> {saving ? "Saving…" : editingId ? "Save changes" : `Add ${section.singular}`}</button>
           </form>
           <section className="cms-list" aria-label={`Saved ${section.label.toLowerCase()}`}>
-            <div className="section-title-row"><div><p className="kicker">LIVE ON THE PORTAL</p><h3>{section.label}</h3></div><span className="record-count">{items.length} saved</span></div>
+            <div className="section-title-row"><div><p className="kicker">LIVE ON SSCA NAVI</p><h3>{section.label}</h3></div><span className="record-count">{items.length} saved</span></div>
             {items.length ? items.map((item) => {
               const badge = section.badge(item);
               return <article key={item.id} className={`cms-item ${editingId === item.id ? "editing" : ""}`}>
