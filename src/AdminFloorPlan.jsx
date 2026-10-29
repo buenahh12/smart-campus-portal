@@ -4,6 +4,7 @@ import Icon from "./Icon";
 import { CMS_COLLECTIONS, deleteItem, setItem } from "./cms";
 import { EDITABLE_TYPES, FLOORS, floorLabel, isEditableSpot, mapRoomDocId, placeTitle } from "./floorPlans";
 import { usePlanVersion } from "./usePlan";
+import "./analytics.css";
 import "./adminplan.css";
 
 // Content manager tab: pick a room on the 2D floor plan and change what it is called and

@@ -4,6 +4,7 @@ import { CMS_COLLECTIONS, deleteItem, readItem, setItem, watchCollection } from 
 import { auth } from "./firebase";
 import { BUILDING_NAME, FLOORS, PLACES, PLAN_HEIGHT, PLAN_WIDTH, ROOM_TYPES, buildGraph, floorLabel, normalizeFloor, placeTitle } from "./floorPlans";
 import { usePlanVersion } from "./usePlan";
+import "./analytics.css";
 import "./adminplan.css";
 
 // Content manager → Floor plan → Add floors. When a contractor sends the blueprint of a new floor
@@ -211,6 +212,34 @@ export default function AdminBlueprint() {
     }
   };
 
+  // Puts a traced plan (from the AI, or a file) on this floor: rooms, hallways and walkways.
+  const applyTrace = (result) => {
+    const rooms = (result.rooms || []).map((item, index) => ({ id: item.id || `${item.type === "stairs" ? "stairs" : "room"}-${index + 1}`, name: item.name || "Room", code: item.code || "", type: ROOM_TYPES.includes(item.type) ? item.type : "classroom", rect: item.rect, door: item.door, stair: item.stair || "" }));
+    const halls = (result.halls || []).map((item, index) => ({ id: item.id || `hall-${index + 1}`, name: item.name || `Hallway ${index + 1}`, rect: item.rect }));
+    // Through normalizeFloor so every rectangle and door is inside the plan.
+    const clean = normalizeFloor({ ...draft, rooms, halls, links: result.links || draft.links });
+    update({ rooms: clean.rooms.map((item, index) => ({ ...item, stair: item.stair || rooms[index].stair })), halls: clean.halls, links: clean.links });
+    setSelected(null);
+    return clean;
+  };
+
+  // A traced plan saved as a .json file: { rooms: [{ name, code, type, rect, door }], halls: [{ name, rect }], links }.
+  const importTrace = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setError("");
+    try {
+      const result = JSON.parse(await file.text());
+      if (!Array.isArray(result.rooms) || !Array.isArray(result.halls)) throw new Error();
+      if ((draft.rooms.length || draft.halls.length) && !window.confirm("Replace the rooms and hallways on this floor with the imported plan?")) return;
+      const clean = applyTrace(result);
+      setNotice(`Imported ${clean.rooms.length} rooms, ${clean.halls.length} hallways and ${clean.links.length} walkways. Check them against the blueprint, then publish.`);
+    } catch {
+      setError("That file is not a traced floor plan. Use the .json file made for this editor.");
+    }
+  };
+
   const generate = async () => {
     if (!image) return setError("Upload the blueprint first.");
     if ((draft.rooms.length || draft.halls.length) && !window.confirm("Replace the rooms and hallways on this floor with the AI's draft?")) return;
@@ -223,12 +252,7 @@ export default function AdminBlueprint() {
       const result = await response.json().catch(() => ({}));
       if (result.error === "nokey") throw new Error("The AI draft is not set up yet (ANTHROPIC_API_KEY in Vercel). You can still trace the blueprint by hand.");
       if (!response.ok) throw new Error(result.error || "The AI could not read this blueprint. Trace it by hand instead.");
-      const rooms = (result.rooms || []).map((item, index) => ({ id: `${item.type === "stairs" ? "stairs" : "room"}-${index + 1}`, name: item.name || "Room", code: item.code || "", type: ROOM_TYPES.includes(item.type) ? item.type : "classroom", rect: item.rect, door: item.door, stair: "" }));
-      const halls = (result.halls || []).map((item, index) => ({ id: `hall-${index + 1}`, name: item.name || `Hallway ${index + 1}`, rect: item.rect }));
-      // Through normalizeFloor so every rectangle and door is inside the plan.
-      const clean = normalizeFloor({ ...draft, rooms, halls });
-      update({ rooms: clean.rooms.map((item, index) => ({ ...item, stair: rooms[index].stair })), halls: clean.halls });
-      setSelected(null);
+      const clean = applyTrace(result);
       setNotice(`Draft ready: ${clean.rooms.length} rooms and ${clean.halls.length} hallways. Check every room, name the stairs, and fix doors before publishing.${result.notes ? ` AI note: ${result.notes}` : ""}`);
     } catch (problem) {
       setError(problem.message);
@@ -368,6 +392,7 @@ export default function AdminBlueprint() {
         <div className="bp-row">
           <label className="cms-link-button bp-upload">{image ? "Replace blueprint" : "Upload blueprint"}<input type="file" accept="image/*" onChange={upload} /></label>
           <button type="button" className="cms-link-button" onClick={generate} disabled={!image || Boolean(busy)}><Icon name="sparkle" size={14} /> Generate with AI</button>
+          <label className="cms-link-button bp-upload">Import traced plan<input type="file" accept=".json,application/json" onChange={importTrace} /></label>
         </div>
       </div>
       <div className="va-segment bp-tools" role="toolbar" aria-label="Drawing tools">
