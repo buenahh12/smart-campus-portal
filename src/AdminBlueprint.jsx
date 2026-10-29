@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Icon from "./Icon";
 import { CMS_COLLECTIONS, deleteItem, readItem, setItem, watchCollection } from "./cms";
+import { BLUEPRINT_ACCEPT, blueprintPicture } from "./blueprintFile";
 import { auth } from "./firebase";
 import { BUILDING_NAME, FLOORS, PLACES, PLAN_HEIGHT, PLAN_WIDTH, ROOM_TYPES, buildGraph, floorLabel, normalizeFloor, placeTitle } from "./floorPlans";
 import { usePlanVersion } from "./usePlan";
@@ -41,10 +42,10 @@ function nearestEdgePoint([x, y, w, h], p) {
   return options.reduce((best, point) => (Math.hypot(point[0] - p.x, point[1] - p.y) < Math.hypot(best[0] - p.x, best[1] - p.y) ? point : best)).map(snap);
 }
 
-// The uploaded blueprint, fitted into a 1600 x 1000 picture (the plan's 160 x 100 shape) on
+// The uploaded blueprint (picture, PDF or DXF), fitted into a 1600 x 1000 picture (the plan's 160 x 100 shape) on
 // white, as a JPEG small enough to save (under about 850 KB).
 async function fitBlueprint(file) {
-  const bitmap = await createImageBitmap(file);
+  const bitmap = await blueprintPicture(file);
   const canvas = document.createElement("canvas");
   canvas.width = 1600;
   canvas.height = 1000;
@@ -201,12 +202,16 @@ export default function AdminBlueprint() {
     if (!file) return;
     setError("");
     try {
-      setBusy("Preparing the blueprint…");
-      setImage(await fitBlueprint(file));
+      setBusy("Opening the blueprint…");
+      const picture = await fitBlueprint(file);
+      setImage(picture);
       setImageChanged(true);
       setNotice("Blueprint added. Draw over it, or try Generate with AI.");
+      setBusy("");
+      // A new, empty floor: let the AI trace it straight away.
+      if (!draft.rooms.length && !draft.halls.length) await generate(picture, true);
     } catch (problem) {
-      setError(problem.message || "That file could not be opened as a picture. Use a JPG or PNG; export a PDF page as an image first.");
+      setError(problem.message || "That file could not be opened. Use a picture (JPG or PNG), a PDF, or a CAD drawing saved as DXF.");
     } finally {
       setBusy("");
     }
@@ -240,16 +245,18 @@ export default function AdminBlueprint() {
     }
   };
 
-  const generate = async () => {
-    if (!image) return setError("Upload the blueprint first.");
-    if ((draft.rooms.length || draft.halls.length) && !window.confirm("Replace the rooms and hallways on this floor with the AI's draft?")) return;
+  // auto: started by the upload itself, so a missing AI key is a tip rather than an error.
+  const generate = async (picture = image, auto = false) => {
+    if (!picture) return setError("Upload the blueprint first.");
+    if (!auto && (draft.rooms.length || draft.halls.length) && !window.confirm("Replace the rooms and hallways on this floor with the AI's draft?")) return;
     setError("");
     setNotice("");
     setBusy("The AI is reading the blueprint. This can take up to a minute…");
     try {
       const idToken = await auth?.currentUser?.getIdToken();
-      const response = await fetch(AI_ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` }, body: JSON.stringify({ image }) });
+      const response = await fetch(AI_ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` }, body: JSON.stringify({ image: picture }) });
       const result = await response.json().catch(() => ({}));
+      if (result.error === "nokey" && auto) return setNotice("Blueprint added. To have the AI trace it for you, add ANTHROPIC_API_KEY in Vercel. Until then, draw the rooms with the tools below or use Import traced plan.");
       if (result.error === "nokey") throw new Error("The AI draft is not set up yet (ANTHROPIC_API_KEY in Vercel). You can still trace the blueprint by hand.");
       if (!response.ok) throw new Error(result.error || "The AI could not read this blueprint. Trace it by hand instead.");
       const clean = applyTrace(result);
@@ -356,7 +363,8 @@ export default function AdminBlueprint() {
     return <div className="bp-home">
       <div className="bp-intro">
         <h3>Add a floor or building from a blueprint</h3>
-        <p>Upload the contractor&apos;s blueprint, draw the rooms, hallways, stairs and doors on top (or let the AI draft them), check that it connects to the rest of the school, then publish. It joins the floor plan, routes, search, SiBot and AR.</p>
+        <p>Upload the file the engineer or contractor sent: a PDF, a CAD drawing saved as DXF, or a picture (JPG/PNG). The AI traces the rooms, hallways, stairs and doors; you check them, connect the floor to the rest of the school, and publish. It joins the floor plan, routes, search, SiBot and AR.</p>
+        <p className="cms-hint">Got a DWG file? Ask the engineer to save it as DXF (AutoCAD: Save As → DXF) or PDF.</p>
         <button type="button" className="attendance-save" onClick={startNew}><Icon name="plus" size={16} /> New floor</button>
       </div>
       {creating && <form className="cms-form bp-create" onSubmit={createFloor}>
@@ -390,8 +398,8 @@ export default function AdminBlueprint() {
       <div className="fp-admin-head">
         <div><button type="button" className="cms-link-button" onClick={() => setDraft(null)}>← All added floors</button><h3 className="bp-title">{title} <span className={`cms-badge ${draft.published ? "good" : "warn"}`}>{draft.published ? "Published" : "Draft"}</span></h3></div>
         <div className="bp-row">
-          <label className="cms-link-button bp-upload">{image ? "Replace blueprint" : "Upload blueprint"}<input type="file" accept="image/*" onChange={upload} /></label>
-          <button type="button" className="cms-link-button" onClick={generate} disabled={!image || Boolean(busy)}><Icon name="sparkle" size={14} /> Generate with AI</button>
+          <label className="cms-link-button bp-upload">{image ? "Replace blueprint" : "Upload blueprint"}<input type="file" accept={BLUEPRINT_ACCEPT} onChange={upload} /></label>
+          <button type="button" className="cms-link-button" onClick={() => generate()} disabled={!image || Boolean(busy)}><Icon name="sparkle" size={14} /> Generate with AI</button>
           <label className="cms-link-button bp-upload">Import traced plan<input type="file" accept=".json,application/json" onChange={importTrace} /></label>
         </div>
       </div>

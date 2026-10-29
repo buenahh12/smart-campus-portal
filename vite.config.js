@@ -18,7 +18,8 @@ function offlineApp() {
         else files.push(relative(dir, path).replaceAll('\\', '/'))
       })
       walk(dir)
-      const precache = files.filter((file) => file !== 'sw.js' && file !== 'index.html' && !file.endsWith('.map'))
+      // The PDF reader (pdf.js, about 1.7 MB) is only for the admin's blueprint uploads: not saved offline.
+      const precache = files.filter((file) => file !== 'sw.js' && file !== 'index.html' && !file.endsWith('.map') && !/^assets\/pdf(\.worker)?[.-]/.test(file))
       const version = createHash('sha256')
         .update(files.sort().join('\n'))
         .update(readFileSync(join(dir, 'index.html')))
