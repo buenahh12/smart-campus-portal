@@ -509,7 +509,7 @@ function AdminLogin({ onClose, onSuccess }) {
 }
 
 // The campus facts. On a phone they take turns, one at a time, sliding in with the number counting
-// up; tap to skip ahead. On a computer, or when the phone asks for less motion, they sit in a grid.
+// up over a soft gradient; tap to skip ahead. On a computer, or when the phone asks for less motion, they sit in a grid.
 const FACT_SECONDS = 3;
 
 function useMedia(query) {
@@ -561,11 +561,6 @@ function CampusFacts({ facts }) {
       <span className="ss-fact-label">{fact.label}</span>
       <span className={`ss-fact-value ${fact.text ? "text" : ""}`}>{fact.text || <CountUp value={fact.value} />}</span>
     </button>
-    <div className="ss-fact-dots">
-      {facts.map((item, i) => <button key={item.label} type="button" className={i === index ? "active" : ""} onClick={() => setIndex(i)} aria-label={item.label} aria-current={i === index ? "true" : undefined}>
-        {i === index && <i key={index} style={{ animationDuration: `${FACT_SECONDS}s` }} />}
-      </button>)}
-    </div>
   </div>;
 }
 
