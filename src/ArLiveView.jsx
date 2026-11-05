@@ -621,7 +621,7 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
     <div ref={canvasHolder} className="ar-live-canvas" aria-hidden="true" />
     {welcome && <div className="ar-live-welcome">
       <div className="ar-live-welcome-card">
-        <span className="ar-live-overline">{"// SSCA NAVI"}</span>
+        <span className="ar-live-overline">{"// SSCAI NAVI"}</span>
         <h2>Welcome to <span>AR live view</span></h2>
         <p>Point your phone down the hallway and follow the arrows on the floor to any room in the Main Academic Building.</p>
         <ol>
@@ -642,7 +642,7 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
       <div className="ar-live-title">
         <div>
           <span className="ar-live-overline">{"// AR live view"}</span>
-          <b>SSCA NAVI</b>
+          <b>SSCAI NAVI</b>
         </div>
         <button type="button" className="ar-live-button ar-live-small" onClick={close}>Close</button>
       </div>

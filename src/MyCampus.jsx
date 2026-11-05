@@ -129,7 +129,7 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, renderAs
 
   return (
     <div className="student-portal-shell" role="dialog" aria-modal="true" aria-labelledby="my-campus-title">
-      <header className="student-portal-header"><a className="student-portal-brand" href="#about" onClick={onClose}><span className="brand-mark" /><span><b>SAINT SIMON OF CYRENE</b><small>MY CAMPUS</small></span></a><div className="student-header-tools"><span className={`connectivity-pill ${online ? "online" : "offline"}`}><i /><span className="connectivity-full">{online ? "Online · live campus updates" : "Offline · updates paused"}</span><span className="connectivity-short">{online ? "Online" : "Offline"}</span></span><button className="student-close" onClick={onClose} aria-label="Close My Campus"><Icon name="close" /></button></div></header>
+      <header className="student-portal-header"><a className="student-portal-brand" href="#about" onClick={onClose}><span className="brand-mark" /><span><b>SAINT SIMON OF CYRENE ACADEMY, INC.</b><small>MY CAMPUS</small></span></a><div className="student-header-tools"><span className={`connectivity-pill ${online ? "online" : "offline"}`}><i /><span className="connectivity-full">{online ? "Online · live campus updates" : "Offline · updates paused"}</span><span className="connectivity-short">{online ? "Online" : "Offline"}</span></span><button className="student-close" onClick={onClose} aria-label="Close My Campus"><Icon name="close" /></button></div></header>
       <main className="student-dashboard">
         <section className="student-welcome">
           <div><p className="kicker">MY CAMPUS</p><h1 id="my-campus-title">Hello, {firstName}</h1><p>Your saved places, route alerts, and campus updates in one place.</p></div>
@@ -166,7 +166,7 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, renderAs
             </div>
           </section>
           <section className="student-card mc-prefs-card">
-            <div className="student-card-heading"><div><p className="kicker">PREFERENCES</p><h2>How SSCA NAVI helps you</h2></div></div>
+            <div className="student-card-heading"><div><p className="kicker">PREFERENCES</p><h2>How SSCAI NAVI helps you</h2></div></div>
             <label className="mc-field">I am a<select value={role} onChange={(event) => update({ role: event.target.value })}>{USER_ROLES.map((item) => <option key={item}>{item}</option>)}</select></label>
             <label className="mc-toggle"><input type="checkbox" checked={prefs.speakAnswers} onChange={(event) => update({ prefs: { ...prefs, speakAnswers: event.target.checked } })} /><span><b>Read SiBot answers aloud</b><small>SiBot speaks every answer, not only voice questions.</small></span></label>
             <label className="mc-toggle"><input type="checkbox" checked={prefs.allClosureAlerts} onChange={(event) => update({ prefs: { ...prefs, allClosureAlerts: event.target.checked } })} /><span><b>Show closures across the whole campus</b><small>Turn off to only see closures near your saved places.</small></span></label>
@@ -188,7 +188,7 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, renderAs
             {notices.length ? notices.map((item) => <article className="announcement-item" key={item.id}><span><Icon name="sparkle" size={16} /></span><div><div><b>{item.title}</b><small>{item.pinned ? "Pinned" : item.updatedAt?.toDate?.().toLocaleDateString("en-US", { month: "short", day: "numeric" }) || "School notice"}</small></div><p>{item.body}</p></div></article>) : <p className="updates-empty">{announcements.loading ? "Loading announcements…" : "No announcements right now."}</p>}
           </section>
         </div>
-        <footer className="student-portal-footer"><a className="student-portal-brand footer-brand" href="#about" onClick={onClose}><span className="brand-mark" /><span><b>SAINT SIMON OF CYRENE</b><small>MY CAMPUS</small></span></a><div className="student-footer-account"><div><b>{name}</b><span>{role}</span></div><button onClick={onSignOut}>Sign out <Icon name="arrow" size={15} /></button></div></footer>
+        <footer className="student-portal-footer"><a className="student-portal-brand footer-brand" href="#about" onClick={onClose}><span className="brand-mark" /><span><b>SAINT SIMON OF CYRENE ACADEMY, INC.</b><small>MY CAMPUS</small></span></a><div className="student-footer-account"><div><b>{name}</b><span>{role}</span></div><button onClick={onSignOut}>Sign out <Icon name="arrow" size={15} /></button></div></footer>
       </main>
       {renderAssistant?.(prefs)}
     </div>
