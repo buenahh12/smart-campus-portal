@@ -103,7 +103,7 @@ const BUILT_IN_FLOORS = [
       room("guidance", "Guidance Office", "", "office", [14, 0, 7, 24], [17.5, 24]),
       room("clinic", "Clinic", "", "office", [21, 0, 11, 24], [26, 24]),
       room("stair-nw-2", "North-west stairs", "", "stairs", [32, 0, 15, 24], [39.5, 24], { stair: "nw", shape: "u" }),
-      room("room-204", "Grade 3 Sapphire", "Room 204", "classroom", [47, 0, 39, 24], [50, 24]),
+      room("room-204", "Grade 3 Sapphire", "Room 204", "classroom", [47, 0, 39, 24], [50, 24], { extraDoors: [[83, 24]] }),
       room("room-205", "Grade 5 Chrysolite", "Room 205", "classroom", [86, 0, 38, 24], [120, 24]),
       room("room-206", "Grade 5 Chalcedony", "Room 206", "classroom", [124, 0, 36, 24], [128, 24]),
       room("room-207", "Grade 4 Amethyst", "Room 207", "classroom", [137, 24, 23, 20], [137, 28]),
@@ -305,20 +305,24 @@ export function buildGraph(floors = FLOORS) {
       if (!item.door) continue;
       const [x, y, w, h] = item.rect;
       const center = addNode(`${floor}:${item.id}`, { floor, x: x + w / 2, y: y + h / 2, kind: "room", room: item.id });
-      const door = addNode(`${floor}:door:${item.id}`, { floor, x: item.door[0], y: item.door[1], kind: "door", room: item.id });
       const tags = item.type === "stairs" ? [`${floor}:${item.id}`] : [];
-      link(center, door, tags);
-      let best = null;
-      for (const segment of segments) {
-        const hit = project(nodes.get(door), nodes.get(segment.a), nodes.get(segment.b));
-        const d = dist(hit, nodes.get(door));
-        if (!best || d < best.d) best = { segment, hit, d };
-      }
-      if (best) {
-        const stop = addNode(`${floor}:s:${item.id}`, { floor, x: best.hit.x, y: best.hit.y, kind: "hall" });
-        best.segment.stops.push({ id: stop, t: best.hit.t });
-        link(door, stop, tags);
-      }
+      // The main door, then any second door (extraDoors); routes use whichever is nearer.
+      [item.door, ...(item.extraDoors || [])].forEach(([dx, dy], index) => {
+        const suffix = index ? `:${index}` : "";
+        const door = addNode(`${floor}:door:${item.id}${suffix}`, { floor, x: dx, y: dy, kind: "door", room: item.id });
+        link(center, door, tags);
+        let best = null;
+        for (const segment of segments) {
+          const hit = project(nodes.get(door), nodes.get(segment.a), nodes.get(segment.b));
+          const d = dist(hit, nodes.get(door));
+          if (!best || d < best.d) best = { segment, hit, d };
+        }
+        if (best) {
+          const stop = addNode(`${floor}:s:${item.id}${suffix}`, { floor, x: best.hit.x, y: best.hit.y, kind: "hall" });
+          best.segment.stops.push({ id: stop, t: best.hit.t });
+          link(door, stop, tags);
+        }
+      });
     }
     for (const segment of segments) {
       const chain = [segment.a, ...segment.stops.sort((p, q) => p.t - q.t).map((stop) => stop.id), segment.b];

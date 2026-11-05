@@ -632,7 +632,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .plan-closed-fill { fill: url(#plan-closed); pointer-events: none; }
 .plan-closed-line { stroke: #e08f86; stroke-width: .4; }
 .plan-void rect { fill: #fafaf8; }
-.plan-void path { fill: none; stroke: #cfd3cf; stroke-width: .2; }
+.plan-void path { fill: none; stroke: #9aa29c; stroke-width: .2; }
+.plan-void rect.plan-void-frame { fill: none; stroke: #4a564f; stroke-width: .35; }
+.plan-void rect.plan-void-frame.inner { stroke-width: .2; }
+.plan-void text { paint-order: stroke; stroke: #fafaf8; stroke-width: .9px; fill: #6b746e; }
 .plan-hatch-line { stroke: #d5d8d3; stroke-width: .22; }
 .plan-room { cursor: pointer; outline: none; }
 .plan-room-fill { fill: #fff; transition: fill .15s ease; }

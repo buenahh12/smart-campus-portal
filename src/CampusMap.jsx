@@ -92,8 +92,11 @@ function doorShape(rect, door) {
 }
 
 // Window marks wherever a room touches the outside wall, like the posted plans.
-function windowMarks(rect) {
-  const [x, y, w, h] = rect;
+const WINDOWED = new Set(["classroom", "lab", "facility", "office"]);
+
+// Windows: on the outer walls, and on the walls a room shares with a hallway (between its doors).
+function windowMarks(item, halls) {
+  const [x, y, w, h] = item.rect;
   const marks = [];
   const add = (x1, y1, x2, y2, horizontal) => {
     const length = horizontal ? x2 - x1 : y2 - y1;
@@ -106,6 +109,32 @@ function windowMarks(rect) {
   if (y + h === PLAN_HEIGHT) add(x, PLAN_HEIGHT, x + w, PLAN_HEIGHT, true);
   if (x === 0) add(0, y, 0, y + h, false);
   if (x + w === PLAN_WIDTH) add(PLAN_WIDTH, y, PLAN_WIDTH, y + h, false);
+  if (!WINDOWED.has(item.type)) return marks;
+  const doors = [item.door, ...(item.extraDoors || [])].filter(Boolean);
+  const near = (a, b) => Math.abs(a - b) < 0.6;
+  const edges = [
+    { horizontal: true, at: y, from: x, to: x + w },
+    { horizontal: true, at: y + h, from: x, to: x + w },
+    { horizontal: false, at: x, from: y, to: y + h },
+    { horizontal: false, at: x + w, from: y, to: y + h },
+  ];
+  for (const edge of edges) {
+    if (edge.at === 0 || edge.at === (edge.horizontal ? PLAN_HEIGHT : PLAN_WIDTH)) continue;
+    const facing = halls.filter(({ rect: [hx, hy, hw, hh] }) => (edge.horizontal
+      ? (near(hy, edge.at) || near(hy + hh, edge.at)) && hx < edge.to && hx + hw > edge.from
+      : (near(hx, edge.at) || near(hx + hw, edge.at)) && hy < edge.to && hy + hh > edge.from));
+    if (!facing.length) continue;
+    const from = Math.max(edge.from, Math.min(...facing.map(({ rect }) => (edge.horizontal ? rect[0] : rect[1]))));
+    const to = Math.min(edge.to, Math.max(...facing.map(({ rect }) => (edge.horizontal ? rect[0] + rect[2] : rect[1] + rect[3]))));
+    const cuts = doors.filter(([dx, dy]) => near(edge.horizontal ? dy : dx, edge.at)).map(([dx, dy]) => (edge.horizontal ? dx : dy)).sort((a, b) => a - b);
+    let start = from + 1;
+    for (const cut of [...cuts, to + DOOR / 2 + 1]) {
+      const end = cut - DOOR / 2 - 1.2;
+      if (edge.horizontal) add(start, edge.at, end, edge.at, true);
+      else add(edge.at, start, edge.at, end, false);
+      start = cut + DOOR / 2 + 1.2;
+    }
+  }
   return marks;
 }
 
@@ -148,14 +177,14 @@ function UStair({ item, floor }) {
   const below = FLOORS.find((entry) => entry.building === plan?.building && entry.level === plan.level - 1);
   const down = Boolean(below?.rooms.some((room) => room.stair === item.stair));
   // Short stairwells side-on to the hallway: the label goes just outside, in the hallway, as on the plans.
-  const [lx, ly] = vertical ? at(entry / 2, width * 0.22) : at(-3.9, middle); // beside the route line, not under it
+  const [lx, ly] = vertical ? at(entry / 2, width * 0.25) : at(-3.9, middle); // beside the route line, not under it
   return <g className="plan-ustair">
     <path d={treads.join(" ")} className="plan-treads" />
     <polyline points={line([[entry - 0.6, middle], [turn, middle]])} className="plan-ustair-wall" />
     <polyline points={line(landing)} className="plan-ustair-rail" />
     <polyline points={line([[entry + 0.6, lane], [tip, lane]])} className="plan-ustair-arrow" />
     <polyline points={line([[tip - 1, lane - 0.8], [tip, lane], [tip - 1, lane + 0.8]])} className="plan-ustair-arrow" />
-    <text x={lx} y={ly} className="plan-ustair-label" fontSize={Math.min(1.5, width / 7)}>{down ? "DOWN" : "UP"}</text>
+    <text x={lx} y={ly} className="plan-ustair-label" fontSize={Math.min(1.25, width / 8)}>{down ? "DOWN" : "UP"}</text>
   </g>;
 }
 
@@ -347,8 +376,12 @@ function FloorPlan2D({ plan, route, startKey, destKey, selectedKey, blocked, onP
           const [x, y, w, h] = item.rect;
           return <g key={item.id} className={`plan-${item.type}`}>
             <rect x={x} y={y} width={w} height={h} fill={item.type === "deck" ? "url(#plan-hatch)" : undefined} />
-            {item.type === "void" && <path d={`M${x} ${y}L${x + w} ${y + h}M${x + w} ${y}L${x} ${y + h}`} />}
-            <text x={x + w / 2} y={y + h / 2}>{item.type === "void" ? (floor === 1 ? "OPEN COURT" : "OPEN BELOW") : "ROOF DECK"}</text>
+            {item.type === "void" && <>
+              <rect x={x + 1.2} y={y + 1.2} width={w - 2.4} height={h - 2.4} className="plan-void-frame" />
+              <rect x={x + 1.9} y={y + 1.9} width={w - 3.8} height={h - 3.8} className="plan-void-frame inner" />
+              <path d={`M${x + 1.9} ${y + 1.9}L${x + w - 1.9} ${y + h - 1.9}M${x + w - 1.9} ${y + 1.9}L${x + 1.9} ${y + h - 1.9}`} />
+            </>}
+            <text x={x + w / 2} y={y + h / 2}>{item.type === "void" ? (floor === 1 ? "OPEN COURT" : floor === 4 ? "OPEN BELOW" : "OPEN DOWN BELOW") : "ROOF DECK"}</text>
           </g>;
         })}
 
@@ -369,20 +402,20 @@ function FloorPlan2D({ plan, route, startKey, destKey, selectedKey, blocked, onP
         </g>
         <rect className="plan-outer-wall" x="0" y="0" width={PLAN_WIDTH} height={PLAN_HEIGHT} />
         <g className="plan-windows">
-          {solidRooms.flatMap((item) => windowMarks(item.rect).map((mark, index) => <g key={`${item.id}-${index}`}>
+          {solidRooms.flatMap((item) => windowMarks(item, plan.halls).map((mark, index) => <g key={`${item.id}-${index}`}>
             <rect x={mark.horizontal ? mark.x : mark.x - 0.75} y={mark.horizontal ? mark.y - 0.75 : mark.y} width={mark.horizontal ? mark.w : 1.5} height={mark.horizontal ? 1.5 : mark.h} className="plan-window-gap" />
             {[-0.35, 0.35].map((offset) => <line key={offset} x1={mark.horizontal ? mark.x : mark.x + offset} y1={mark.horizontal ? mark.y + offset : mark.y} x2={mark.horizontal ? mark.x + mark.w : mark.x + offset} y2={mark.horizontal ? mark.y + offset : mark.y + mark.h} />)}
           </g>))}
         </g>
         <g className="plan-doors">
-          {solidRooms.filter((item) => item.door).map((item) => {
-            const shape = item.type === "stairs" ? stairOpening(item.rect, item.door) : doorShape(item.rect, item.door);
+          {solidRooms.filter((item) => item.door).flatMap((item) => [item.door, ...(item.extraDoors || [])].map((door, index) => {
+            const shape = item.type === "stairs" ? stairOpening(item.rect, door) : doorShape(item.rect, door);
             if (!shape) return null;
-            return <g key={item.id} className={item.type === "exit" ? "exit" : undefined}>
+            return <g key={`${item.id}-${index}`} className={item.type === "exit" ? "exit" : undefined}>
               <path d={shape.gap} className="plan-door-gap" />
               {item.type !== "exit" && item.type !== "stairs" && <path d={shape.swing} className="plan-door-swing" />}
             </g>;
-          })}
+          }))}
         </g>
 
         {/* Labels */}
@@ -433,7 +466,8 @@ function FloorPlan2D({ plan, route, startKey, destKey, selectedKey, blocked, onP
           <text x="1.2" y="0">{floorLabel(badge.toFloor).toUpperCase()}</text>
         </g>)}
         {start?.floor === floor && (() => {
-          const node = (route?.path && graphNode(`${floor}:door:${start.id}`)) || graphNode(start.key);
+          const leaving = route?.path && graphNode(route.path[1]);
+          const node = (leaving?.kind === "door" && leaving.room === start.id ? leaving : null) || (route?.path && graphNode(`${floor}:door:${start.id}`)) || graphNode(start.key);
           return <g className="plan-you" transform={`translate(${node.x} ${node.y})`}>
             <circle r="4" className="halo" />
             <circle r="1.7" className="dot" />
@@ -441,7 +475,8 @@ function FloorPlan2D({ plan, route, startKey, destKey, selectedKey, blocked, onP
           </g>;
         })()}
         {dest?.floor === floor && (() => {
-          const node = graphNode(`${floor}:door:${dest.id}`) || graphNode(dest.key);
+          const arrival = route?.path && graphNode(route.path[route.path.length - 2]);
+          const node = (arrival?.kind === "door" && arrival.room === dest.id ? arrival : null) || graphNode(`${floor}:door:${dest.id}`) || graphNode(dest.key);
           return <g className={`plan-pin ${dest.type === "exit" ? "exit" : ""}`} transform={`translate(${node.x} ${node.y})`}>
             {/* A small glossy pin that hops over its shadow, so the destination is easy to spot. */}
             <defs>
