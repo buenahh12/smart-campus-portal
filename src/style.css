@@ -659,6 +659,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .plan-room-label.muted .plan-name { fill: #a7aea9; font-weight: 500; }
 .plan-exit-label { fill: var(--exit); font-size: 1.6px; font-weight: 800; letter-spacing: .3px; dominant-baseline: central; }
 .plan-stairs-tag { fill: #fff; }
+.plan-ustair { pointer-events: none; }
+.plan-ustair-wall { fill: none; stroke: var(--ink); stroke-width: .45; }
+.plan-ustair-rail, .plan-ustair-arrow { fill: none; stroke: #5d665f; stroke-width: .2; stroke-linejoin: round; }
+.plan-ustair-label { fill: #3c4640; font-weight: 800; letter-spacing: .25px; text-anchor: middle; dominant-baseline: central; }
 .plan-stairs-label { fill: #5d665f; font-weight: 700; letter-spacing: .3px; dominant-baseline: central; }
 
 .plan-route { pointer-events: none; }

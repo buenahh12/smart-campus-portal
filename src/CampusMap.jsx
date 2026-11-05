@@ -105,6 +105,48 @@ function stairTreads(rect) {
   return lines.join(" ");
 }
 
+// A U-shaped stairwell like the posted plans: two flights with a wall between them, a rounded
+// half landing at the far end, an arrow up the flight, and UP or DOWN at the end you walk in.
+function UStair({ item, floor }) {
+  const [x, y, w, h] = item.rect;
+  const vertical = h >= w;
+  const length = vertical ? h : w;
+  const width = vertical ? w : h;
+  const fromStart = (vertical ? item.door[1] - y : item.door[0] - x) < length / 2;
+  // t runs from the entrance (0) to the far wall (length); u runs across the stairwell.
+  const at = (t, u) => {
+    const along = fromStart ? t : length - t;
+    return vertical ? [x + u, y + along] : [x + along, y + u];
+  };
+  const line = (points) => points.map((point) => at(...point).join(",")).join(" ");
+  const margin = 0.7;
+  const entry = Math.min(4, length * 0.2);
+  const turn = length - width / 2;
+  const middle = width / 2;
+  const treads = [];
+  for (let t = entry; t < turn - 0.3; t += 1.2) treads.push(`M${at(t, margin).join(" ")} L${at(t, middle - 0.35).join(" ")} M${at(t, middle + 0.35).join(" ")} L${at(t, width - margin).join(" ")}`);
+  const radius = middle - margin;
+  const landing = Array.from({ length: 13 }, (_, i) => {
+    const angle = -Math.PI / 2 + (Math.PI * i) / 12;
+    return [turn + radius * Math.cos(angle), middle + radius * Math.sin(angle)];
+  });
+  const lane = width * 0.75;
+  const tip = turn - 0.6;
+  const plan = FLOORS.find((entry) => entry.floor === floor);
+  const below = FLOORS.find((entry) => entry.building === plan?.building && entry.level === plan.level - 1);
+  const down = Boolean(below?.rooms.some((room) => room.stair === item.stair));
+  // Short stairwells side-on to the hallway: the label goes just outside, in the hallway, as on the plans.
+  const [lx, ly] = vertical ? at(entry / 2, middle) : at(-3.9, middle);
+  return <g className="plan-ustair">
+    <path d={treads.join(" ")} className="plan-treads" />
+    <polyline points={line([[entry - 0.6, middle], [turn, middle]])} className="plan-ustair-wall" />
+    <polyline points={line(landing)} className="plan-ustair-rail" />
+    <polyline points={line([[entry + 0.6, lane], [tip, lane]])} className="plan-ustair-arrow" />
+    <polyline points={line([[tip - 1, lane - 0.8], [tip, lane], [tip - 1, lane + 0.8]])} className="plan-ustair-arrow" />
+    <text x={lx} y={ly} className="plan-ustair-label" fontSize={Math.min(1.5, width / 7)}>{down ? "DOWN" : "UP"}</text>
+  </g>;
+}
+
 function routeRuns(route, floor) {
   if (!route?.path) return [];
   const runs = [];
@@ -306,7 +348,7 @@ function FloorPlan2D({ plan, route, startKey, destKey, selectedKey, blocked, onP
           const classes = ["plan-room", `type-${item.type}`, item.unlabeled && "unlabeled", key === selectedKey && "selected", key === dest?.key && "destination", key === startKey && "start", closed && "closed"].filter(Boolean).join(" ");
           return <g key={item.id} className={classes} onClick={() => pick(key)} onKeyDown={(event) => (event.key === "Enter" || event.key === " ") && onPick(key)} tabIndex={0} role="button" aria-label={`${placeTitle({ ...item, floor })}${closed ? ", closed" : ""}`}>
             <rect x={x} y={y} width={w} height={h} className="plan-room-fill" />
-            {item.type === "stairs" && <path d={stairTreads(item.rect)} className="plan-treads" />}
+            {item.type === "stairs" && (item.shape === "u" && item.door ? <UStair item={item} floor={floor} /> : <path d={stairTreads(item.rect)} className="plan-treads" />)}
             {closed && <rect x={x} y={y} width={w} height={h} className="plan-closed-fill" />}
           </g>;
         })}
@@ -341,6 +383,7 @@ function FloorPlan2D({ plan, route, startKey, destKey, selectedKey, blocked, onP
               return <text key={item.id} className="plan-exit-label" x={cx} y={cy} transform={h > w ? `rotate(-90 ${cx} ${cy})` : undefined}>{w > 5 || h > 5 ? "EXIT" : ""}</text>;
             }
             if (item.type === "stairs") {
+              if (item.shape === "u" && item.door) return null;
               const size = Math.min(1.7, Math.max(w, h) / 9);
               return <g key={item.id}>
                 <rect x={cx - size * 3.3} y={cy - size * 0.85} width={size * 6.6} height={size * 1.7} className="plan-stairs-tag" />
