@@ -56,3 +56,17 @@
 
 /* The search message sits right under "Where do you want to go?", above the box, so the keyboard or a popup can't hide it. */
 .ss-search > .ss-field-error { margin: 0 0 10px; }
+
+/* Campus facts on a phone: one at a time, sliding in, with dots and a filling bar for the next one. */
+.ss-facts.ss-facts-rotate { display: block; padding: 22px 24px 18px; }
+.ss-fact-slide { display: grid; gap: 6px; width: 100%; min-height: 92px; padding: 0; border: 0; color: inherit; background: none; text-align: left; animation: fact-in .5s cubic-bezier(.2, .8, .2, 1) both; }
+.ss-fact-label { color: var(--muted); font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.ss-fact-value { color: var(--forest); font-family: var(--serif); font-size: 52px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.ss-fact-value.text { padding-top: 6px; font-family: var(--sans); font-size: 24px; line-height: 1.2; }
+.ss-fact-dots { display: flex; gap: 8px; margin-top: 14px; }
+.ss-fact-dots button { position: relative; flex: 1; height: 5px; min-height: 0; padding: 0; overflow: hidden; border: 0; border-radius: 99px; background: var(--line, #e2d7c2); }
+.ss-fact-dots button::after { content: ""; position: absolute; inset: -12px 0; }
+.ss-fact-dots button.active { background: rgba(31, 74, 53, .18); }
+.ss-fact-dots i { position: absolute; inset: 0; border-radius: inherit; background: var(--forest, #1f4a35); transform-origin: left; animation: fact-progress linear both; }
+@keyframes fact-in { from { opacity: 0; transform: translateX(32px); } to { opacity: 1; transform: none; } }
+@keyframes fact-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }

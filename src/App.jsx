@@ -508,6 +508,67 @@ function AdminLogin({ onClose, onSuccess }) {
   return <div className="modal-shell" role="dialog" aria-modal="true" aria-labelledby="admin-login-title"><form className="login-modal admin-login" onSubmit={submit}><button type="button" className="modal-close" onClick={onClose} aria-label="Close admin login"><Icon name="close" /></button><div className="modal-mark"><Icon name="shield" size={26} /></div><p className="kicker">RESTRICTED STAFF ACCESS</p><h2 id="admin-login-title">Administrator sign in</h2><p className="modal-copy">Sign in with the administrator username and password.</p><input className="admin-password" type="text" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Username" autoComplete="username" required autoFocus /><input className="admin-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" autoComplete="current-password" required />{error && <p className="auth-error" role="alert">{error}</p>}<button className="visitor-button" type="submit" disabled={busy}>{busy ? "Verifying admin access..." : "Sign in to admin"}</button><p className="terms">Admin access is verified by Firebase authorization.</p></form></div>;
 }
 
+// The campus facts. On a phone they take turns, one at a time, sliding in with the number counting
+// up; tap to skip ahead. On a computer, or when the phone asks for less motion, they sit in a grid.
+const FACT_SECONDS = 3;
+
+function useMedia(query) {
+  const [matches, setMatches] = useState(() => typeof window !== "undefined" && window.matchMedia(query).matches);
+  useEffect(() => {
+    const list = window.matchMedia(query);
+    const change = () => setMatches(list.matches);
+    change();
+    list.addEventListener("change", change);
+    return () => list.removeEventListener("change", change);
+  }, [query]);
+  return matches;
+}
+
+function CountUp({ value }) {
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    let frame;
+    const start = performance.now();
+    const step = (now) => {
+      const t = Math.min(1, (now - start) / 700);
+      setShown(Math.round(value * (1 - (1 - t) ** 3)));
+      if (t < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+  return shown;
+}
+
+function CampusFacts({ facts }) {
+  const phone = useMedia("(max-width: 640px)");
+  const still = useMedia("(prefers-reduced-motion: reduce)");
+  const [index, setIndex] = useState(0);
+  const rotating = phone && !still;
+  useEffect(() => {
+    if (!rotating) return undefined;
+    const timer = setInterval(() => { if (!document.hidden) setIndex((current) => (current + 1) % facts.length); }, FACT_SECONDS * 1000);
+    return () => clearInterval(timer);
+  }, [rotating, facts.length, index]);
+  if (!rotating) {
+    return <dl className="ss-facts" data-reveal style={{ "--delay": "120ms" }}>
+      {facts.map((fact) => <div key={fact.label}><dt>{fact.label}</dt><dd className={fact.text ? "ss-facts-text" : undefined}>{fact.text || fact.value}</dd></div>)}
+    </dl>;
+  }
+  const fact = facts[index];
+  return <div className="ss-facts ss-facts-rotate" data-reveal style={{ "--delay": "120ms" }} role="group" aria-label="Campus facts">
+    <button type="button" className="ss-fact-slide" key={index} onClick={() => setIndex((index + 1) % facts.length)} aria-label={`${fact.label}: ${fact.text || fact.value}. Tap for the next fact.`}>
+      <span className="ss-fact-label">{fact.label}</span>
+      <span className={`ss-fact-value ${fact.text ? "text" : ""}`}>{fact.text || <CountUp value={fact.value} />}</span>
+    </button>
+    <div className="ss-fact-dots">
+      {facts.map((item, i) => <button key={item.label} type="button" className={i === index ? "active" : ""} onClick={() => setIndex(i)} aria-label={item.label} aria-current={i === index ? "true" : undefined}>
+        {i === index && <i key={index} style={{ animationDuration: `${FACT_SECONDS}s` }} />}
+      </button>)}
+    </div>
+  </div>;
+}
+
 function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alreadySignedIn = false, speakAnswers = false }) {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
@@ -914,12 +975,12 @@ export default function App() {
             </figure>
           </div>
           <div className="ss-container">
-            <dl className="ss-facts" data-reveal style={{ "--delay": "120ms" }}>
-              <div><dt>Floors mapped</dt><dd>{FLOORS.length}</dd></div>
-              <div><dt>Rooms &amp; offices</dt><dd>{mappedPlaces().length}</dd></div>
-              <div><dt>Exits &amp; fire stairs</dt><dd>{exitCount()}</dd></div>
-              <div><dt>Office hours</dt><dd className="ss-facts-text">Mon–Fri, 7 AM–5 PM</dd></div>
-            </dl>
+            <CampusFacts facts={[
+              { label: "Floors mapped", value: FLOORS.length },
+              { label: "Rooms & offices", value: mappedPlaces().length },
+              { label: "Exits & fire stairs", value: exitCount() },
+              { label: "Office hours", text: "Mon–Fri, 7 AM–5 PM" },
+            ]} />
           </div>
         </section>
 
