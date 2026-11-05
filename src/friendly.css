@@ -172,3 +172,9 @@
 .ss-3d-showing button { margin-left: auto; min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; color: #fff; background: #1f4a35; font-weight: 700; }
 @media (max-width: 480px) { .account-grade, .mc-grade { grid-template-columns: 1fr; } }
 .mc-grade .mc-field input { box-sizing: border-box; width: 100%; min-height: 42px; padding: 0 14px; border: 1px solid var(--line-strong, #d8cbb3); border-radius: 12px; color: #123525; background: #fbfffc; font: inherit; font-size: 16px; }
+
+/* Announcements: the "Choose a photo" button (a label around a hidden file input). */
+.cms-photo-pick { position: relative; cursor: pointer; }
+.cms-photo-pick input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.cms-photo-pick:focus-within { outline: 2px solid #10b95c; outline-offset: 2px; }
+.cms-form label.cms-photo-pick, label.cms-photo-pick { display: inline-flex; flex-direction: row; align-items: center; gap: 7px; color: #fff; font-size: 13px; font-weight: 800; }

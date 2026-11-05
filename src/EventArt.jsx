@@ -359,7 +359,7 @@ export function AnnouncementArt({ title = "", body = "", picture = "ai", seed = 
   if (picture === "none") return null;
   const theme = themeFor(`${title} ${body}`);
   const r = seeded(pictureSeed(title, seed));
-  const showAi = picture === "ai" && aiImage;
+  const showAi = (picture === "ai" || picture === "photo") && aiImage;
   const [top, bottom] = theme?.sky || ["#efe6d2", "#e3d6bb"];
   const gradientId = `sky-${artId}`;
   return (
@@ -373,7 +373,7 @@ export function AnnouncementArt({ title = "", body = "", picture = "ai", seed = 
         </> : abstractScene(r)}
       </svg>
       {showAi && <img className="event-art-ai" src={aiImage} alt="" />}
-      {showAi && <figcaption>AI picture</figcaption>}
+      {showAi && picture === "ai" && <figcaption>AI picture</figcaption>}
     </figure>
   );
 }
