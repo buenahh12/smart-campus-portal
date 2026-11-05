@@ -53,3 +53,6 @@
   .siibot-launcher > span { display: none; }
 }
 
+
+/* The search message sits right under "Where do you want to go?", above the box, so the keyboard or a popup can't hide it. */
+.ss-search > .ss-field-error { margin: 0 0 10px; }

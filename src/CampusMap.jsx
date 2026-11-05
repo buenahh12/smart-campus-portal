@@ -50,6 +50,18 @@ function wrap(text, maxChars) {
 const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
 
 // Door opening on the room wall: a gap in the wall plus the swing of the door leaf.
+// Stairs are open to the hallway, as on the posted plans: no wall along the side you walk in.
+// (A door on the long side of a stairwell is a normal doorway in a wall, so it keeps a plain gap.)
+function stairOpening(rect, door) {
+  const [x, y, w, h] = rect;
+  const [dx, dy] = door;
+  const near = (a, b) => Math.abs(a - b) < 0.01;
+  if ((near(dy, y) || near(dy, y + h)) && w <= h) return { gap: `M${x + 0.3} ${dy} L${x + w - 0.3} ${dy}` };
+  if ((near(dx, x) || near(dx, x + w)) && h <= w + 1) return { gap: `M${dx} ${y + 0.3} L${dx} ${y + h - 0.3}` };
+  const shape = doorShape(rect, door);
+  return shape && { gap: shape.gap };
+}
+
 function doorShape(rect, door) {
   const [x, y, w, h] = rect;
   const [dx, dy] = door;
@@ -364,7 +376,7 @@ function FloorPlan2D({ plan, route, startKey, destKey, selectedKey, blocked, onP
         </g>
         <g className="plan-doors">
           {solidRooms.filter((item) => item.door).map((item) => {
-            const shape = doorShape(item.rect, item.door);
+            const shape = item.type === "stairs" ? stairOpening(item.rect, item.door) : doorShape(item.rect, item.door);
             if (!shape) return null;
             return <g key={item.id} className={item.type === "exit" ? "exit" : undefined}>
               <path d={shape.gap} className="plan-door-gap" />

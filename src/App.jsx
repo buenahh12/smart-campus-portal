@@ -756,6 +756,14 @@ export default function App() {
   const [where, setWhere] = useState("");
   const [whereError, setWhereError] = useState("");
   const [whereSuggestions, setWhereSuggestions] = useState([]);
+  const [whereNudge, setWhereNudge] = useState(0);
+  const searchForm = useRef(null);
+  // A problem with the search: say so, shake the box (every time), and bring the message into view.
+  const searchProblem = (message) => {
+    setWhereError(message);
+    setWhereNudge((count) => count + 1);
+    requestAnimationFrame(() => searchForm.current?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  };
   const [scrolled, setScrolled] = useState(false);
   useReveal();
   useEffect(() => {
@@ -788,7 +796,7 @@ export default function App() {
     const query = where.trim();
     setWhereSuggestions([]);
     if (!query) {
-      setWhereError("Type where you want to go, like clinic, CR or 204. Or tap a place below.");
+      searchProblem("You didn’t type anything yet. Type where you want to go, like clinic, CR or 204, or tap a place below.");
       return;
     }
     const lower = query.toLowerCase();
@@ -807,7 +815,7 @@ export default function App() {
       setWhereError(`Did you mean one of these?`);
       return;
     }
-    setWhereError(`We couldn’t find “${query}” in the building. Try a room number like 204, or tap a place below.`);
+    searchProblem(`We couldn’t find “${query}” in the building. Try a room number like 204, or tap a place below.`);
   };
 
   const handleSignOut = async () => {
@@ -871,16 +879,15 @@ export default function App() {
               <p className="ss-overline" data-reveal style={{ "--delay": "0ms" }}>// Main Academic Building · Imus, Cavite</p>
               <h1 id="ss-hero-title" className="ss-display" data-reveal style={{ "--delay": "80ms" }}><span>Find any room</span> <span className="t-outline">at Saint Simon</span> <span className="t-stripe">of Cyrene Academy</span></h1>
               <p className="ss-lead" data-reveal style={{ "--delay": "160ms" }}>Type a room or tap a place. We&apos;ll show you the way, step by step.</p>
-              <form className={`ss-search ${whereError ? "has-error" : ""}`} onSubmit={submitWhere} role="search" data-reveal style={{ "--delay": "240ms" }}>
+              <form ref={searchForm} className={`ss-search ${whereError ? "has-error" : ""}`} onSubmit={submitWhere} role="search" data-reveal style={{ "--delay": "240ms" }}>
                 <label htmlFor="ss-where">Where do you want to go?</label>
-                <div className="ss-search-row">
+                {whereError && !whereSuggestions.length && <p id="ss-where-error" className="ss-field-error" role="alert">{whereError}</p>}
+                <div className="ss-search-row" key={whereNudge}>
                   <input id="ss-where" list="ss-places" value={where} onChange={(event) => { setWhere(event.target.value); setWhereError(""); setWhereSuggestions([]); }} placeholder="Try: clinic, CR, 204, library" autoComplete="off" enterKeyHint="go" aria-describedby={whereError ? "ss-where-error" : undefined} aria-invalid={Boolean(whereError && !whereSuggestions.length)} />
                   <button type="submit" className="ss-btn ss-btn-primary">Show me the way</button>
                 </div>
                 <datalist id="ss-places">{mappedPlaces().map((item) => <option key={item.key} value={placeTitle(item)} />)}</datalist>
-                {whereError && (whereSuggestions.length
-                  ? <p id="ss-where-error" className="ss-field-hint" role="status">{whereError}</p>
-                  : <p id="ss-where-error" className="ss-field-error" role="alert">{whereError}</p>)}
+                {whereError && whereSuggestions.length > 0 && <p id="ss-where-error" className="ss-field-hint" role="status">{whereError}</p>}
                 {whereSuggestions.length > 0 && <div className="ss-suggestions">
                   {whereSuggestions.map((key) => placeByKey(key)).map((item) => <button key={item.key} type="button" onClick={() => setMapState({ destination: item.key, floor: item.floor })}>
                     <b>{placeTitle(item)}</b><small>{planFloorLabel(item.floor)}</small>
