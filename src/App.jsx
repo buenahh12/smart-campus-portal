@@ -957,7 +957,7 @@ export default function App() {
                 <div className="dollhouse-actions">
                   <button type="button" onClick={() => setArOpen(true)}><Icon name="scan" size={16} /> Start AR live view</button>
                 </div>
-                <p className="ar-app-note">Uses your phone&apos;s camera. Works best in Chrome on Android. Prefer an app? <a href={AR_APP_URL} target="_blank" rel="noopener noreferrer">Get the Android AR app</a> by Jan Lawrence Cambaya Florido.</p>
+                <p className="ar-app-note">Uses your phone&apos;s camera. Works best in Chrome on Android. Prefer an app? <a href={AR_APP_URL} target="_blank" rel="noopener noreferrer">Get the Android AR app</a>.</p>
               </article>
               <article className="ss-way">
                 <span className="ss-way-icon" aria-hidden="true"><Icon name="bot" size={26} /></span>
