@@ -148,7 +148,7 @@ function UStair({ item, floor }) {
   const below = FLOORS.find((entry) => entry.building === plan?.building && entry.level === plan.level - 1);
   const down = Boolean(below?.rooms.some((room) => room.stair === item.stair));
   // Short stairwells side-on to the hallway: the label goes just outside, in the hallway, as on the plans.
-  const [lx, ly] = vertical ? at(entry / 2, width * 0.27) : at(-3.9, middle); // beside the route line, not under it
+  const [lx, ly] = vertical ? at(entry / 2, width * 0.22) : at(-3.9, middle); // beside the route line, not under it
   return <g className="plan-ustair">
     <path d={treads.join(" ")} className="plan-treads" />
     <polyline points={line([[entry - 0.6, middle], [turn, middle]])} className="plan-ustair-wall" />
@@ -443,11 +443,26 @@ function FloorPlan2D({ plan, route, startKey, destKey, selectedKey, blocked, onP
         {dest?.floor === floor && (() => {
           const node = graphNode(`${floor}:door:${dest.id}`) || graphNode(dest.key);
           return <g className={`plan-pin ${dest.type === "exit" ? "exit" : ""}`} transform={`translate(${node.x} ${node.y})`}>
-            {/* A bright pin that hops over its shadow, so the destination is easy to spot. */}
-            <ellipse cy="0.9" rx="2.4" ry="0.6" className="plan-pin-shadow" />
-            <g className="plan-pin-body">
-              <path d="M0 -0.2 L-2.75 -2.9 A3.8 3.8 0 1 1 2.75 -2.9 Z" />
-              <circle cy="-5.5" r="2.05" />
+            {/* A small glossy pin that hops over its shadow, so the destination is easy to spot. */}
+            <defs>
+              <radialGradient id="plan-pin-shade" cx="0.35" cy="0.3" r="0.85">
+                <stop offset="0" className="pin-light" />
+                <stop offset="0.55" className="pin-mid" />
+                <stop offset="1" className="pin-dark" />
+              </radialGradient>
+              <radialGradient id="plan-pin-hole" cx="0.5" cy="0.35" r="0.7">
+                <stop offset="0.6" stopColor="#ffffff" />
+                <stop offset="1" stopColor="#dfe8e3" />
+              </radialGradient>
+              <filter id="plan-pin-blur" x="-50%" y="-200%" width="200%" height="500%"><feGaussianBlur stdDeviation="0.25" /></filter>
+            </defs>
+            <g transform="scale(0.62)">
+              <ellipse cy="0.9" rx="2.5" ry="0.7" className="plan-pin-shadow" filter="url(#plan-pin-blur)" />
+              <g className="plan-pin-body">
+                <path d="M0 -0.2 L-2.75 -2.9 A3.8 3.8 0 1 1 2.75 -2.9 Z" fill="url(#plan-pin-shade)" />
+                <ellipse cx="-1.35" cy="-7.2" rx="1.15" ry="0.6" transform="rotate(-35 -1.35 -7.2)" className="plan-pin-gloss" />
+                <circle cy="-5.5" r="1.95" fill="url(#plan-pin-hole)" className="plan-pin-hole" />
+              </g>
             </g>
           </g>;
         })()}
