@@ -179,13 +179,17 @@ const exitCount = () => PLACES.filter((item) => item.type === "exit").length;
 const mainFloors = () => FLOORS.filter((plan) => plan.building === BUILDING_NAME).map((plan) => plan.floor);
 // Big picture buttons on the home page for the places people look for most. "CR" opens the
 // one nearest to where the person said they are (searchPlace), and "Way out" the nearest exit.
+// The place buttons under the search box. Each kind of place has its own colour (tone), so young
+// learners can spot "the pink one" for the clinic.
 const QUICK_PLACES = [
-  { label: "Clinic", icon: "heart", search: "clinic" },
-  { label: "CR", hint: "Comfort room", icon: "restroom", search: "cr" },
-  { label: "Library", icon: "book", search: "library" },
-  { label: "Guidance", icon: "chat", search: "guidance" },
-  { label: "Computer Room", icon: "monitor", search: "computer" },
-  { label: "Way out", hint: "Nearest exit", icon: "door", exit: true },
+  { label: "Clinic", hint: "Feeling sick?", icon: "heart", search: "clinic", tone: "pink" },
+  { label: "CR", hint: "Comfort room", icon: "restroom", search: "cr", tone: "blue" },
+  { label: "Library", hint: "Books & reading", icon: "book", search: "library", tone: "yellow" },
+  { label: "Guidance", hint: "Talk to someone", icon: "chat", search: "guidance", tone: "purple" },
+  { label: "Computer Room", hint: "Computer class", icon: "monitor", search: "computer", tone: "sky" },
+  { label: "Director's Office", hint: "School head", icon: "building", search: "director", tone: "orange" },
+  { label: "Faculty", hint: "Teachers' room", icon: "info", search: "faculty", tone: "lime" },
+  { label: "Way out", hint: "Nearest exit", icon: "door", exit: true, tone: "red" },
 ];
 // School location. Google Maps finds the school by name, so no exact coordinates are hard-coded.
 const SCHOOL_MAP_QUERY = "Saint Simon of Cyrene Academy, Carsadang Bago II, Imus, Cavite";
@@ -883,6 +887,13 @@ export default function App() {
   const openAdminLogin = () => setAdminLoginOpen(true);
   const navigateTo = (sectionId) => document.querySelector(`#${sectionId}`)?.scrollIntoView({ behavior: "smooth" });
 
+  // One tap from a place button: open the floor plan with the route there.
+  const goToPlace = (item) => {
+    const found = item.exit ? { exit: true } : searchPlace(item.search, savedStart());
+    if (found?.exit) setMapState({ emergency: true });
+    else if (found?.key) setMapState({ destination: found.key, floor: placeByKey(found.key).floor });
+  };
+
   const submitWhere = (event) => {
     event.preventDefault();
     const query = where.trim();
@@ -989,11 +1000,7 @@ export default function App() {
               <div className="ss-quick" data-reveal style={{ "--delay": "320ms" }}>
                 <p id="ss-quick-label">Or tap a place:</p>
                 <div className="ss-quick-grid" role="group" aria-labelledby="ss-quick-label">
-                  {QUICK_PLACES.map((item) => <button key={item.label} type="button" className={item.exit ? "is-exit" : ""} onClick={() => {
-                    const found = item.exit ? { exit: true } : searchPlace(item.search, savedStart());
-                    if (found?.exit) setMapState({ emergency: true });
-                    else if (found?.key) setMapState({ destination: found.key, floor: placeByKey(found.key).floor });
-                  }}>
+                  {QUICK_PLACES.map((item) => <button key={item.label} type="button" className={`tone-${item.tone} ${item.exit ? "is-exit" : ""}`} onClick={() => goToPlace(item)}>
                     <span className="ss-quick-icon" aria-hidden="true"><Icon name={item.icon} size={24} /></span>
                     <span><b>{item.label}</b>{item.hint && <small>{item.hint}</small>}</span>
                   </button>)}
@@ -1009,6 +1016,35 @@ export default function App() {
               { label: "Exits & fire stairs", value: exitCount() },
               { label: "Office hours", text: "Mon–Fri, 7 AM–5 PM" },
             ]} />
+          </div>
+        </section>
+
+        <section className="ss-section ss-start" id="start" aria-labelledby="ss-start-title">
+          <div className="ss-container">
+            <div className="ss-section-head" data-reveal>
+              <h2 id="ss-start-title" className="ss-display"><span>Finding your way</span> <span className="t-outline">is easy</span></h2>
+              <p>Three steps, for everyone from Grade 1 to Grade 12, parents and visitors. You don&apos;t need an account.</p>
+            </div>
+            <ol className="ss-steps" data-reveal>
+              <li className="tone-yellow"><span className="ss-step-number">1</span><span className="ss-step-icon" aria-hidden="true"><Icon name="location" size={28} /></span><h3>Pick a place</h3><p>Type a room like <b>204</b>, or tap a button like <b>Clinic</b>.</p></li>
+              <li className="tone-lime"><span className="ss-step-number">2</span><span className="ss-step-icon" aria-hidden="true"><Icon name="route" size={28} /></span><h3>Follow the green line</h3><p>The map draws your path, floor by floor, and tells you which stairs to take.</p></li>
+              <li className="tone-sky"><span className="ss-step-number">3</span><span className="ss-step-icon" aria-hidden="true"><Icon name="heart" size={28} /></span><h3>You&apos;re there!</h3><p>Look for the bouncing pin. Still lost? Ask SiBot or a teacher.</p></li>
+            </ol>
+            <aside className="ss-visitors" aria-labelledby="ss-visitors-title" data-reveal>
+              <div className="ss-visitors-head">
+                <span className="ss-step-icon" aria-hidden="true"><Icon name="info" size={26} /></span>
+                <div><p className="kicker">For parents and visitors</p><h3 id="ss-visitors-title">First time here?</h3></div>
+              </div>
+              <ul>
+                <li><b>Come in</b> through the main entrance of the Main Academic Building, on N.I.A. Road.</li>
+                <li><b>Offices are open</b> Monday to Friday, 7:00 AM to 5:00 PM.</li>
+                <li><b>In an emergency,</b> tap <b>Way out</b> and follow the line to the nearest exit.</li>
+              </ul>
+              <p className="ss-visitors-label">Show me the way to:</p>
+              <div className="ss-visitors-actions">
+                {QUICK_PLACES.filter((item) => ["Director's Office", "Guidance", "Clinic", "CR"].includes(item.label)).map((item) => <button key={item.label} type="button" className={`tone-${item.tone}`} onClick={() => goToPlace(item)}><Icon name={item.icon} size={18} /> {item.label}</button>)}
+              </div>
+            </aside>
           </div>
         </section>
 

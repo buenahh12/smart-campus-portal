@@ -139,7 +139,10 @@ export function searchPlace(query, fromKey = '') {
   }).filter((item) => item.total > 0);
   if (!scored.length) return null;
 
-  scored.sort((a, b) => b.matched - a.matched || b.total - a.total
+  // A C.R. loses a tie unless they asked for one ("faculty" should find the faculty room, not its C.R.).
+  const wantsCr = words.some((word) => canonical.get(word) === "cr");
+  const crLast = (item) => Number(!wantsCr && item.place.type === "cr");
+  scored.sort((a, b) => b.matched - a.matched || b.total - a.total || crLast(a) - crLast(b)
     || Number(b.place.floor === from?.floor) - Number(a.place.floor === from?.floor)
     || a.place.floor - b.place.floor
     || placeTitle(a.place).length - placeTitle(b.place).length);

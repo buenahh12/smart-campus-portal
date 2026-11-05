@@ -104,3 +104,52 @@
 
 /* SiBot: bubbles keep their full height (the list scrolls) instead of being squeezed into each other. */
 .siibot-conversation > .siibot-message { flex-shrink: 0; }
+
+/* ---------- School-friendly colours ----------
+   Each kind of place has a bright tone, taken from the school's lime green and yellow, so young
+   learners can recognise buttons by colour as well as by word. */
+.tone-pink { --tone: #ff8fb1; --tone-ink: #5a1030; }
+.tone-blue { --tone: #7cc4ff; --tone-ink: #0c3557; }
+.tone-yellow { --tone: #ffd45c; --tone-ink: #4a3500; }
+.tone-purple { --tone: #c3a6ff; --tone-ink: #2f1660; }
+.tone-sky { --tone: #8fe3e0; --tone-ink: #0b4442; }
+.tone-orange { --tone: #ffb36b; --tone-ink: #5a2a00; }
+.tone-lime { --tone: #b8ec6b; --tone-ink: #234300; }
+.tone-red { --tone: #ff7a6b; --tone-ink: #5c0d06; }
+
+/* Place buttons: a coloured icon bubble, the name, and a short hint. */
+.ss-quick-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ss-quick-grid button { flex-direction: column; align-items: flex-start; gap: 8px; min-height: 104px; padding: 14px; border-color: rgba(246, 239, 225, .22); background: rgba(246, 239, 225, .06); text-align: left; transition: transform .15s ease, border-color .15s ease, background .15s ease; }
+.ss-quick-grid button:hover, .ss-quick-grid button:focus-visible { transform: translateY(-2px); border-color: var(--tone); background: rgba(246, 239, 225, .12); }
+.ss-quick-grid .ss-quick-icon, .ss-quick-grid .is-exit .ss-quick-icon { width: 46px; height: 46px; color: var(--tone-ink); background: var(--tone); box-shadow: 0 6px 16px rgba(0, 0, 0, .18); }
+.ss-quick-grid b { font-size: 16.5px; }
+@media (max-width: 1100px) { .ss-quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ss-quick-grid button { flex-direction: row; align-items: center; min-height: 72px; } }
+
+/* "Finding your way is easy": three big numbered steps, then the card for visitors. */
+.ss-start { padding-top: 110px; background: radial-gradient(90% 60% at 10% 0%, rgba(184, 236, 107, .28), rgba(184, 236, 107, 0) 60%), radial-gradient(70% 50% at 100% 100%, rgba(255, 212, 92, .28), rgba(255, 212, 92, 0) 60%), var(--paper, #f5efe2); }
+.ss-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin: 28px 0 0; padding: 0; list-style: none; counter-reset: none; }
+.ss-steps li { position: relative; display: grid; gap: 10px; align-content: start; padding: 26px 22px 24px; border: 2px solid color-mix(in srgb, var(--tone) 70%, transparent); border-radius: 22px; background: #fffcf5; box-shadow: 0 10px 26px rgba(31, 74, 53, .08); }
+.ss-step-number { position: absolute; top: -18px; left: 20px; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; color: var(--tone-ink); background: var(--tone); font-family: var(--display, inherit); font-size: 22px; font-weight: 900; box-shadow: 0 4px 0 color-mix(in srgb, var(--tone-ink) 35%, transparent); }
+.ss-step-icon { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 16px; color: var(--tone-ink, #1f4a35); background: color-mix(in srgb, var(--tone, #b8ec6b) 35%, #fff); }
+.ss-steps h3 { margin: 4px 0 0; color: var(--forest, #1f4a35); font-size: 22px; }
+.ss-steps p { margin: 0; color: var(--ink-2, #3c4a3f); font-size: 17px; line-height: 1.5; }
+.ss-visitors { --tone: #ffd45c; --tone-ink: #4a3500; margin-top: 26px; padding: 24px; border-radius: 22px; color: var(--cream, #f6efe1); background: linear-gradient(135deg, #1f4a35 0%, #2f6b4c 100%); box-shadow: 0 18px 40px rgba(31, 74, 53, .22); }
+.ss-visitors-head { display: flex; align-items: center; gap: 14px; }
+.ss-visitors .kicker { margin: 0; color: var(--tone); }
+.ss-visitors h3 { margin: 2px 0 0; font-size: 26px; }
+.ss-visitors ul { display: grid; gap: 10px; margin: 18px 0 0; padding: 0; list-style: none; }
+.ss-visitors li { position: relative; padding-left: 28px; font-size: 17px; line-height: 1.5; }
+.ss-visitors li::before { content: ""; position: absolute; top: .45em; left: 4px; width: 12px; height: 12px; border-radius: 50%; background: var(--tone); }
+.ss-visitors-label { margin: 20px 0 10px; font-weight: 700; }
+.ss-visitors-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.ss-visitors-actions button { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 18px; border: 0; border-radius: 999px; color: var(--tone-ink); background: var(--tone); font-size: 16px; font-weight: 800; transition: transform .15s ease; }
+.ss-visitors-actions button:hover, .ss-visitors-actions button:focus-visible { transform: translateY(-2px); }
+@media (max-width: 760px) {
+  .ss-start { padding-top: 96px; }
+  .ss-steps { grid-template-columns: 1fr; gap: 26px; }
+  .ss-steps li { grid-template-columns: auto 1fr; column-gap: 14px; padding: 24px 18px 20px; }
+  .ss-steps li .ss-step-icon { grid-row: span 2; }
+  .ss-visitors { padding: 20px 18px; }
+  .ss-visitors-actions button { flex: 1 1 calc(50% - 10px); justify-content: center; }
+}
+@media (prefers-reduced-motion: reduce) { .ss-quick-grid button, .ss-visitors-actions button { transition: none; } }

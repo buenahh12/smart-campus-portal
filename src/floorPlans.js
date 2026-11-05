@@ -153,7 +153,7 @@ const BUILT_IN_FLOORS = [
       room("room-310", "Grade 8 Moonstone", "Room 310", "classroom", [47, 76, 39, 24], [50, 76], { extraDoors: [[83, 76]] }),
       room("room-309", "Grade 7 Crystal", "Room 309", "classroom", [86, 76, 38, 24], [89, 76], { extraDoors: [[120, 76]] }),
       room("faculty-elem", "Faculty (Elementary)", "", "office", [124, 76, 36, 24], [127, 76]),
-      room("cr-3e", "Faculty C.R.", "", "cr", [148, 76, 12, 6], [148, 79]),
+      room("cr-3e", "Staff C.R.", "", "cr", [148, 76, 12, 6], [148, 79]),
       room("void-3", "Open to below", "", "void", [47, 31, 78, 35], null),
     ],
   },
