@@ -173,44 +173,92 @@
 @media (max-width: 480px) { .account-grade, .mc-grade { grid-template-columns: 1fr; } }
 .mc-grade .mc-field input { box-sizing: border-box; width: 100%; min-height: 42px; padding: 0 14px; border: 1px solid var(--line-strong, #d8cbb3); border-radius: 12px; color: #123525; background: #fbfffc; font: inherit; font-size: 16px; }
 
-/* ---------- My Campus: warm and textured, a colour per card ----------
-   The same paper, grain and school colours as the home page. Motion is kept small: the cards fade
-   up once when My Campus opens, and nothing moves when the device asks for reduced motion. */
-body .student-portal-shell { background: radial-gradient(70% 45% at 0% 0%, rgba(184, 236, 107, .22), rgba(184, 236, 107, 0) 60%), radial-gradient(60% 40% at 100% 100%, rgba(255, 212, 92, .22), rgba(255, 212, 92, 0) 60%), var(--paper, #f5efe2) var(--grain); }
-body .student-portal-shell .student-portal-header { background: rgba(251, 247, 238, .94); }
-body .student-portal-shell .student-welcome { position: relative; overflow: hidden; padding: 28px 30px; border-radius: 26px; color: var(--cream, #f6efe1); background: radial-gradient(90% 120% at 0% 0%, rgba(63, 174, 116, .35), rgba(63, 174, 116, 0) 60%), radial-gradient(70% 90% at 100% 100%, rgba(240, 199, 154, .30), rgba(240, 199, 154, 0) 60%), linear-gradient(150deg, #1f4a35 0%, #163828 100%); box-shadow: 0 22px 50px rgba(20, 45, 30, .25); }
-body .student-portal-shell .student-welcome::after { content: ""; position: absolute; inset: 0; background: var(--grain-light, none); opacity: .5; pointer-events: none; }
-body .student-portal-shell .student-welcome > * { position: relative; z-index: 1; }
-body .student-portal-shell .student-welcome .kicker { color: var(--peach, #f1c39a); }
-body .student-portal-shell .student-welcome h1 { color: #fffaf0; }
-body .student-portal-shell .student-welcome p { color: rgba(246, 239, 225, .85); }
-body .student-portal-shell .mc-grade-chip { display: inline-flex; align-items: center; gap: 6px; margin: 6px 0 4px; padding: 6px 12px; border-radius: 999px; color: #4a3500; background: #ffd45c; font-size: 15px; font-weight: 800; }
-body .student-portal-shell .student-welcome .checkin-card { border: 0; background: #fbf7ee; box-shadow: 0 10px 24px rgba(0, 0, 0, .18); }
 
-body .student-portal-shell .student-card { position: relative; overflow: hidden; border: 1.5px solid color-mix(in srgb, var(--tone, #b8ec6b) 55%, #e6dcc6); border-radius: 22px; background: #fffcf5 var(--grain-light, none); box-shadow: 0 12px 28px rgba(60, 45, 20, .08); }
-body .student-portal-shell .student-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 6px; background: var(--tone, #b8ec6b); }
-body .student-portal-shell .student-card .student-card-heading { align-items: center; gap: 12px; }
-body .student-portal-shell .mc-card-icon { display: grid; flex: none; place-items: center; width: 46px; height: 46px; border-radius: 15px; color: var(--tone-ink, #1f4a35); background: var(--tone, #b8ec6b); box-shadow: 0 6px 14px color-mix(in srgb, var(--tone, #b8ec6b) 45%, transparent); }
-body .student-portal-shell .student-card .student-card-heading > div { flex: 1; min-width: 0; }
-body .student-portal-shell .student-card .kicker { color: #8a5a34; }
-body .student-portal-shell .mc-place { border: 1px solid #eadfca; border-left: 5px solid var(--tone, #b8ec6b); border-radius: 16px; background: #fffaf0; transition: transform .15s ease, box-shadow .15s ease; }
-body .student-portal-shell .mc-place:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(60, 45, 20, .10); }
-body .student-portal-shell .mc-place-actions button { border-radius: 999px; background: #fff; }
-body .student-portal-shell .mc-place-actions button.saved { color: var(--tone-ink, #234300); border-color: var(--tone, #b8ec6b); background: var(--tone, #b8ec6b); }
-body .student-portal-shell .mc-my-classroom { border: 1.5px dashed #c79d6f; }
-body .student-portal-shell .student-card .directory-search { border-radius: 14px; background: #fffaf0; }
-body .student-portal-shell .mc-toggle { border-radius: 16px; background: #fffaf0; }
-body .student-portal-shell .student-dashboard-grid > .student-card { animation: mc-in .45s ease both; }
-body .student-portal-shell .student-dashboard-grid > .student-card:nth-child(2) { animation-delay: .05s; }
-body .student-portal-shell .student-dashboard-grid > .student-card:nth-child(3) { animation-delay: .1s; }
-body .student-portal-shell .student-dashboard-grid > .student-card:nth-child(4) { animation-delay: .15s; }
-body .student-portal-shell .student-dashboard-grid > .student-card:nth-child(5) { animation-delay: .2s; }
-@keyframes mc-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-@media (max-width: 760px) { body .student-portal-shell .student-welcome { padding: 22px 20px; border-radius: 22px; } }
-@media (prefers-reduced-motion: reduce) { body .student-portal-shell .student-dashboard-grid > .student-card { animation: none; } body .student-portal-shell .mc-place { transition: none; } body .student-portal-shell .mc-place:hover { transform: none; } }
-body .student-portal-shell .student-welcome > div > p:not(.kicker) { color: rgba(250, 244, 232, .9); font-weight: 500; }
 /* Announcements: the "Choose a photo" button (a label around a hidden file input). */
 .cms-photo-pick { position: relative; cursor: pointer; }
 .cms-photo-pick input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .cms-photo-pick:focus-within { outline: 2px solid #10b95c; outline-offset: 2px; }
 .cms-form label.cms-photo-pick, label.cms-photo-pick { display: inline-flex; flex-direction: row; align-items: center; gap: 7px; color: #fff; font-size: 13px; font-weight: 800; }
+
+/* ---------- My Campus: calm and natural ----------
+   Cream paper, olive green and terracotta (the school's green, softened), serif headings with an
+   italic word, an organic curved banner with leaf line drawings, and thin outlined icons. Text
+   stays large and high-contrast for young learners; the only motion is a gentle fade-up on open. */
+body .student-portal-shell {
+  --mc-paper: #f4ede1; --mc-sand: #e9dcc6; --mc-card: #fbf6ec; --mc-line: #e2d4bb;
+  --mc-olive: #5d6b43; --mc-olive-deep: #45512f; --mc-terracotta: #b5653c; --mc-ink: #33372a; --mc-muted: #6c6656;
+  --mc-serif: "Cormorant Garamond", "Georgia", serif;
+  color: var(--mc-ink);
+  background: radial-gradient(60% 40% at 100% 0%, rgba(181, 101, 60, .10), rgba(181, 101, 60, 0) 60%), radial-gradient(60% 40% at 0% 100%, rgba(93, 107, 67, .12), rgba(93, 107, 67, 0) 60%), var(--mc-paper) var(--grain);
+}
+body .student-portal-shell .student-portal-header { border-bottom: 1px solid var(--mc-line); background: rgba(244, 237, 225, .94); }
+body .student-portal-shell .student-portal-brand b { color: var(--mc-olive-deep); }
+
+/* The banner: olive, with a soft wavy bottom edge and leaves drawn in thin cream lines. */
+body .student-portal-shell .student-welcome { position: relative; overflow: hidden; padding: 34px 36px 54px; border-radius: 34px 34px 46% 54% / 34px 34px 46px 60px; color: #f7f0e2; background: radial-gradient(80% 120% at 100% 0%, rgba(255, 255, 255, .10), rgba(255, 255, 255, 0) 55%), linear-gradient(160deg, #66754a 0%, var(--mc-olive-deep) 100%); box-shadow: 0 24px 50px rgba(69, 81, 47, .22); }
+body .student-portal-shell .student-welcome::after { content: ""; position: absolute; inset: 0; background: var(--grain-light, none); opacity: .45; pointer-events: none; }
+body .student-portal-shell .student-welcome > * { position: relative; z-index: 1; }
+body .student-portal-shell .mc-leaf { position: absolute; z-index: 0; right: 30%; bottom: -30px; width: 150px; height: 210px; fill: none; stroke: rgba(247, 240, 226, .35); stroke-width: 1.4; stroke-linecap: round; transform: rotate(-12deg); pointer-events: none; }
+body .student-portal-shell .student-welcome .kicker { color: #e8d3ad; letter-spacing: .18em; }
+body .student-portal-shell .student-welcome h1 { margin: 6px 0 8px; color: #fbf5ea; font-family: var(--mc-serif); font-size: clamp(42px, 6vw, 64px); font-weight: 600; letter-spacing: 0; line-height: 1; }
+body .student-portal-shell .student-welcome h1 em { color: #f1d7b0; font-style: italic; font-weight: 500; }
+body .student-portal-shell .student-welcome > div > p:not(.kicker) { max-width: 32em; color: rgba(251, 245, 234, .9); font-size: 17px; font-weight: 500; }
+body .student-portal-shell .mc-grade-chip { display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 6px; padding: 6px 14px; border: 1px solid rgba(247, 240, 226, .5); border-radius: 999px; color: #fbf5ea; background: rgba(247, 240, 226, .14); font-size: 15px; font-weight: 700; }
+body .student-portal-shell .student-welcome .checkin-card { border: 1px solid var(--mc-line); border-radius: 22px; background: var(--mc-card); box-shadow: 0 12px 28px rgba(40, 40, 20, .18); }
+body .student-portal-shell .student-welcome .checkin-card small { color: var(--mc-olive); }
+body .student-portal-shell .student-welcome .checkin-card b { color: var(--mc-ink); }
+
+/* Cards: soft paper with a hairline border, a thin outlined icon, a small-caps kicker with a leaf. */
+body .student-portal-shell .tone-lime { --tone: #5d6b43; }
+body .student-portal-shell .tone-orange { --tone: #b5653c; }
+body .student-portal-shell .tone-yellow { --tone: #a5803f; }
+body .student-portal-shell .tone-sky { --tone: #6f8a7a; }
+body .student-portal-shell .tone-purple { --tone: #8a6a78; }
+body .student-portal-shell .student-card { position: relative; overflow: hidden; border: 1px solid var(--mc-line); border-radius: 30px; background: var(--mc-card) var(--grain-light, none); box-shadow: 0 1px 0 rgba(255, 255, 255, .7) inset, 0 16px 34px rgba(70, 60, 30, .07); }
+body .student-portal-shell .student-card::before { content: none; }
+body .student-portal-shell .student-card .student-card-heading { align-items: center; gap: 14px; }
+body .student-portal-shell .student-card .student-card-heading > div { flex: 1; min-width: 0; }
+body .student-portal-shell .mc-card-icon { display: grid; flex: none; place-items: center; width: 52px; height: 52px; border: 1.5px solid var(--tone); border-radius: 50%; color: var(--tone); background: color-mix(in srgb, var(--tone) 8%, var(--mc-card)); box-shadow: none; }
+body .student-portal-shell .student-card .kicker { display: inline-flex; align-items: center; gap: 8px; color: var(--tone); font-size: 12px; letter-spacing: .2em; }
+body .student-portal-shell .student-card .kicker::after { content: ""; width: 14px; height: 14px; background: currentColor; opacity: .7; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 20C4 11 10 5 20 4c-1 10-7 16-16 16Zm0 0L13 11' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 20C4 11 10 5 20 4c-1 10-7 16-16 16Zm0 0L13 11' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat; }
+body .student-portal-shell .student-card h2 { color: var(--mc-ink); font-family: var(--mc-serif); font-size: clamp(28px, 3vw, 34px); font-weight: 600; letter-spacing: 0; line-height: 1.05; }
+body .student-portal-shell .student-card p, body .student-portal-shell .updates-empty { color: var(--mc-muted); }
+body .student-portal-shell .pending-badge { border: 1px solid var(--mc-line); border-radius: 999px; color: var(--mc-olive-deep); background: var(--mc-paper); }
+
+/* Inputs and buttons: rounded, cream, olive when focused or chosen. */
+body .student-portal-shell .directory-search, body .student-portal-shell .mc-field select, body .student-portal-shell .mc-grade .mc-field input { min-height: 50px; border: 1px solid var(--mc-line); border-radius: 999px; color: var(--mc-ink); background: #fffdf7; padding: 0 20px; font-size: 16px; }
+body .student-portal-shell .directory-search:focus, body .student-portal-shell .mc-field select:focus, body .student-portal-shell .mc-grade .mc-field input:focus { outline: none; border-color: var(--mc-olive); box-shadow: 0 0 0 4px rgba(93, 107, 67, .16); }
+body .student-portal-shell .mc-field { color: var(--mc-olive-deep); font-size: 13px; }
+body .student-portal-shell .mc-toggle { border: 1px solid var(--mc-line); border-radius: 22px; background: #fffdf7; }
+body .student-portal-shell .mc-toggle b { color: var(--mc-ink); }
+body .student-portal-shell .mc-toggle input { accent-color: var(--mc-olive); }
+
+/* Room rows: a soft rounded slip with an olive edge; buttons are pills. */
+body .student-portal-shell .mc-place { border: 1px solid var(--mc-line); border-radius: 24px; background: #fffdf7; transition: transform .15s ease, box-shadow .15s ease; }
+body .student-portal-shell .mc-place:hover { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(70, 60, 30, .08); }
+body .student-portal-shell .mc-place-info b { color: var(--mc-ink); font-family: var(--mc-serif); font-size: 22px; font-weight: 600; }
+body .student-portal-shell .mc-place-actions button { min-height: 42px; border: 1px solid var(--mc-line); border-radius: 999px; color: var(--mc-olive-deep); background: var(--mc-card); font-weight: 700; }
+body .student-portal-shell .mc-place-actions button:hover { border-color: var(--mc-olive); }
+body .student-portal-shell .mc-place-actions button:first-child { border-color: var(--mc-olive); color: #fbf5ea; background: var(--mc-olive); }
+body .student-portal-shell .mc-place-actions button.saved { border-color: var(--mc-terracotta); color: #fff8ef; background: var(--mc-terracotta); }
+body .student-portal-shell .mc-my-classroom { border: 1px dashed var(--mc-terracotta); border-radius: 26px; background: color-mix(in srgb, var(--mc-terracotta) 7%, var(--mc-card)); }
+body .student-portal-shell .mc-my-classroom .kicker { color: var(--mc-terracotta); }
+
+body .student-portal-shell .student-dashboard-grid > .student-card { animation: mc-in .5s ease both; }
+body .student-portal-shell .student-dashboard-grid > .student-card:nth-child(2) { animation-delay: .06s; }
+body .student-portal-shell .student-dashboard-grid > .student-card:nth-child(3) { animation-delay: .12s; }
+body .student-portal-shell .student-dashboard-grid > .student-card:nth-child(4) { animation-delay: .18s; }
+body .student-portal-shell .student-dashboard-grid > .student-card:nth-child(5) { animation-delay: .24s; }
+@keyframes mc-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@media (max-width: 760px) {
+  body .student-portal-shell .student-welcome { padding: 26px 22px 48px; border-radius: 28px 28px 40% 60% / 28px 28px 36px 50px; }
+  body .student-portal-shell .mc-leaf { right: -10px; width: 110px; height: 160px; }
+  body .student-portal-shell .student-card { border-radius: 26px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body .student-portal-shell .student-dashboard-grid > .student-card { animation: none; }
+  body .student-portal-shell .mc-place { transition: none; }
+  body .student-portal-shell .mc-place:hover { transform: none; }
+}
+/* Serif headings use normal-height numbers, so "304" reads as 304 for young learners. */
+body .student-portal-shell .student-welcome h1, body .student-portal-shell .student-card h2, body .student-portal-shell .mc-place-info b { font-variant-numeric: lining-nums; font-feature-settings: "lnum" 1; }
