@@ -564,6 +564,34 @@ function CampusFacts({ facts }) {
   </div>;
 }
 
+// Real photos of the school at the top of the home page, fading from one to the next with a slow
+// zoom. Tap to go to the next one. Phones that ask for less motion get no zoom and no autoplay.
+const CAMPUS_PHOTOS = [
+  { file: "campus/building-front.jpg", caption: "Main Academic Building, Carsadang Bago II", alt: "The green Main Academic Building of Saint Simon of Cyrene Academy, Inc. seen from the street" },
+  { file: "campus/building-sign.jpg", caption: "Saint Simon of Cyrene Academy, Inc.", alt: "The school's name and logo painted across the front of the building" },
+  { file: "campus/classroom.jpg", caption: "A classroom", alt: "A light blue classroom with rows of wooden armchairs, windows and air conditioners" },
+  { file: "campus/library-elementary.jpg", caption: "Elementary library", alt: "The elementary library with green walls, bookshelves, a globe and reading tables" },
+  { file: "campus/library-high-school.jpg", caption: "High school library", alt: "The high school library with blue walls, tall bookshelves and students reading" },
+];
+const PHOTO_SECONDS = 5;
+
+function CampusPhotos() {
+  const still = useMedia("(prefers-reduced-motion: reduce)");
+  const [index, setIndex] = useState(0);
+  useEffect(() => {
+    if (still) return undefined;
+    const timer = setInterval(() => { if (!document.hidden) setIndex((current) => (current + 1) % CAMPUS_PHOTOS.length); }, PHOTO_SECONDS * 1000);
+    return () => clearInterval(timer);
+  }, [still, index]);
+  const photo = CAMPUS_PHOTOS[index];
+  return <figure className="ss-hero-figure ss-photos" data-reveal style={{ "--delay": "200ms" }}>
+    <button type="button" className="ss-photo-frame" onClick={() => setIndex((index + 1) % CAMPUS_PHOTOS.length)} aria-label={`Photo ${index + 1} of ${CAMPUS_PHOTOS.length}: ${photo.alt}. Tap for the next photo.`}>
+      {CAMPUS_PHOTOS.map((item, i) => <img key={item.file} src={asset(item.file)} alt="" width="1200" height="900" decoding="async" loading={i === 0 ? "eager" : "lazy"} className={`ss-photo ${i === index ? "on" : ""}`} />)}
+    </button>
+    <figcaption key={index}>{photo.caption}</figcaption>
+  </figure>;
+}
+
 function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alreadySignedIn = false, speakAnswers = false }) {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
@@ -964,10 +992,7 @@ export default function App() {
                 </div>
               </div>
             </div>
-            <figure className="ss-hero-figure" data-reveal style={{ "--delay": "200ms" }}>
-              <img src={asset("campus.jpg")} alt="Illustration of the Saint Simon of Cyrene Academy, Inc. main building" width="1192" height="896" decoding="async" />
-              <figcaption>Main Academic Building, Carsadang Bago II</figcaption>
-            </figure>
+            <CampusPhotos />
           </div>
           <div className="ss-container">
             <CampusFacts facts={[

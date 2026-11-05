@@ -18,7 +18,8 @@ function offlineApp() {
         else files.push(relative(dir, path).replaceAll('\\', '/'))
       })
       walk(dir)
-      const precache = files.filter((file) => file !== 'sw.js' && file !== 'index.html' && !file.endsWith('.map'))
+      // Of the campus photos only the first is saved offline; the rest load when online.
+      const precache = files.filter((file) => file !== 'sw.js' && file !== 'index.html' && !file.endsWith('.map') && !(file.startsWith('campus/') && file !== 'campus/building-front.jpg'))
       const version = createHash('sha256')
         .update(files.sort().join('\n'))
         .update(readFileSync(join(dir, 'index.html')))
