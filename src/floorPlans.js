@@ -518,8 +518,26 @@ const hallName = (floor, hallId) => {
   return plan?.halls.find((hall) => hall.id === hallId)?.name || plan?.walks.find((walk) => walk.hall === hallId)?.name;
 };
 
+// Rooms people can spot from the hallway, best first: they name turns and stretches in the steps.
+const LANDMARK_RANK = { office: 0, facility: 0, lab: 0, cr: 1, stairs: 1, exit: 1, classroom: 2 };
+const landmarkName = (place) => {
+  const label = place.code && place.code !== "EXIT" && /^Room /.test(place.code) ? place.code : place.name;
+  if (/^Room /.test(label)) return label;
+  return `the ${place.type === "stairs" || place.type === "exit" ? label.replace(/ \(.*\)/, "").toLowerCase() : label}`;
+};
+const joinNames = (names) => (names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0]);
+
 function describe(path, via, start, end) {
   const steps = [];
+  const skip = new Set([start.key, end.key]);
+  // The room whose door the route passes at this hallway point, if any.
+  const doorAt = (nodeId) => {
+    const match = /^(\d+):s:([^:]+)/.exec(nodeId);
+    if (!match) return null;
+    const place = placeByKey(`${match[1]}:${match[2]}`);
+    if (!place || skip.has(place.key) || place.unlabeled || !(place.type in LANDMARK_RANK)) return null;
+    return place;
+  };
   let walked = 0;
   let current = null;
   let lastDirection = null;
@@ -534,12 +552,38 @@ function describe(path, via, start, end) {
     if (current && current.meters >= 1) {
       const inside = current.name.toLowerCase().includes("room");
       const place = inside ? `the ${current.name}` : `the ${current.name.toLowerCase()}`;
-      const text = current.verb === "Head" ? `Walk ${inside ? "through" : "along"} ${place}` : current.verb === "Continue" ? `Continue ${inside ? "through" : "along"} ${place}` : `${current.verb} ${inside ? "and walk through" : "into"} ${place}`;
+      // Landmarks: the room at the corner where you turn, then up to two rooms you walk past.
+      // Stairs the route itself uses are not landmarks: you are on them, or about to be.
+      const seen = [];
+      for (const id of current.nodes) {
+        const found = doorAt(id);
+        if (found && !usedStairs.has(found.key) && !seen.some((item) => item.key === found.key)) seen.push(found);
+      }
+      const first = GRAPH.nodes.get(current.nodes[0]);
+      const turning = current.verb.startsWith("Turn");
+      const corner = turning && !current.offStairs ? seen.find((item) => {
+        const door = GRAPH.nodes.get(`${item.floor}:s:${item.id}`);
+        return door && Math.hypot(door.x - first.x, door.y - first.y) < 6;
+      }) : null;
+      const passed = seen.filter((item) => item !== corner)
+        .map((item, order) => ({ item, order }))
+        .sort((p, q) => LANDMARK_RANK[p.item.type] - LANDMARK_RANK[q.item.type] || p.order - q.order)
+        .slice(0, 2).sort((p, q) => p.order - q.order).map(({ item }) => landmarkName(item));
+      const past = passed.length ? ` past ${joinNames(passed)}` : "";
+      let text;
+      if (inside) text = current.verb === "Head" || current.verb === "Continue" ? `Walk through ${place}` : `${current.verb} and walk through ${place}`;
+      else if (current.offStairs) text = `Step off the stairs${turning ? ` and ${current.verb.toLowerCase()}` : ""}${passed.length ? `, then walk${past}` : ""}`;
+      else if (current.verb === "Head") text = passed.length ? `Walk${past}` : "Walk down the hallway";
+      else if (current.verb === "Continue") text = passed.length ? `Keep going${past}` : "Keep going straight";
+      else if (corner) text = `${current.verb} at ${landmarkName(corner)}${passed.length ? `, then walk${past}` : ""}`;
+      else text = passed.length ? `${current.verb} and walk${past}` : `${current.verb} down the hallway`;
       const kind = current.verb === "Turn left" ? "left" : current.verb === "Turn right" ? "right" : current.verb.startsWith("Turn around") ? "around" : "straight";
       steps.push({ floor: current.floor, text, kind, meters: Math.round(current.meters) });
     }
     current = null;
   };
+  const usedStairs = new Set(via.flatMap((edge, index) => (edge.stairs ? [path[index], path[index + 1]] : [])));
+  let offStairs = false;
   steps.push({ floor: start.floor, kind: "start", text: start.type === "exit" ? `Start at the ${start.name.toLowerCase()} on the ${floorPhrase(start.floor)}` : `Leave ${placeTitle(start)} (${floorPhrase(start.floor)})` });
   for (let index = 0; index < via.length; index += 1) {
     const a = GRAPH.nodes.get(path[index]);
@@ -566,11 +610,13 @@ function describe(path, via, start, end) {
         previousStep.text = `Take the ${stairsName} ${b.floor > previousStep.floor ? "up" : "down"} to the ${levelPhrase(b.floor)}`;
         walked += STAIR_COST * METERS_PER_UNIT;
         lastDirection = null;
+        offStairs = true;
         continue;
       }
       steps.push({ floor: a.floor, stairsName, text: `Take the ${stairsName} ${b.floor > a.floor ? "up" : "down"} to the ${levelPhrase(b.floor)}`, stairs: true, kind: b.floor > a.floor ? "up" : "down", toFloor: b.floor });
       walked += STAIR_COST * METERS_PER_UNIT;
       lastDirection = null;
+      offStairs = true;
       continue;
     }
     const meters = dist(a, b) * METERS_PER_UNIT;
@@ -582,9 +628,11 @@ function describe(path, via, start, end) {
       const name = hallName(a.floor, hallId) || "Hallway";
       if (!current || current.name !== name) {
         flush();
-        current = { floor: a.floor, name, meters: 0, verb: turnWord(lastDirection, direction) };
+        current = { floor: a.floor, name, meters: 0, verb: turnWord(lastDirection, direction), nodes: [path[index]], offStairs };
+        offStairs = false;
       }
       current.meters += meters;
+      current.nodes.push(path[index + 1]);
     }
     if (meters > 0.01) lastDirection = direction;
   }
