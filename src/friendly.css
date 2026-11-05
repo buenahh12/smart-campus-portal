@@ -101,3 +101,6 @@
 .ss-footer-links { display: inline-flex; flex-wrap: wrap; gap: 8px 16px; }
 @media (max-width: 640px) { .policy-shell { padding: 10px; } .policy-dialog header { padding: 18px 56px 12px 18px; } .policy-body { padding: 4px 18px 14px; } .policy-dialog footer { padding: 12px 18px; } }
 @media (prefers-reduced-motion: reduce) { .privacy-notice { animation: none; } }
+
+/* SiBot: bubbles keep their full height (the list scrolls) instead of being squeezed into each other. */
+.siibot-conversation > .siibot-message { flex-shrink: 0; }

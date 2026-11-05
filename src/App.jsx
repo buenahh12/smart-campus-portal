@@ -593,6 +593,8 @@ function CampusPhotos() {
   </figure>;
 }
 
+const SIBOT_KEEP = 3; // questions (with their answers) SiBot keeps on screen
+
 function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alreadySignedIn = false, speakAnswers = false }) {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
@@ -764,10 +766,14 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
       answer = "I don’t have that answer in my school information yet. I can help with the school overview, address and hours, grade levels, student groups, subjects, enrollment, contact links, finding rooms and offices, closed hallways, and the campus map. For other details, please ask a teacher or the school office.";
     }
     const timestamp = Date.now();
-    setMessages((current) => [...current,
-      { id: `${timestamp}-question-${Math.random()}`, role: "user", text },
-      { id: `${timestamp}-answer-${Math.random()}`, role: "assistant", text: answer },
-    ]);
+    // Keep the welcome and the last 3 questions with their answers; older ones drop off.
+    setMessages((current) => {
+      const [welcome, ...rest] = current;
+      return [welcome, ...rest.slice(-(SIBOT_KEEP * 2 - 2)),
+        { id: `${timestamp}-question-${Math.random()}`, role: "user", text },
+        { id: `${timestamp}-answer-${Math.random()}`, role: "assistant", text: answer },
+      ];
+    });
     setCenterAnswer(answer);
     if ((voiceCommandRef.current || speakAnswers) && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
