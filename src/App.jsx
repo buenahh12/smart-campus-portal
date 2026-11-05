@@ -16,6 +16,7 @@ import { usePlanVersion } from "./usePlan";
 import { useOfflineApp } from "./offline";
 import { BUILDING_NAME, FLOORS, PLACES, findPlaceKey, floorShort, placeByKey, placeTitle, floorLabel as planFloorLabel } from "./floorPlans";
 import { searchPlace } from "./placeSearch";
+import { PolicyDialog, PrivacyNotice, privacyNoticeSeen } from "./Policies";
 
 // Where the person said they are, last time they used the floor plan (to pick the nearest CR).
 const savedStart = () => {
@@ -831,6 +832,7 @@ export default function App() {
   usePrefetchScreens();
   const offlineApp = useOfflineApp();
   const [loginOpen, setLoginOpen] = useState(false);
+  const [noticeOpen, setNoticeOpen] = useState(() => !privacyNoticeSeen());
   const [menuOpen, setMenuOpen] = useState(false);
   const [floor, setFloor] = useState(2);
   const [mapState, setMapState] = useState(null);
@@ -1127,12 +1129,14 @@ export default function App() {
         </div>
         <div className="ss-container ss-footer-bottom">
           <span>© 2026 Saint Simon of Cyrene Academy, Inc.</span>
-          <a href="#top">Back to top</a>
+          <span className="ss-footer-links"><a href="#privacy">Privacy Policy</a> <a href="#terms">Terms of Use</a> <a href="#top">Back to top</a></span>
         </div>
       </footer>
       {!accountOpen && !loginOpen && !mapState && !arOpen && <SiiBot onSignIn={openLogin} onSignOut={handleSignOut} onOpenAccount={() => setAccountOpen(true)} alreadySignedIn={Boolean(signedInUser)} onNavigate={navigateTo} onOpenMap={setMapState} />}
       <AppStatus online={offlineApp.online} updateReady={offlineApp.updateReady} onUpdate={offlineApp.applyUpdate} />
-      <InstallPrompt offlineApp={offlineApp} hidden={Boolean(mapState || arOpen || loginOpen || accountOpen || createAccountOpen || adminLoginOpen || adminView || offlineApp.updateReady)} />
+      <InstallPrompt offlineApp={offlineApp} hidden={Boolean(noticeOpen || mapState || arOpen || loginOpen || accountOpen || createAccountOpen || adminLoginOpen || adminView || offlineApp.updateReady)} />
+      {noticeOpen && !mapState && !arOpen && !adminView && <PrivacyNotice onDone={() => setNoticeOpen(false)} />}
+      <PolicyDialog />
       <Suspense fallback={<ScreenLoading />}>
       {arOpen && <ArLiveView onClose={() => setArOpen(false)} />}
       {mapState && <CampusMap onClose={() => setMapState(null)} initialFloor={mapState.floor || 2} initialDestination={mapState.destination || null} initialEmergency={Boolean(mapState.emergency)} />}
