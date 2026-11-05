@@ -1,15 +1,20 @@
 import { useEffect, useState } from "react";
 import Icon from "./Icon";
 import { usePublicCollection, visibleAnnouncements } from "./CampusUpdates";
-import { CMS_COLLECTIONS, MAX_SAVED_PLACES, USER_ROLES, isClosureActive, placeKey, saveProfile, setEmailUpdates, watchProfile, watchSubscription } from "./cms";
+import { CMS_COLLECTIONS, GRADE_LEVELS, MAX_SAVED_PLACES, MAX_SECTION_LENGTH, USER_ROLES, isClosureActive, placeKey, saveProfile, setEmailUpdates, watchProfile, watchSubscription } from "./cms";
+import { BUILDING_NAME, PLACES, buildingOf, classroomOf, floorLabel as planFloorLabel, placeByKey, placeTitle, sectionsOf } from "./floorPlans";
+import { searchPlace } from "./placeSearch";
 import { refreshEmailConfirmed, sendConfirmationEmail, wantsEmailUpdates, wishForEmailUpdates } from "./firebase";
 
 const floorLabel = (floor) => (floor === 0 ? "Ground floor" : `Floor ${floor}`);
+const TYPE_LABELS = { classroom: "Classroom", office: "Office", lab: "Laboratory", facility: "Facility", cr: "Comfort room", exit: "Exit" };
+// A floor-plan place as a My Campus row. Saved as "map:<key>" next to older directory entries.
+const mapRow = (place) => ({ saveKey: `map:${place.key}`, mapKey: place.key, name: placeTitle(place), floor: place.floor, building: buildingOf(place.floor), detail: `${TYPE_LABELS[place.type] || "Place"} · ${planFloorLabel(place.floor)}` });
 const statusTone = (status) => (status === "Available" ? "good" : status === "In use" ? "warn" : "bad");
 
 // Personal navigation hub for signed-in users: saved places, route alerts for
 // those places, and preferences, all stored on their account in Firestore.
-export default function MyCampus({ user, onClose, onSignOut, onShowMap, renderAssistant }) {
+export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D, renderAssistant }) {
   const [profile, setProfile] = useState(); // undefined while loading, null if never saved
   const [profileError, setProfileError] = useState("");
   const [search, setSearch] = useState("");
@@ -63,26 +68,45 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, renderAs
   const name = profile?.name || user.displayName || user.email?.split("@")[0] || "there";
   const firstName = name.split(" ")[0];
   const role = profile?.role || "Student";
+  const gradeLevel = profile?.gradeLevel || "";
+  const section = profile?.section || "";
+  const myClassroom = role === "Student" ? classroomOf(gradeLevel, section) : null;
+  const [sectionDraft, setSectionDraft] = useState(null); // typed but not saved yet
   const prefs = { speakAnswers: false, allClosureAlerts: true, ...profile?.prefs };
   const savedKeys = profile?.savedPlaces || [];
   const places = [
     ...offices.items.map((item) => ({ ...item, kind: "Office" })),
     ...rooms.items.map((item) => ({ ...item, kind: item.type || "Room" })),
   ];
+  // Everything on the floor plan you can walk to (what the home page search finds).
+  const mapPlaces = PLACES.filter((place) => place.door && place.type !== "stairs" && !(place.unlabeled && place.type === "classroom"));
   const activeClosures = closures.items.filter((item) => isClosureActive(item));
   const closuresNear = (place) => activeClosures.filter((item) => item.building === place.building && item.floor === place.floor);
-  const savedPlaces = savedKeys.map((key) => places.find((place) => placeKey(place) === key)).filter(Boolean);
+  const savedPlaces = savedKeys.map((key) => {
+    if (key.startsWith("map:")) {
+      const place = placeByKey(key.slice(4));
+      return place ? mapRow(place) : null;
+    }
+    const entry = places.find((place) => placeKey(place) === key);
+    return entry ? { ...entry, saveKey: key, detail: `${entry.kind} · ${entry.building} · ${floorLabel(entry.floor)}${entry.room ? ` · ${entry.room}` : ""}` } : null;
+  }).filter(Boolean);
   const affectedPlaces = savedPlaces.filter((place) => closuresNear(place).length);
   const alertList = prefs.allClosureAlerts
     ? activeClosures
     : activeClosures.filter((closure) => savedPlaces.some((place) => place.building === closure.building && place.floor === closure.floor));
   const term = search.trim().toLowerCase();
-  const results = term
-    ? places
-      .filter((place) => [place.name, place.building, place.kind, place.room, place.description, place.notes].some((value) => String(value || "").toLowerCase().includes(term)))
-      .sort((first, second) => first.name.localeCompare(second.name, undefined, { numeric: true }))
-      .slice(0, 6)
-    : [];
+  // The same search as the home page first (it knows "cr", "nurse", "204"…), then name matches.
+  const results = (() => {
+    if (!term) return [];
+    const found = searchPlace(search.trim(), "");
+    const best = [found?.key, ...(found?.suggestions || [])].filter(Boolean).map((key) => placeByKey(key)).filter(Boolean);
+    // Asked for a C.R.: list them all, lowest floor first.
+    if (best[0]?.type === "cr") best.push(...mapPlaces.filter((place) => place.type === "cr").sort((a, b) => a.floor - b.floor));
+    // Name matches only from 3 letters, so "cr" doesn't also find "Crystal".
+    const named = term.length < 3 ? [] : mapPlaces.filter((place) => [placeTitle(place), place.name, place.code, TYPE_LABELS[place.type]].some((value) => String(value || "").toLowerCase().includes(term)))
+      .sort((first, second) => placeTitle(first).localeCompare(placeTitle(second), undefined, { numeric: true }));
+    return [...new Map([...best, ...named].map((place) => [place.key, place])).values()].slice(0, 6).map(mapRow);
+  })();
   const notices = visibleAnnouncements(announcements.items).slice(0, 3);
 
   const update = async (changes) => {
@@ -97,7 +121,7 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, renderAs
   };
 
   const toggleSaved = (place) => {
-    const key = placeKey(place);
+    const key = place.saveKey;
     if (savedKeys.includes(key)) {
       update({ savedPlaces: savedKeys.filter((item) => item !== key) });
     } else if (savedKeys.length >= MAX_SAVED_PLACES) {
@@ -109,17 +133,18 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, renderAs
 
   const placeRow = (place, { showSave }) => {
     const nearby = closuresNear(place);
-    const saved = savedKeys.includes(placeKey(place));
-    return <article className={`mc-place ${nearby.length ? "affected" : ""}`} key={placeKey(place)}>
+    const saved = savedKeys.includes(place.saveKey);
+    return <article className={`mc-place ${nearby.length ? "affected" : ""}`} key={place.saveKey}>
       <div className="mc-place-info">
         <b>{place.name}</b>
-        <small>{place.kind} · {place.building} · {floorLabel(place.floor)}{place.room ? ` · ${place.room}` : ""}</small>
+        <small>{place.detail}</small>
         {place.hours && <small>{place.hours}</small>}
         {nearby.map((closure) => <span className="mc-place-alert" key={closure.id}><Icon name="alert" size={13} /> {closure.pathway} closed{closure.detour ? ` · ${closure.detour}` : ""}</span>)}
       </div>
       <div className="mc-place-actions">
         {place.status && <span className={`cms-badge ${statusTone(place.status)}`}>{place.status}</span>}
-        <button type="button" onClick={() => onShowMap(place)}>Map</button>
+        <button type="button" onClick={() => onShowMap(place)} aria-label={`Show ${place.name} on the 2D floor plan`}><Icon name="route" size={14} /> 2D map</button>
+        {place.mapKey && place.building === BUILDING_NAME && <button type="button" onClick={() => onShow3D(place)} aria-label={`Show ${place.name} in 3D`}><Icon name="cube" size={14} /> 3D</button>}
         {showSave
           ? <button type="button" className={saved ? "saved" : ""} onClick={() => toggleSaved(place)} aria-pressed={saved}>{saved ? "Saved" : "Save"}</button>
           : <button type="button" className="remove" onClick={() => toggleSaved(place)} aria-label={`Remove ${place.name} from saved places`}>Remove</button>}
@@ -142,11 +167,12 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, renderAs
         <div className="student-dashboard-grid">
           <section className="student-card mc-find-card">
             <div className="student-card-heading"><div><p className="kicker">FIND A PLACE</p><h2>Where do you need to go?</h2></div></div>
-            <input className="directory-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search rooms, offices, the clinic, the library…" aria-label="Search rooms and offices" autoFocus />
+            {myClassroom && <div className="mc-my-classroom"><p className="kicker">YOUR CLASSROOM</p>{placeRow(mapRow(myClassroom), { showSave: false, mine: true })}</div>}
+            <input className="directory-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Type a room like 304, or the clinic, the library…" aria-label="Search rooms and offices" autoFocus />
             <div className="mc-place-list">
               {term
                 ? results.length ? results.map((place) => placeRow(place, { showSave: true })) : <p className="updates-empty">No rooms or offices match “{search.trim()}”.</p>
-                : <p className="updates-empty">{rooms.loading || offices.loading ? "Loading the campus directory…" : places.length ? `Search ${places.length} rooms and offices. Save the ones you visit often.` : "The campus directory hasn't been published yet."}</p>}
+                : <p className="updates-empty">{`Search ${mapPlaces.length} rooms and offices. See each one on the 2D map or in 3D, and save the ones you visit often.`}</p>}
             </div>
           </section>
           <section className="student-card mc-alerts-card">
@@ -168,6 +194,12 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, renderAs
           <section className="student-card mc-prefs-card">
             <div className="student-card-heading"><div><p className="kicker">PREFERENCES</p><h2>How SSCAI NAVI helps you</h2></div></div>
             <label className="mc-field">I am a<select value={role} onChange={(event) => update({ role: event.target.value })}>{USER_ROLES.map((item) => <option key={item}>{item}</option>)}</select></label>
+            {role === "Student" && <div className="mc-grade">
+              <label className="mc-field">Grade level<select value={gradeLevel} onChange={(event) => update({ gradeLevel: event.target.value, section: "" })}><option value="">Choose…</option>{GRADE_LEVELS.map((item) => <option key={item}>{item}</option>)}</select></label>
+              <label className="mc-field">Section<input value={sectionDraft ?? section} maxLength={MAX_SECTION_LENGTH} list="mc-sections" placeholder={sectionsOf(gradeLevel)[0] ? `e.g. ${sectionsOf(gradeLevel)[0]}` : "Your section"} onChange={(event) => setSectionDraft(event.target.value)} onBlur={() => { if (sectionDraft !== null && sectionDraft.trim() !== section) update({ section: sectionDraft.trim() }); setSectionDraft(null); }} /></label>
+              <datalist id="mc-sections">{sectionsOf(gradeLevel).map((item) => <option key={item} value={item} />)}</datalist>
+              {gradeLevel && section && !myClassroom && <small className="mc-grade-note">Your classroom isn&apos;t on the floor plan yet, so it can&apos;t be shown.</small>}
+            </div>}
             <label className="mc-toggle"><input type="checkbox" checked={prefs.speakAnswers} onChange={(event) => update({ prefs: { ...prefs, speakAnswers: event.target.checked } })} /><span><b>Read SiBot answers aloud</b><small>SiBot speaks every answer, not only voice questions.</small></span></label>
             <label className="mc-toggle"><input type="checkbox" checked={prefs.allClosureAlerts} onChange={(event) => update({ prefs: { ...prefs, allClosureAlerts: event.target.checked } })} /><span><b>Show closures across the whole campus</b><small>Turn off to only see closures near your saved places.</small></span></label>
             {user.email && !confirmed && <div className="mc-toggle mc-confirm" role="group" aria-label="Confirm your email">

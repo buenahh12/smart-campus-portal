@@ -153,10 +153,12 @@ service cloud.firestore {
     // Personal profile: saved places and preferences. Only its owner (the uid in
     // their verified JWT) can read or write it.
     function validProfile() {
-      return data().keys().hasOnly(['name', 'role', 'savedPlaces', 'prefs', 'updatedAt'])
+      return data().keys().hasOnly(['name', 'role', 'gradeLevel', 'section', 'savedPlaces', 'prefs', 'updatedAt'])
         && data().updatedAt == request.time
         && (!('name' in data()) || (data().name is string && data().name.size() <= 80))
         && (!('role' in data()) || data().role in ['Student', 'Faculty / Staff', 'Parent / Guardian', 'Visitor'])
+        && (!('gradeLevel' in data()) || data().gradeLevel in ['', 'Nursery', 'Kindergarten', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'])
+        && (!('section' in data()) || (data().section is string && data().section.size() <= 40))
         && (!('savedPlaces' in data()) || (data().savedPlaces is list && data().savedPlaces.size() <= 30))
         && (!('prefs' in data()) || (data().prefs is map
           && data().prefs.keys().hasOnly(['speakAnswers', 'allClosureAlerts'])));

@@ -11,10 +11,10 @@ import {
 } from "./firebase";
 import Icon from "./Icon";
 import CampusUpdates, { usePublicCollection } from "./CampusUpdates";
-import { CMS_COLLECTIONS, USER_ROLES, isClosureActive, recordSignIn, recordVisit, todayKey, watchSession } from "./cms";
+import { CMS_COLLECTIONS, GRADE_LEVELS, MAX_SECTION_LENGTH, USER_ROLES, isClosureActive, recordSignIn, recordVisit, todayKey, watchSession } from "./cms";
 import { usePlanVersion } from "./usePlan";
 import { useOfflineApp } from "./offline";
-import { BUILDING_NAME, FLOORS, PLACES, findPlaceKey, floorShort, placeByKey, placeTitle, floorLabel as planFloorLabel } from "./floorPlans";
+import { BUILDING_NAME, FLOORS, PLACES, findPlaceKey, floorShort, placeByKey, placeTitle, sectionsOf, floorLabel as planFloorLabel } from "./floorPlans";
 import { searchPlace } from "./placeSearch";
 import { PolicyDialog, PrivacyNotice, privacyNoticeSeen } from "./Policies";
 
@@ -405,6 +405,8 @@ function CreateAccountModal({ onClose, onCreated }) {
     name: "",
     email: "",
     role: "",
+    gradeLevel: "",
+    section: "",
     emailUpdates: true,
     password: "",
     confirmPassword: "",
@@ -429,6 +431,10 @@ function CreateAccountModal({ onClose, onCreated }) {
     setError("");
     if (!["name", "email", "role", "password", "confirmPassword"].every((field) => form[field].trim())) {
       setError("Complete every field before creating your account.");
+      return;
+    }
+    if (form.role === "Student" && !form.gradeLevel) {
+      setError("Choose your grade level.");
       return;
     }
     // Same limit as the profile in firestore.rules, so the profile always saves.
@@ -469,6 +475,11 @@ function CreateAccountModal({ onClose, onCreated }) {
           <input name="name" value={form.name} onChange={updateField} placeholder="Full name" autoComplete="name" maxLength={80} />
           <input name="email" type="email" value={form.email} onChange={updateField} placeholder="Email address" autoComplete="email" maxLength={254} />
           <select name="role" value={form.role} onChange={updateField} aria-label="I am a"><option value="">I am a…</option>{USER_ROLES.map((item) => <option key={item}>{item}</option>)}</select>
+          {form.role === "Student" && <div className="account-grade">
+            <select name="gradeLevel" value={form.gradeLevel} onChange={(event) => setForm((current) => ({ ...current, gradeLevel: event.target.value, section: "" }))} aria-label="Grade level"><option value="">Grade level…</option>{GRADE_LEVELS.map((item) => <option key={item}>{item}</option>)}</select>
+            <input name="section" value={form.section} onChange={updateField} placeholder="Section (optional)" list="account-sections" maxLength={MAX_SECTION_LENGTH} autoComplete="off" aria-label="Section" />
+            <datalist id="account-sections">{sectionsOf(form.gradeLevel).map((item) => <option key={item} value={item} />)}</datalist>
+          </div>}
           <div className="password-field"><input name="password" type={showPassword ? "text" : "password"} value={form.password} onChange={updateField} placeholder="Password (12+ characters)" autoComplete="new-password" aria-describedby="password-strength" maxLength={128} /><button type="button" className="password-visibility" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "Hide password" : "Show password"}><Icon name={showPassword ? "eyeOff" : "eye"} size={18} /></button></div>
           {passwordStrength && <div className={`password-strength ${passwordStrength.toLowerCase()}`} id="password-strength" aria-live="polite"><div className="strength-meter"><i /><i /><i /></div><span>Password strength: <b>{passwordStrength}</b></span></div>}
           <div className="password-field"><input name="confirmPassword" type={showConfirmPassword ? "text" : "password"} value={form.confirmPassword} onChange={updateField} placeholder="Confirm password" autoComplete="new-password" maxLength={128} /><button type="button" className="password-visibility" onClick={() => setShowConfirmPassword((visible) => !visible)} aria-label={showConfirmPassword ? "Hide confirmation password" : "Show confirmation password"}><Icon name={showConfirmPassword ? "eyeOff" : "eye"} size={18} /></button></div>
@@ -845,6 +856,7 @@ export default function App() {
   const [noticeOpen, setNoticeOpen] = useState(() => !privacyNoticeSeen());
   const [menuOpen, setMenuOpen] = useState(false);
   const [floor, setFloor] = useState(2);
+  const [highlight3d, setHighlight3d] = useState(null); // a place key lit up in the 3D view
   const [mapState, setMapState] = useState(null);
   // A link ending in #ar-live or ?ar-live (for example from a printed QR code, or the hand-over
   // from Messenger to Chrome) opens AR live view directly.
@@ -1068,8 +1080,9 @@ export default function App() {
                     {mainFloors().map((item) => <button key={item} type="button" className={floor === item ? "active" : ""} aria-pressed={floor === item} onClick={() => setFloor(item)}>{floorShort(item)}</button>)}
                   </div>
                   <Suspense fallback={<MiniPlan floor={floor} onOpen={() => setMapState({ floor })} />}>
-                    <Dollhouse3D key={planVersion} floor={floor} onOpen={() => setMapState({ floor })} label={`3D model of the ${planFloorLabel(floor).toLowerCase()}`}
+                    <Dollhouse3D key={planVersion} floor={floor} highlight={highlight3d} onOpen={() => setMapState({ floor })} label={`3D model of the ${planFloorLabel(floor).toLowerCase()}`}
                       fallback={<MiniPlan floor={floor} onOpen={() => setMapState({ floor })} />} />
+                    {highlight3d && placeByKey(highlight3d) && <p className="ss-3d-showing"><Icon name="location" size={16} /> Showing <b>{placeTitle(placeByKey(highlight3d))}</b> · {planFloorLabel(placeByKey(highlight3d).floor)}<button type="button" onClick={() => setHighlight3d(null)} aria-label="Stop showing this room">Clear</button></p>}
                   </Suspense>
                 </div>
                 <div className="dollhouse-actions">
@@ -1187,7 +1200,13 @@ export default function App() {
         user={signedInUser}
         onClose={() => setAccountOpen(false)}
         onSignOut={handleSignOut}
-        onShowMap={(place) => { setAccountOpen(false); setMapState({ destination: findPlaceKey(place?.room, place?.name), floor: place?.floor }); }}
+        onShowMap={(place) => { setAccountOpen(false); setMapState({ destination: place?.mapKey || findPlaceKey(place?.room, place?.name), floor: place?.floor }); }}
+        onShow3D={(place) => {
+          setAccountOpen(false);
+          setFloor(place.floor);
+          setHighlight3d(place.mapKey);
+          setTimeout(() => document.querySelector(".ss-dollhouse")?.scrollIntoView({ behavior: "smooth", block: "center" }), 200);
+        }}
         renderAssistant={(prefs) => <SiiBot onSignIn={() => {}} onSignOut={handleSignOut} onOpenAccount={() => {}} alreadySignedIn speakAnswers={prefs.speakAnswers} onNavigate={(sectionId) => { setAccountOpen(false); window.setTimeout(() => navigateTo(sectionId), 50); }} onOpenMap={(state) => { setAccountOpen(false); setMapState(state); }} />}
       />}
       {createAccountOpen && <CreateAccountModal onClose={() => setCreateAccountOpen(false)} onCreated={(user) => { setSignedInUser(user); setCreateAccountOpen(false); setAccountOpen(true); }} />}

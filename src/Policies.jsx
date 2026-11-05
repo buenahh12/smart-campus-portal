@@ -29,7 +29,7 @@ const PAGES = {
           <li>your device type (phone, tablet or computer), its system (for example Android or iOS), your browser and screen size</li>
           <li>the date and time</li>
         </ul>
-        <p>Your profile keeps your name, role, saved places and settings, so they follow you to any device. Only you can read your profile.</p>
+        <p>Your profile keeps your name, role, your grade level and section (students only, if you give them), saved places and settings, so they follow you to any device. Only you can read your profile.</p>
       </>],
       ["Email updates (only if you turn them on)", <p key="e">If you turn on email updates in My Campus, we keep your email and name so the school can email you announcements. The emails are sent through EmailJS. You can turn them off at any time in My Campus.</p>],
       ["Who can see it", <p key="w">Only the school&apos;s administrator account can see sign-in records, the visit counts and the email list. The database rules block everyone else. Your information is not sold and is not used for ads. It is stored with Google Firebase, and the site is hosted on Vercel.</p>],

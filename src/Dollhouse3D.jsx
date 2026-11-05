@@ -98,7 +98,8 @@ function buildFloor(plan, materialFor) {
   return group;
 }
 
-export default function Dollhouse3D({ floor, onOpen, label, fallback }) {
+// highlight: a place key ("3:room-304") to light up with a glowing box and a bouncing pin.
+export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight = null }) {
   const holder = useRef(null);
   const scene = useRef(null);
   const [failed, setFailed] = useState(false);
@@ -169,20 +170,25 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback }) {
 
     // Only animate while the card is on screen.
     let running = false;
-    const loop = () => { controls.update(); renderer.render(world, camera); };
+    const loop = (time = 0) => {
+      const marker = scene.current?.marker;
+      if (marker && !reduceMotion) marker.userData.pin.position.y = marker.userData.pinY + Math.sin(time / 280) * 0.6;
+      controls.update();
+      renderer.render(world, camera);
+    };
     const visibility = new IntersectionObserver(([entry]) => {
       running = entry.isIntersecting;
       renderer.setAnimationLoop(running ? loop : null);
     });
     visibility.observe(element);
 
-    scene.current = { floors, controls, camera, render: () => !running && loop() };
+    scene.current = { floors, controls, camera, world, marker: null, render: () => !running && loop() };
     return () => {
       visibility.disconnect();
       sizeObserver.disconnect();
       renderer.setAnimationLoop(null);
       controls.dispose();
-      world.traverse((item) => item.geometry?.dispose());
+      world.traverse((item) => { item.geometry?.dispose(); if (item.userData.ownMaterial) item.material.dispose(); });
       floors.forEach(({ materials }) => materials.forEach((material) => material.dispose()));
       renderer.dispose();
       renderer.domElement.remove();
@@ -190,9 +196,51 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback }) {
     };
   }, []);
 
+  // The highlighted room: a translucent green box over it and a pin bobbing above.
+  useEffect(() => {
+    const current = scene.current;
+    if (!current) return undefined;
+    const [floorText, id] = String(highlight || "").split(":");
+    const plan = FLOORS.find((item) => item.floor === Number(floorText) && item.building === BUILDING_NAME);
+    const room = plan?.rooms.find((item) => item.id === id);
+    if (!room) return undefined;
+    const [x, y, w, h] = room.rect;
+    const [cx, cz] = toWorld(x + w / 2, y + h / 2);
+    const base = (plan.floor - 1) * FLOOR_HEIGHT;
+    const glowMaterial = new THREE.MeshBasicMaterial({ color: "#2ddf87", transparent: true, opacity: 0.38, depthWrite: false });
+    const pinMaterial = new THREE.MeshLambertMaterial({ color: "#13a35c" });
+    const marker = new THREE.Group();
+    const glow = new THREE.Mesh(new THREE.BoxGeometry(w * M, WALL_HEIGHT, h * M), glowMaterial);
+    glow.position.set(cx, base + SLAB + WALL_HEIGHT / 2, cz);
+    const pin = new THREE.Group();
+    const head = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), pinMaterial);
+    head.position.y = 1.6;
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.85, 1.9, 24), pinMaterial);
+    tip.rotation.x = Math.PI;
+    tip.position.y = 0.45;
+    pin.add(head, tip);
+    pin.position.set(cx, base + WALL_HEIGHT + 1.2, cz);
+    [glow, head, tip].forEach((mesh) => { mesh.userData.ownMaterial = true; });
+    marker.add(glow, pin);
+    marker.userData = { pin, pinY: pin.position.y, floor: plan.floor };
+    current.world.add(marker);
+    current.marker = marker;
+    marker.visible = plan.floor === floor;
+    current.render();
+    return () => {
+      current.world.remove(marker);
+      marker.traverse((item) => item.geometry?.dispose());
+      glowMaterial.dispose();
+      pinMaterial.dispose();
+      if (current.marker === marker) current.marker = null;
+      current.render();
+    };
+  }, [highlight]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const current = scene.current;
     if (!current) return;
+    if (current.marker) current.marker.visible = current.marker.userData.floor === floor;
     current.floors.forEach((item) => {
       item.group.visible = item.floor <= floor;
       const opacity = item.floor === floor ? 1 : 0.18;

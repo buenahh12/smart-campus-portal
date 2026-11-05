@@ -103,7 +103,7 @@ export const loginAsAdmin = async ({ email, password }) => {
   }
   return credential.user;
 };
-export const createCampusAccount = async ({ email, password, name, role, emailUpdates = false }) => {
+export const createCampusAccount = async ({ email, password, name, role, gradeLevel = '', section = '', emailUpdates = false }) => {
   if (!hasFirebaseConfig) {
     throw new Error('Firebase is not configured. Add the VITE_FIREBASE_* values to your .env file.');
   }
@@ -113,6 +113,7 @@ export const createCampusAccount = async ({ email, password, name, role, emailUp
     await setDoc(doc(db, 'users', credential.user.uid), {
       name,
       role,
+      ...(role === 'Student' ? { gradeLevel, section: section.trim().slice(0, 40) } : {}),
       savedPlaces: [],
       prefs: { speakAnswers: false, allClosureAlerts: true },
       updatedAt: serverTimestamp(),

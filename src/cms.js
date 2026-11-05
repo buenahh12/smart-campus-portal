@@ -111,6 +111,9 @@ export function watchSession(onChange) {
 // read or change it (see firestore.rules), so it follows them to any device.
 export const USER_ROLES = ['Student', 'Faculty / Staff', 'Parent / Guardian', 'Visitor'];
 export const MAX_SAVED_PLACES = 30;
+// Students also give their grade level and section (same lists as validProfile in firestore.rules).
+export const GRADE_LEVELS = ['Nursery', 'Kindergarten', ...Array.from({ length: 12 }, (_, i) => `Grade ${i + 1}`)];
+export const MAX_SECTION_LENGTH = 40;
 
 export function watchProfile(uid, onData, onError = () => {}) {
   if (!db) {

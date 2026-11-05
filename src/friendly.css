@@ -160,3 +160,15 @@
 .ss-steps li .ss-step-number { color: #fff8ec; background: #9a6a3f; box-shadow: 0 4px 0 #6e4826; }
 .ss-steps h3 { color: #4a2c12; }
 .ss-steps p { color: #5c4630; }
+
+/* Grade level and section (sign-up and My Campus), the student's classroom, and the 3D "Showing" chip. */
+.account-grade { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.mc-grade { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.mc-grade-note { grid-column: 1 / -1; color: var(--muted, #5d6a5e); font-size: 14px; }
+.mc-my-classroom { margin-bottom: 14px; padding: 12px; border-radius: 16px; background: linear-gradient(160deg, #f8eedd 0%, #efdfc4 100%); }
+.mc-my-classroom .kicker { margin: 0 0 6px; color: #6e4826; }
+.mc-place-actions button { display: inline-flex; align-items: center; gap: 5px; }
+.ss-3d-showing { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 0; padding: 10px 14px; border-radius: 14px; color: #0f3b26; background: #d3f5e2; font-size: 15px; }
+.ss-3d-showing button { margin-left: auto; min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; color: #fff; background: #1f4a35; font-weight: 700; }
+@media (max-width: 480px) { .account-grade, .mc-grade { grid-template-columns: 1fr; } }
+.mc-grade .mc-field input { box-sizing: border-box; width: 100%; min-height: 42px; padding: 0 14px; border: 1px solid var(--line-strong, #d8cbb3); border-radius: 12px; color: #123525; background: #fbfffc; font: inherit; font-size: 16px; }

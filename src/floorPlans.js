@@ -642,6 +642,17 @@ function describe(path, via, start, end) {
   return { steps, meters: Math.round(walked), minutes: Math.max(1, Math.round(seconds / 60)) };
 }
 
+// Sections of a grade, from the classroom names on the plan ("Grade 7 Fire Opal" -> "Fire Opal").
+export const sectionsOf = (grade) => PLACES
+  .filter((place) => place.type === "classroom" && place.name.startsWith(`${grade} `))
+  .map((place) => place.name.slice(grade.length + 1));
+
+// The classroom of a grade and section, if it is on the plan.
+export const classroomOf = (grade, section) => {
+  const wanted = `${grade} ${section}`.trim().toLowerCase();
+  return grade && section ? PLACES.find((place) => place.type === "classroom" && place.name.toLowerCase() === wanted) || null : null;
+};
+
 // Route between two places, or null when closures leave no way through.
 export function findRoute(startKey, endKey, blocked = new Set()) {
   if (!startKey || !endKey || startKey === endKey) return null;
