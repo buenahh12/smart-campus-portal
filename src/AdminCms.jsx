@@ -9,6 +9,37 @@ import { AnnouncementArt, ClosureArt, generateAiPicture, useDebounced } from "./
 
 const FLOOR_PLAN_TAB = "floorplan";
 
+// A photo from the admin's computer, made small enough to save with the announcement: at most
+// 1280 px wide, as a JPEG under about 290 KB (pictureData in firestore.rules allows 300 KB).
+async function photoForAnnouncement(file) {
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new Error("That file couldn't be opened as a picture. Use a JPG or PNG photo.");
+  }
+  const scale = Math.min(1, 1280 / bitmap.width, 960 / bitmap.height);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  const context = canvas.getContext("2d");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  for (const [quality, shrink] of [[0.82, 1], [0.7, 1], [0.6, 0.8], [0.5, 0.65], [0.45, 0.5]]) {
+    let source = canvas;
+    if (shrink < 1) {
+      source = document.createElement("canvas");
+      source.width = Math.round(canvas.width * shrink);
+      source.height = Math.round(canvas.height * shrink);
+      source.getContext("2d").drawImage(canvas, 0, 0, source.width, source.height);
+    }
+    const data = source.toDataURL("image/jpeg", quality);
+    if (data.length < 290000) return data;
+  }
+  throw new Error("This photo is too big to use. Try a smaller or cropped photo.");
+}
+
 // Live preview of the announcement picture. The illustration follows the title as it is
 // typed; the AI picture is generated on request and saved with the announcement.
 function PicturePreview({ values, setValue }) {
@@ -16,7 +47,20 @@ function PicturePreview({ values, setValue }) {
   const [status, setStatus] = useState({ busy: false, message: "" });
   if (values.picture === "none") return null;
   const ai = values.picture === "ai";
+  const photo = values.picture === "photo";
   const hasPicture = Boolean(values.pictureData);
+  const choosePhoto = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setStatus({ busy: true, message: "Getting the photo ready…" });
+    try {
+      setValue("pictureData", await photoForAnnouncement(file));
+      setStatus({ busy: false, message: "" });
+    } catch (error) {
+      setStatus({ busy: false, message: error.message });
+    }
+  };
   const generate = async (nextSeed) => {
     if (!values.title.trim()) {
       setStatus({ busy: false, message: "Type a title first. The picture is made from it." });
@@ -46,7 +90,12 @@ function PicturePreview({ values, setValue }) {
       </button>
       {hasPicture && <button type="button" className="cms-link-button" onClick={() => setValue("pictureData", "")}>Use the illustration instead</button>}
     </div>}
-    {!ai && title.trim() && <button type="button" className="cms-link-button" onClick={() => setValue("pictureSeed", nextSeed)}>Rearrange the illustration</button>}
+    {photo && <div className="cms-preview-actions">
+      <label className="cms-preview-button cms-photo-pick"><Icon name="download" size={15} /> {status.busy ? "Getting the photo ready…" : hasPicture ? "Choose a different photo" : "Choose a photo"}<input type="file" accept="image/*" onChange={choosePhoto} disabled={status.busy} /></label>
+      {hasPicture && <button type="button" className="cms-link-button" onClick={() => setValue("pictureData", "")}>Remove the photo</button>}
+    </div>}
+    {photo && !hasPicture && !status.message && <small className="cms-hint">Choose a photo from your computer (JPG or PNG). Until then, the illustration above is shown.</small>}
+    {!ai && !photo && title.trim() && <button type="button" className="cms-link-button" onClick={() => setValue("pictureSeed", nextSeed)}>Rearrange the illustration</button>}
     {ai && !hasPicture && !status.message && <small className="cms-hint">Until you make the AI picture, the illustration above is shown.</small>}
     {status.message && <small className={status.busy ? "cms-hint" : "cms-hint cms-hint-warn"} role="status">{status.message}</small>}
   </div>;
@@ -68,14 +117,20 @@ const SECTIONS = [
       { name: "published", label: "Published (visible to everyone)", type: "checkbox", initial: true },
       { name: "picture", label: "Picture", type: "select", required: true, initial: "ai", options: [
         { value: "ai", label: "AI picture (the illustration shows while it loads)" },
+        { value: "photo", label: "Photo from your computer" },
         { value: "art", label: "Illustration only" },
         { value: "none", label: "No picture" },
       ], hint: "The picture is made from the title, for example \"Halloween Party\" or \"Science Fair\". Check the preview below before publishing." },
       { name: "pictureSeed", type: "seed", initial: 0 },
       { name: "pictureData", type: "hidden", initial: "" },
     ],
-    // Only keep the saved AI picture when "AI picture" is chosen.
-    beforeSave: (record) => ({ ...record, pictureData: record.picture === "ai" ? record.pictureData : "" }),
+    // Keep the saved picture only for "AI picture" or "Photo"; a photo choice with no photo yet
+    // falls back to the illustration.
+    beforeSave: (record) => {
+      const keeps = record.picture === "ai" || record.picture === "photo";
+      const picture = record.picture === "photo" && !record.pictureData ? "art" : record.picture;
+      return { ...record, picture, pictureData: keeps ? record.pictureData : "" };
+    },
     preview: (values, setValue) => <PicturePreview values={values} setValue={setValue} />,
     title: (item) => item.title,
     meta: (item) => [item.pinned && "Pinned", item.expiresOn && `Until ${item.expiresOn}`].filter(Boolean).join(" · ") || "No end date",

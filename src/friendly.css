@@ -209,3 +209,8 @@ body .student-portal-shell .student-dashboard-grid > .student-card:nth-child(5) 
 @media (max-width: 760px) { body .student-portal-shell .student-welcome { padding: 22px 20px; border-radius: 22px; } }
 @media (prefers-reduced-motion: reduce) { body .student-portal-shell .student-dashboard-grid > .student-card { animation: none; } body .student-portal-shell .mc-place { transition: none; } body .student-portal-shell .mc-place:hover { transform: none; } }
 body .student-portal-shell .student-welcome > div > p:not(.kicker) { color: rgba(250, 244, 232, .9); font-weight: 500; }
+/* Announcements: the "Choose a photo" button (a label around a hidden file input). */
+.cms-photo-pick { position: relative; cursor: pointer; }
+.cms-photo-pick input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.cms-photo-pick:focus-within { outline: 2px solid #10b95c; outline-offset: 2px; }
+.cms-form label.cms-photo-pick, label.cms-photo-pick { display: inline-flex; flex-direction: row; align-items: center; gap: 7px; color: #fff; font-size: 13px; font-weight: 800; }
