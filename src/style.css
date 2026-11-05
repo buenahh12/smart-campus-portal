@@ -682,9 +682,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .plan-you text { fill: #fff; font-size: 1.4px; font-weight: 800; letter-spacing: .2px; text-anchor: middle; dominant-baseline: central; }
 @keyframes plan-halo { from { transform: scale(.5); opacity: 1; } to { transform: scale(1.3); opacity: 0; } }
 .plan-pin { pointer-events: none; }
-.plan-pin path { fill: var(--route); stroke: #fff; stroke-width: .45; }
+.plan-pin path { fill: #2ddf87; stroke: #2ddf87; stroke-width: .5; stroke-linejoin: round; }
 .plan-pin circle { fill: #fff; }
-.plan-pin.exit path { fill: var(--exit); }
+.plan-pin-shadow { fill: #7aaefc; }
+.plan-pin.exit path { fill: #f04438; stroke: #f04438; }
+.plan-pin.exit .plan-pin-shadow { fill: #f7a29b; }
+.plan-pin-body { animation: pin-hop 1.1s ease-in-out infinite; }
+.plan-pin-shadow { transform-box: fill-box; transform-origin: center; animation: pin-shadow 1.1s ease-in-out infinite; }
+@keyframes pin-hop { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.8px); } }
+@keyframes pin-shadow { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(.65); opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .plan-pin-body, .plan-pin-shadow { animation: none; } }
 .plan-title-block { pointer-events: none; }
 .plan-title-block .title { fill: var(--ink); font-size: 3.6px; font-weight: 800; letter-spacing: .2px; }
 .plan-title-block .sub { fill: var(--muted); font-size: 1.6px; font-weight: 600; letter-spacing: .35px; }

@@ -86,15 +86,15 @@ const BUILT_IN_FLOORS = [
     floor: 2,
     halls: [
       ...frameHalls(10),
-      { id: "cr-passage", name: "Small passage", rect: [0, 66, 32, 2] },
       { id: "se-passage", name: "South-east passage", rect: [124, 76, 21, 14] },
     ],
     walks: [
       { hall: "top-hall", points: [[12, 27.5], [39.5, 27.5], [131, 27.5]] },
-      { hall: "left-hall", points: [[39.5, 27.5], [39.5, 67], [39.5, 71]] },
+      { hall: "left-hall", points: [[39.5, 27.5], [39.5, 68.5], [39.5, 71]] },
       { hall: "right-hall", points: [[131, 27.5], [131, 71]] },
       { hall: "bottom-hall", points: [[39.5, 71], [127, 71], [131, 71], [141, 71]] },
-      { hall: "cr-passage", points: [[39.5, 67], [3, 67]] },
+      // Inside the Computer Room, to the C.R. and the small room in its corner.
+      { hall: "computer-aisle", name: "Computer Room", points: [[39.5, 68.5], [27.5, 68.5], [27.5, 76], [3, 76]], closable: false },
       { hall: "se-passage", points: [[127, 71], [127, 86], [143, 86]] },
     ],
     rooms: [
@@ -110,9 +110,10 @@ const BUILT_IN_FLOORS = [
       room("room-208", "Grade 4 Sardonyx", "Room 208", "classroom", [137, 44, 23, 21], [137, 62]),
       room("tvl-room", "TVL Room", "", "facility", [0, 31, 32, 17], [32, 34]),
       room("tle-room", "TLE Room", "", "facility", [0, 48, 32, 18], [32, 63]),
-      room("cr-2w", "C.R.", "", "cr", [0, 68, 10.5, 6], [6, 68]),
-      room("cr-2w-side", "Unlabeled room", "", "classroom", [10.5, 68, 12, 6], [16.5, 68], { unlabeled: true }),
-      room("computer-room", "Computer Room", "", "lab", [0, 74, 32, 26], [32, 77]),
+      // The C.R. and the small room sit inside the top-left corner of the Computer Room, as on the posted plan.
+      room("computer-room", "Computer Room", "", "lab", [0, 66, 32, 34], [32, 68.5]),
+      room("cr-2w", "C.R.", "", "cr", [0, 66, 10, 8], [5, 74]),
+      room("cr-2w-side", "Unlabeled room", "", "classroom", [10, 66, 13, 8], [16.5, 74], { unlabeled: true }),
       room("stair-sw-2", "South-west stairs", "", "stairs", [32, 76, 15, 24], [39.5, 76], { stair: "sw", shape: "u" }),
       room("room-211", "Grade 7 Fire Opal", "Room 211", "classroom", [47, 76, 39, 24], [50, 76]),
       room("room-210", "Grade 6 Turquoise", "Room 210", "classroom", [86, 76, 38, 24], [120, 76]),

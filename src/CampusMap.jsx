@@ -148,7 +148,7 @@ function UStair({ item, floor }) {
   const below = FLOORS.find((entry) => entry.building === plan?.building && entry.level === plan.level - 1);
   const down = Boolean(below?.rooms.some((room) => room.stair === item.stair));
   // Short stairwells side-on to the hallway: the label goes just outside, in the hallway, as on the plans.
-  const [lx, ly] = vertical ? at(entry / 2, middle) : at(-3.9, middle);
+  const [lx, ly] = vertical ? at(entry / 2, width * 0.27) : at(-3.9, middle); // beside the route line, not under it
   return <g className="plan-ustair">
     <path d={treads.join(" ")} className="plan-treads" />
     <polyline points={line([[entry - 0.6, middle], [turn, middle]])} className="plan-ustair-wall" />
@@ -443,8 +443,12 @@ function FloorPlan2D({ plan, route, startKey, destKey, selectedKey, blocked, onP
         {dest?.floor === floor && (() => {
           const node = graphNode(`${floor}:door:${dest.id}`) || graphNode(dest.key);
           return <g className={`plan-pin ${dest.type === "exit" ? "exit" : ""}`} transform={`translate(${node.x} ${node.y})`}>
-            <path d="M0 0 C-0.6 -1.6 -2.6 -3 -2.6 -5.2 A2.6 2.6 0 1 1 2.6 -5.2 C2.6 -3 0.6 -1.6 0 0 Z" />
-            <circle cy="-5.2" r="1" />
+            {/* A bright pin that hops over its shadow, so the destination is easy to spot. */}
+            <ellipse cy="0.9" rx="2.4" ry="0.6" className="plan-pin-shadow" />
+            <g className="plan-pin-body">
+              <path d="M0 -0.2 L-2.75 -2.9 A3.8 3.8 0 1 1 2.75 -2.9 Z" />
+              <circle cy="-5.5" r="2.05" />
+            </g>
           </g>;
         })()}
 
