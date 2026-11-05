@@ -128,7 +128,7 @@ function OfflinePanel({ offlineApp }) {
 }
 
 function ScreenLoading() {
-  return <div className="screen-loading" role="status"><i aria-hidden="true" />Loading…</div>;
+  return <div className="screen-loading" role="status"><i aria-hidden="true" /><span className="screen-loading-sr">Loading…</span></div>;
 }
 
 // Shown in place of a screen whose code could not be downloaded, instead of crashing the page.

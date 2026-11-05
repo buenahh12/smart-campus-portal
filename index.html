@@ -17,16 +17,19 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Space+Mono:wght@400;700&display=swap" />
   <style>
     /* Shown at once while the app downloads (slow connections); React replaces it. */
-    .boot { min-height: 100vh; display: grid; place-content: center; justify-items: center; gap: 14px; padding: 24px; color: #1f4a35; background: #f5efe2; font: 600 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; text-align: center; }
-    .boot img { width: 72px; height: 72px; border-radius: 50%; }
-    .boot b { font-size: 20px; }
-    .boot i { width: 28px; height: 28px; border: 3px solid #d7e0d1; border-top-color: #1f4a35; border-radius: 50%; animation: boot-spin .9s linear infinite; }
-    @keyframes boot-spin { to { transform: rotate(360deg); } }
-    @media (prefers-reduced-motion: reduce) { .boot i { animation: none; } }
+    body { margin: 0; }
+    .boot { min-height: 100vh; min-height: 100dvh; display: grid; place-content: center; justify-items: center; gap: 16px; padding: 24px; color: #f5efe2; background: radial-gradient(120% 80% at 20% 10%, #3f7a5a 0%, rgba(63,122,90,0) 60%), radial-gradient(90% 70% at 90% 100%, #c98f5c 0%, rgba(201,143,92,0) 55%), linear-gradient(160deg, #1f4a35 0%, #163828 55%, #0f2a1e 100%); font: 700 18px/1.3 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; text-align: center; }
+    .boot img { width: 84px; height: 84px; border-radius: 50%; box-shadow: 0 0 0 6px rgba(245,239,226,.12), 0 12px 40px rgba(0,0,0,.35); animation: boot-glow 1.8s ease-in-out infinite; }
+    .boot b { max-width: 16em; letter-spacing: .02em; }
+    .boot i { display: block; width: 140px; height: 4px; border-radius: 99px; background: linear-gradient(90deg, rgba(245,239,226,.15) 0%, #f0c79a 50%, rgba(245,239,226,.15) 100%) 0 0 / 200% 100%; animation: boot-shine 1.4s linear infinite; }
+    .boot .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    @keyframes boot-glow { 50% { box-shadow: 0 0 0 10px rgba(245,239,226,.08), 0 12px 48px rgba(240,199,154,.35); transform: scale(1.03); } }
+    @keyframes boot-shine { to { background-position: -200% 0; } }
+    @media (prefers-reduced-motion: reduce) { .boot img, .boot i { animation: none; } }
   </style>
 </head>
 <body>
-  <div id="root"><div class="boot" role="status"><img src="%BASE_URL%logologooo.jpg" alt="" width="72" height="72" /><b>Saint Simon of Cyrene Academy</b><span>Loading SSCA NAVI…</span><i aria-hidden="true"></i><noscript>Please turn on JavaScript to use SSCA NAVI.</noscript></div></div>
+  <div id="root"><div class="boot" role="status"><img src="%BASE_URL%logologooo.jpg" alt="" width="72" height="72" /><b>Saint Simon of Cyrene Academy</b><span class="sr">Loading SSCA NAVI…</span><i aria-hidden="true"></i><noscript>Please turn on JavaScript to use SSCA NAVI.</noscript></div></div>
   <script type="module" src="/src/main.jsx"></script>
 </body>
 </html>
