@@ -157,7 +157,7 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
       <header className="student-portal-header"><a className="student-portal-brand" href="#about" onClick={onClose}><span className="brand-mark" /><span><b>SAINT SIMON OF CYRENE ACADEMY, INC.</b><small>MY CAMPUS</small></span></a><div className="student-header-tools"><span className={`connectivity-pill ${online ? "online" : "offline"}`}><i /><span className="connectivity-full">{online ? "Online · live campus updates" : "Offline · updates paused"}</span><span className="connectivity-short">{online ? "Online" : "Offline"}</span></span><button className="student-close" onClick={onClose} aria-label="Close My Campus"><Icon name="close" /></button></div></header>
       <main className="student-dashboard">
         <section className="student-welcome">
-          <div><p className="kicker">MY CAMPUS</p><h1 id="my-campus-title">Hello, {firstName}</h1><p>Your saved places, route alerts, and campus updates in one place.</p></div>
+          <div><p className="kicker">MY CAMPUS</p><h1 id="my-campus-title">Hello, {firstName}!</h1>{role === "Student" && gradeLevel && <span className="mc-grade-chip"><Icon name="book" size={15} /> {gradeLevel}{section ? ` · ${section}` : ""}</span>}<p>Your saved places, route alerts, and campus updates in one place.</p></div>
           <div className={`checkin-card mc-route-status ${affectedPlaces.length ? "alert" : "clear"}`}>
             <span className="mc-status-dot" />
             <div><small>YOUR ROUTES TODAY</small><b>{affectedPlaces.length ? `${affectedPlaces.length} saved place${affectedPlaces.length === 1 ? " has" : "s have"} a closure nearby` : savedPlaces.length ? "All your saved places are reachable" : "Save places to get route alerts"}</b><span>{activeClosures.length ? `${activeClosures.length} pathway restriction${activeClosures.length === 1 ? "" : "s"} on campus` : "No pathway restrictions on campus"}</span></div>
@@ -165,8 +165,8 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
         </section>
         {profileError && <p className="updates-unavailable" role="alert">{profileError}</p>}
         <div className="student-dashboard-grid">
-          <section className="student-card mc-find-card">
-            <div className="student-card-heading"><div><p className="kicker">FIND A PLACE</p><h2>Where do you need to go?</h2></div></div>
+          <section className="student-card mc-find-card tone-lime">
+            <div className="student-card-heading"><span className="mc-card-icon" aria-hidden="true"><Icon name="location" size={22} /></span><div><p className="kicker">FIND A PLACE</p><h2>Where do you need to go?</h2></div></div>
             {myClassroom && <div className="mc-my-classroom"><p className="kicker">YOUR CLASSROOM</p>{placeRow(mapRow(myClassroom), { showSave: false, mine: true })}</div>}
             <input className="directory-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Type a room like 304, or the clinic, the library…" aria-label="Search rooms and offices" autoFocus />
             <div className="mc-place-list">
@@ -175,8 +175,8 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
                 : <p className="updates-empty">{`Search ${mapPlaces.length} rooms and offices. See each one on the 2D map or in 3D, and save the ones you visit often.`}</p>}
             </div>
           </section>
-          <section className="student-card mc-alerts-card">
-            <div className="student-card-heading"><div><p className="kicker">ROUTE ALERTS</p><h2>Closed pathways</h2></div><span className="pending-badge">{prefs.allClosureAlerts ? "Whole campus" : "My places only"}</span></div>
+          <section className="student-card mc-alerts-card tone-orange">
+            <div className="student-card-heading"><span className="mc-card-icon" aria-hidden="true"><Icon name="alert" size={22} /></span><div><p className="kicker">ROUTE ALERTS</p><h2>Closed pathways</h2></div><span className="pending-badge">{prefs.allClosureAlerts ? "Whole campus" : "My places only"}</span></div>
             <div className="mc-place-list">
               {alertList.length ? alertList.map((item) => <div className="closure-item" key={item.id}>
                 <b>{item.pathway}</b>
@@ -185,14 +185,14 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
               </div>) : <p className="updates-empty">{closures.loading ? "Checking pathways…" : prefs.allClosureAlerts ? "All campus pathways are open." : "No closures near your saved places."}</p>}
             </div>
           </section>
-          <section className="student-card mc-saved-card">
-            <div className="student-card-heading"><div><p className="kicker">SAVED TO YOUR ACCOUNT</p><h2>My places</h2></div><span className="pending-badge">{savedPlaces.length} / {MAX_SAVED_PLACES}</span></div>
+          <section className="student-card mc-saved-card tone-yellow">
+            <div className="student-card-heading"><span className="mc-card-icon" aria-hidden="true"><Icon name="heart" size={22} /></span><div><p className="kicker">SAVED TO YOUR ACCOUNT</p><h2>My places</h2></div><span className="pending-badge">{savedPlaces.length} / {MAX_SAVED_PLACES}</span></div>
             <div className="mc-place-list">
               {savedPlaces.length ? savedPlaces.map((place) => placeRow(place, { showSave: false })) : <p className="updates-empty">{profile === undefined && !profileError ? "Loading your places…" : "Nothing saved yet. Search for a room or office above and tap Save. Your places follow you on any device you sign in to."}</p>}
             </div>
           </section>
-          <section className="student-card mc-prefs-card">
-            <div className="student-card-heading"><div><p className="kicker">PREFERENCES</p><h2>How SSCAI NAVI helps you</h2></div></div>
+          <section className="student-card mc-prefs-card tone-sky">
+            <div className="student-card-heading"><span className="mc-card-icon" aria-hidden="true"><Icon name="info" size={22} /></span><div><p className="kicker">PREFERENCES</p><h2>How SSCAI NAVI helps you</h2></div></div>
             <label className="mc-field">I am a<select value={role} onChange={(event) => update({ role: event.target.value })}>{USER_ROLES.map((item) => <option key={item}>{item}</option>)}</select></label>
             {role === "Student" && <div className="mc-grade">
               <label className="mc-field">Grade level<select value={gradeLevel} onChange={(event) => update({ gradeLevel: event.target.value, section: "" })}><option value="">Choose…</option>{GRADE_LEVELS.map((item) => <option key={item}>{item}</option>)}</select></label>
@@ -215,8 +215,8 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
               });
             }} /><span><b>Email me announcements and closed hallways</b><small>Sent to {user.email} when the school posts an update.</small></span></label>}
           </section>
-          <section className="student-card announcements-card">
-            <div className="student-card-heading"><div><p className="kicker">SCHOOL BROADCAST</p><h2>Announcements</h2></div></div>
+          <section className="student-card announcements-card tone-purple">
+            <div className="student-card-heading"><span className="mc-card-icon" aria-hidden="true"><Icon name="sparkle" size={22} /></span><div><p className="kicker">SCHOOL BROADCAST</p><h2>Announcements</h2></div></div>
             {notices.length ? notices.map((item) => <article className="announcement-item" key={item.id}><span><Icon name="sparkle" size={16} /></span><div><div><b>{item.title}</b><small>{item.pinned ? "Pinned" : item.updatedAt?.toDate?.().toLocaleDateString("en-US", { month: "short", day: "numeric" }) || "School notice"}</small></div><p>{item.body}</p></div></article>) : <p className="updates-empty">{announcements.loading ? "Loading announcements…" : "No announcements right now."}</p>}
           </section>
         </div>

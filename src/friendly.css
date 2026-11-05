@@ -172,3 +172,40 @@
 .ss-3d-showing button { margin-left: auto; min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; color: #fff; background: #1f4a35; font-weight: 700; }
 @media (max-width: 480px) { .account-grade, .mc-grade { grid-template-columns: 1fr; } }
 .mc-grade .mc-field input { box-sizing: border-box; width: 100%; min-height: 42px; padding: 0 14px; border: 1px solid var(--line-strong, #d8cbb3); border-radius: 12px; color: #123525; background: #fbfffc; font: inherit; font-size: 16px; }
+
+/* ---------- My Campus: warm and textured, a colour per card ----------
+   The same paper, grain and school colours as the home page. Motion is kept small: the cards fade
+   up once when My Campus opens, and nothing moves when the device asks for reduced motion. */
+body .student-portal-shell { background: radial-gradient(70% 45% at 0% 0%, rgba(184, 236, 107, .22), rgba(184, 236, 107, 0) 60%), radial-gradient(60% 40% at 100% 100%, rgba(255, 212, 92, .22), rgba(255, 212, 92, 0) 60%), var(--paper, #f5efe2) var(--grain); }
+body .student-portal-shell .student-portal-header { background: rgba(251, 247, 238, .94); }
+body .student-portal-shell .student-welcome { position: relative; overflow: hidden; padding: 28px 30px; border-radius: 26px; color: var(--cream, #f6efe1); background: radial-gradient(90% 120% at 0% 0%, rgba(63, 174, 116, .35), rgba(63, 174, 116, 0) 60%), radial-gradient(70% 90% at 100% 100%, rgba(240, 199, 154, .30), rgba(240, 199, 154, 0) 60%), linear-gradient(150deg, #1f4a35 0%, #163828 100%); box-shadow: 0 22px 50px rgba(20, 45, 30, .25); }
+body .student-portal-shell .student-welcome::after { content: ""; position: absolute; inset: 0; background: var(--grain-light, none); opacity: .5; pointer-events: none; }
+body .student-portal-shell .student-welcome > * { position: relative; z-index: 1; }
+body .student-portal-shell .student-welcome .kicker { color: var(--peach, #f1c39a); }
+body .student-portal-shell .student-welcome h1 { color: #fffaf0; }
+body .student-portal-shell .student-welcome p { color: rgba(246, 239, 225, .85); }
+body .student-portal-shell .mc-grade-chip { display: inline-flex; align-items: center; gap: 6px; margin: 6px 0 4px; padding: 6px 12px; border-radius: 999px; color: #4a3500; background: #ffd45c; font-size: 15px; font-weight: 800; }
+body .student-portal-shell .student-welcome .checkin-card { border: 0; background: #fbf7ee; box-shadow: 0 10px 24px rgba(0, 0, 0, .18); }
+
+body .student-portal-shell .student-card { position: relative; overflow: hidden; border: 1.5px solid color-mix(in srgb, var(--tone, #b8ec6b) 55%, #e6dcc6); border-radius: 22px; background: #fffcf5 var(--grain-light, none); box-shadow: 0 12px 28px rgba(60, 45, 20, .08); }
+body .student-portal-shell .student-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 6px; background: var(--tone, #b8ec6b); }
+body .student-portal-shell .student-card .student-card-heading { align-items: center; gap: 12px; }
+body .student-portal-shell .mc-card-icon { display: grid; flex: none; place-items: center; width: 46px; height: 46px; border-radius: 15px; color: var(--tone-ink, #1f4a35); background: var(--tone, #b8ec6b); box-shadow: 0 6px 14px color-mix(in srgb, var(--tone, #b8ec6b) 45%, transparent); }
+body .student-portal-shell .student-card .student-card-heading > div { flex: 1; min-width: 0; }
+body .student-portal-shell .student-card .kicker { color: #8a5a34; }
+body .student-portal-shell .mc-place { border: 1px solid #eadfca; border-left: 5px solid var(--tone, #b8ec6b); border-radius: 16px; background: #fffaf0; transition: transform .15s ease, box-shadow .15s ease; }
+body .student-portal-shell .mc-place:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(60, 45, 20, .10); }
+body .student-portal-shell .mc-place-actions button { border-radius: 999px; background: #fff; }
+body .student-portal-shell .mc-place-actions button.saved { color: var(--tone-ink, #234300); border-color: var(--tone, #b8ec6b); background: var(--tone, #b8ec6b); }
+body .student-portal-shell .mc-my-classroom { border: 1.5px dashed #c79d6f; }
+body .student-portal-shell .student-card .directory-search { border-radius: 14px; background: #fffaf0; }
+body .student-portal-shell .mc-toggle { border-radius: 16px; background: #fffaf0; }
+body .student-portal-shell .student-dashboard-grid > .student-card { animation: mc-in .45s ease both; }
+body .student-portal-shell .student-dashboard-grid > .student-card:nth-child(2) { animation-delay: .05s; }
+body .student-portal-shell .student-dashboard-grid > .student-card:nth-child(3) { animation-delay: .1s; }
+body .student-portal-shell .student-dashboard-grid > .student-card:nth-child(4) { animation-delay: .15s; }
+body .student-portal-shell .student-dashboard-grid > .student-card:nth-child(5) { animation-delay: .2s; }
+@keyframes mc-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@media (max-width: 760px) { body .student-portal-shell .student-welcome { padding: 22px 20px; border-radius: 22px; } }
+@media (prefers-reduced-motion: reduce) { body .student-portal-shell .student-dashboard-grid > .student-card { animation: none; } body .student-portal-shell .mc-place { transition: none; } body .student-portal-shell .mc-place:hover { transform: none; } }
+body .student-portal-shell .student-welcome > div > p:not(.kicker) { color: rgba(250, 244, 232, .9); font-weight: 500; }
