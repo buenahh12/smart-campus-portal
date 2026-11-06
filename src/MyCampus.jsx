@@ -10,6 +10,29 @@ const floorLabel = (floor) => (floor === 0 ? "Ground floor" : `Floor ${floor}`);
 const TYPE_LABELS = { classroom: "Classroom", office: "Office", lab: "Laboratory", facility: "Facility", cr: "Comfort room", exit: "Exit" };
 // A floor-plan place as a My Campus row. Saved as "map:<key>" next to older directory entries.
 const mapRow = (place) => ({ saveKey: `map:${place.key}`, mapKey: place.key, name: placeTitle(place), floor: place.floor, building: buildingOf(place.floor), detail: `${TYPE_LABELS[place.type] || "Place"} · ${planFloorLabel(place.floor)}` });
+// A leafy branch drawn along the edge of the page: long soft leaves in grey-green, each with a
+// light midrib. Decoration only (hidden from screen readers, never in the way of a tap).
+const BRANCH_LEAVES = [
+  [64, 70, -62, 1.0], [58, 130, 205, 0.95], [52, 195, -55, 1.05], [47, 262, 215, 1.0], [43, 330, -48, 1.1],
+  [40, 398, 222, 1.0], [38, 466, -42, 0.95], [37, 532, 228, 0.9], [38, 596, -38, 0.85],
+];
+function Branch({ className }) {
+  return <svg className={`mc-branch ${className}`} viewBox="0 0 180 680" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id={`${className}-leaf`} x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stopColor="#7d8a6c" />
+        <stop offset="0.55" stopColor="#a7b29a" />
+        <stop offset="1" stopColor="#c9cfbd" />
+      </linearGradient>
+    </defs>
+    <path className="mc-branch-stem" d="M70 0 C66 160 50 330 40 470 C34 560 38 620 40 680" />
+    {BRANCH_LEAVES.map(([x, y, angle, size]) => <g key={y} transform={`translate(${x} ${y}) rotate(${angle}) scale(${size})`}>
+      <path d="M0 0 C18 -15 62 -17 104 0 C62 15 18 13 0 0Z" fill={`url(#${className}-leaf)`} />
+      <path className="mc-branch-rib" d="M3 0 C35 -2 70 -2 100 0" />
+    </g>)}
+  </svg>;
+}
+
 const statusTone = (status) => (status === "Available" ? "good" : status === "In use" ? "warn" : "bad");
 
 // Personal navigation hub for signed-in users: saved places, route alerts for
@@ -155,6 +178,8 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
   return (
     <div className="student-portal-shell" role="dialog" aria-modal="true" aria-labelledby="my-campus-title">
       <header className="student-portal-header"><a className="student-portal-brand" href="#about" onClick={onClose}><span className="brand-mark" /><span><b>SAINT SIMON OF CYRENE ACADEMY, INC.</b><small>MY CAMPUS</small></span></a><div className="student-header-tools"><span className={`connectivity-pill ${online ? "online" : "offline"}`}><i /><span className="connectivity-full">{online ? "Online · live campus updates" : "Offline · updates paused"}</span><span className="connectivity-short">{online ? "Online" : "Offline"}</span></span><button className="student-close" onClick={onClose} aria-label="Close My Campus"><Icon name="close" /></button></div></header>
+      <Branch className="mc-branch-left" />
+      <Branch className="mc-branch-right" />
       <main className="student-dashboard">
         <section className="student-welcome">
           <div><p className="kicker">{"// MY CAMPUS"}</p><h1 id="my-campus-title">Hello, <em>{firstName}</em>!</h1>{role === "Student" && gradeLevel && <span className="mc-grade-chip"><Icon name="book" size={15} /> {gradeLevel}{section ? ` · ${section}` : ""}</span>}<p>Your saved places, route alerts, and campus updates in one place.</p></div>
