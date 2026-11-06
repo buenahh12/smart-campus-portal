@@ -33,6 +33,57 @@ function Branch({ className }) {
   </svg>;
 }
 
+// The welcome questions on a first sign-in. Answers go to the profile (role, and for students
+// grade level and section); they can be changed later under Preferences.
+const WELCOME_ROLES = [
+  { role: "Student", icon: "book", hint: "Nursery to Grade 12" },
+  { role: "Faculty / Staff", icon: "building", hint: "Teachers and school staff" },
+  { role: "Parent / Guardian", icon: "heart", hint: "Family of a learner" },
+  { role: "Visitor", icon: "location", hint: "Here for a visit" },
+];
+function WelcomeQuestions({ firstName, onSave, onSkip }) {
+  const [role, setRole] = useState("");
+  const [gradeLevel, setGradeLevel] = useState("");
+  const [section, setSection] = useState("");
+  const [saving, setSaving] = useState(false);
+  const finish = async (answers) => {
+    setSaving(true);
+    await onSave(answers);
+    setSaving(false);
+  };
+  const choose = (picked) => {
+    if (picked === "Student") setRole(picked);
+    else finish({ role: picked });
+  };
+  return <div className="mc-welcome" role="dialog" aria-modal="true" aria-labelledby="mc-welcome-title">
+    <div className="mc-welcome-card">
+      {role !== "Student" ? <>
+        <p className="kicker">{"// WELCOME TO SSCAI NAVI"}</p>
+        <h2 id="mc-welcome-title">Hi, {firstName}! Who are you?</h2>
+        <p className="mc-welcome-lead">Pick one, so SSCAI NAVI can help you better.</p>
+        <div className="mc-welcome-roles">
+          {WELCOME_ROLES.map((item) => <button key={item.role} type="button" onClick={() => choose(item.role)} disabled={saving}>
+            <span className="mc-card-icon" aria-hidden="true"><Icon name={item.icon} size={22} /></span>
+            <span><b>{item.role === "Faculty / Staff" ? "Faculty or staff" : item.role === "Parent / Guardian" ? "Parent or guardian" : item.role}</b><small>{item.hint}</small></span>
+          </button>)}
+        </div>
+      </> : <>
+        <p className="kicker">{"// ALMOST DONE"}</p>
+        <h2 id="mc-welcome-title">What grade are you in?</h2>
+        <p className="mc-welcome-lead">Your classroom can then show up first in My Campus.</p>
+        <label className="mc-field">Grade level<select value={gradeLevel} onChange={(event) => { setGradeLevel(event.target.value); setSection(""); }} autoFocus><option value="">Choose your grade…</option>{GRADE_LEVELS.map((item) => <option key={item}>{item}</option>)}</select></label>
+        <label className="mc-field">Section (optional)<input value={section} maxLength={MAX_SECTION_LENGTH} list="mc-welcome-sections" placeholder={sectionsOf(gradeLevel)[0] ? `e.g. ${sectionsOf(gradeLevel)[0]}` : "Your section"} onChange={(event) => setSection(event.target.value)} /></label>
+        <datalist id="mc-welcome-sections">{sectionsOf(gradeLevel).map((item) => <option key={item} value={item} />)}</datalist>
+        <div className="mc-welcome-actions">
+          <button type="button" className="mc-welcome-back" onClick={() => setRole("")} disabled={saving}>Back</button>
+          <button type="button" className="mc-welcome-done" disabled={!gradeLevel || saving} onClick={() => finish({ role: "Student", gradeLevel, section: section.trim() })}>{saving ? "Saving…" : "Done"}</button>
+        </div>
+      </>}
+      <button type="button" className="mc-welcome-skip" onClick={onSkip} disabled={saving}>Skip for now</button>
+    </div>
+  </div>;
+}
+
 const statusTone = (status) => (status === "Available" ? "good" : status === "In use" ? "warn" : "bad");
 
 // Personal navigation hub for signed-in users: saved places, route alerts for
@@ -95,6 +146,9 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
   const section = profile?.section || "";
   const myClassroom = role === "Student" ? classroomOf(gradeLevel, section) : null;
   const [sectionDraft, setSectionDraft] = useState(null); // typed but not saved yet
+  // A first sign-in (no profile yet, or no role chosen): ask who they are.
+  const [welcomeSkipped, setWelcomeSkipped] = useState(false);
+  const needsWelcome = !user.isAnonymous && !welcomeSkipped && (profile === null || (profile && !profile.role));
   const prefs = { speakAnswers: false, allClosureAlerts: true, ...profile?.prefs };
   const savedKeys = profile?.savedPlaces || [];
   const places = [
@@ -180,6 +234,7 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
       <header className="student-portal-header"><a className="student-portal-brand" href="#about" onClick={onClose}><span className="brand-mark" /><span><b>SAINT SIMON OF CYRENE ACADEMY, INC.</b><small>MY CAMPUS</small></span></a><div className="student-header-tools"><span className={`connectivity-pill ${online ? "online" : "offline"}`}><i /><span className="connectivity-full">{online ? "Online · live campus updates" : "Offline · updates paused"}</span><span className="connectivity-short">{online ? "Online" : "Offline"}</span></span><button className="student-close" onClick={onClose} aria-label="Close My Campus"><Icon name="close" /></button></div></header>
       <Branch className="mc-branch-left" />
       <Branch className="mc-branch-right" />
+      {needsWelcome && <WelcomeQuestions firstName={firstName} onSkip={() => setWelcomeSkipped(true)} onSave={(answers) => update({ ...(profile?.name ? {} : { name: (user.displayName || "").slice(0, 80) }), ...answers })} />}
       <main className="student-dashboard">
         <section className="student-welcome">
           <div><p className="kicker">{"// MY CAMPUS"}</p><h1 id="my-campus-title">Hello, <em>{firstName}</em>!</h1>{role === "Student" && gradeLevel && <span className="mc-grade-chip"><Icon name="book" size={15} /> {gradeLevel}{section ? ` · ${section}` : ""}</span>}<p>Your saved places, route alerts, and campus updates in one place.</p></div>
