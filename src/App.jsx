@@ -259,7 +259,7 @@ function useReveal() {
   }, []);
 }
 
-function LoginModal({ onClose, onCreate, onAdmin, onSignedIn = () => {} }) {
+function LoginModal({ onClose, onCreate, onSignedIn = () => {} }) {
   const [signingIn, setSigningIn] = useState(false);
   const [emailSigningIn, setEmailSigningIn] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
@@ -389,7 +389,6 @@ function LoginModal({ onClose, onCreate, onAdmin, onSignedIn = () => {} }) {
               <button className="visitor-button" type="submit" disabled={emailSigningIn}>{emailSigningIn ? "Signing in..." : "Sign in with email"}</button>
             </form>
             <button className="create-account-link" onClick={onCreate}>Create a new campus account</button>
-            <button className="staff-access-link" onClick={onAdmin}>Staff / administrator access</button>
             <p className="auth-security-note"><Icon name="shield" size={15} /> Sign-in is handled by Firebase. Your password is not shared with Google.</p>
             <p className="auth-security-note"><Icon name="info" size={15} /> When you sign in, the school can see your account email, how you signed in, and your device type and browser.</p>
             <p className="terms">By continuing, you agree to SSCAI NAVI&apos;s <a href="#terms">Terms</a> and <a href="#privacy">Privacy Policy</a>.</p>
@@ -896,7 +895,18 @@ export default function App() {
     setLoginOpen(false);
     setCreateAccountOpen(true);
   };
-  const openAdminLogin = () => setAdminLoginOpen(true);
+  // The administrator's private way in: the site address followed by #admin. Nothing on the site
+  // links to it; the admin account and the database rules still guard everything behind it.
+  useEffect(() => {
+    const check = () => {
+      if (location.hash !== "#admin") return;
+      history.replaceState(null, "", location.pathname + location.search);
+      setAdminLoginOpen(true);
+    };
+    check();
+    window.addEventListener("hashchange", check);
+    return () => window.removeEventListener("hashchange", check);
+  }, []);
   const navigateTo = (sectionId) => document.querySelector(`#${sectionId}`)?.scrollIntoView({ behavior: "smooth" });
 
   // One tap from a place button: open the floor plan with the route there.
@@ -1195,7 +1205,7 @@ export default function App() {
       <Suspense fallback={<ScreenLoading />}>
       {arOpen && <ArLiveView onClose={() => setArOpen(false)} />}
       {mapState && <CampusMap onClose={() => setMapState(null)} initialFloor={mapState.floor || 2} initialDestination={mapState.destination || null} initialEmergency={Boolean(mapState.emergency)} />}
-      {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} onCreate={openCreateAccount} onAdmin={openAdminLogin} onSignedIn={(user) => { setSignedInUser(user); setLoginOpen(false); setAccountOpen(true); }} />}
+      {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} onCreate={openCreateAccount} onSignedIn={(user) => { setSignedInUser(user); setLoginOpen(false); setAccountOpen(true); }} />}
       {accountOpen && signedInUser && <MyCampus
         user={signedInUser}
         onClose={() => setAccountOpen(false)}
