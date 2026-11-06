@@ -549,6 +549,7 @@ function describe(path, via, start, end) {
     return cross > 0 ? "Turn right" : "Turn left";
   };
   const flush = () => {
+    if (current && current.meters < 1) extra += current.meters;
     if (current && current.meters >= 1) {
       const inside = current.name.toLowerCase().includes("room");
       const place = inside ? `the ${current.name}` : `the ${current.name.toLowerCase()}`;
@@ -568,7 +569,15 @@ function describe(path, via, start, end) {
       const passed = seen.filter((item) => item !== corner)
         .map((item, order) => ({ item, order }))
         .sort((p, q) => LANDMARK_RANK[p.item.type] - LANDMARK_RANK[q.item.type] || p.order - q.order)
-        .slice(0, 2).sort((p, q) => p.order - q.order).map(({ item }) => landmarkName(item));
+        .reduce((list, entry) => {
+          const name = landmarkName(entry.item);
+          const same = list.find((other) => other.name === name);
+          if (same) same.count += 1;
+          else if (!corner || name !== landmarkName(corner)) list.push({ ...entry, name, count: 1 });
+          return list;
+        }, [])
+        .slice(0, 2).sort((p, q) => p.order - q.order)
+        .map(({ name, count }) => (count > 1 ? `${name.replace(/^the /, "the two ")}s` : name));
       const past = passed.length ? ` past ${joinNames(passed)}` : "";
       let text;
       if (inside) text = current.verb === "Head" || current.verb === "Continue" ? `Walk through ${place}` : `${current.verb} and walk through ${place}`;
@@ -578,12 +587,14 @@ function describe(path, via, start, end) {
       else if (corner) text = `${current.verb} at ${landmarkName(corner)}${passed.length ? `, then walk${past}` : ""}`;
       else text = passed.length ? `${current.verb} and walk${past}` : `${current.verb} down the hallway`;
       const kind = current.verb === "Turn left" ? "left" : current.verb === "Turn right" ? "right" : current.verb.startsWith("Turn around") ? "around" : "straight";
-      steps.push({ floor: current.floor, text, kind, meters: Math.round(current.meters) });
+      steps.push({ floor: current.floor, text, kind, raw: current.meters + extra });
+      extra = 0;
     }
     current = null;
   };
   const usedStairs = new Set(via.flatMap((edge, index) => (edge.stairs ? [path[index], path[index + 1]] : [])));
   let offStairs = false;
+  let extra = 0;
   steps.push({ floor: start.floor, kind: "start", text: start.type === "exit" ? `Start at the ${start.name.toLowerCase()} on the ${floorPhrase(start.floor)}` : `Leave ${placeTitle(start)} (${floorPhrase(start.floor)})` });
   for (let index = 0; index < via.length; index += 1) {
     const a = GRAPH.nodes.get(path[index]);
@@ -594,7 +605,7 @@ function describe(path, via, start, end) {
       flush();
       const target = placeByKey(path[index + 1]);
       const otherBuilding = buildingOf(b.floor) !== buildingOf(a.floor);
-      steps.push({ floor: a.floor, toFloor: b.floor, link: true, kind: "walkway", text: `Walk to ${target ? placeTitle(target) : "the next building"}${otherBuilding ? ` in the ${buildingOf(b.floor)}` : ""}`, meters: Math.round(edge.w * METERS_PER_UNIT) });
+      steps.push({ floor: a.floor, toFloor: b.floor, link: true, kind: "walkway", text: `Walk to ${target ? placeTitle(target) : "the next building"}${otherBuilding ? ` in the ${buildingOf(b.floor)}` : ""}`, raw: edge.w * METERS_PER_UNIT });
       walked += edge.w * METERS_PER_UNIT;
       lastDirection = null;
       continue;
@@ -608,12 +619,13 @@ function describe(path, via, start, end) {
         previousStep.toFloor = b.floor;
         previousStep.kind = b.floor > previousStep.floor ? "up" : "down";
         previousStep.text = `Take the ${stairsName} ${b.floor > previousStep.floor ? "up" : "down"} to the ${levelPhrase(b.floor)}`;
+        previousStep.raw += STAIR_COST * METERS_PER_UNIT;
         walked += STAIR_COST * METERS_PER_UNIT;
         lastDirection = null;
         offStairs = true;
         continue;
       }
-      steps.push({ floor: a.floor, stairsName, text: `Take the ${stairsName} ${b.floor > a.floor ? "up" : "down"} to the ${levelPhrase(b.floor)}`, stairs: true, kind: b.floor > a.floor ? "up" : "down", toFloor: b.floor });
+      steps.push({ floor: a.floor, stairsName, text: `Take the ${stairsName} ${b.floor > a.floor ? "up" : "down"} to the ${levelPhrase(b.floor)}`, stairs: true, kind: b.floor > a.floor ? "up" : "down", toFloor: b.floor, raw: STAIR_COST * METERS_PER_UNIT });
       walked += STAIR_COST * METERS_PER_UNIT;
       lastDirection = null;
       offStairs = true;
@@ -633,13 +645,24 @@ function describe(path, via, start, end) {
       }
       current.meters += meters;
       current.nodes.push(path[index + 1]);
-    }
+    } else extra += meters;
     if (meters > 0.01) lastDirection = direction;
   }
   flush();
-  steps.push({ floor: end.floor, text: end.type === "exit" ? `Go out through the ${end.name.toLowerCase()}` : `Arrive at ${placeTitle(end)}`, done: true, kind: end.type === "exit" ? "exit" : "arrive" });
+  const measured = steps.filter((step) => step.raw !== undefined);
+  if (extra > 0 && measured.length) measured[measured.length - 1].raw += extra;
+  steps.push({ floor: end.floor, text: end.type === "exit" ? `Go out through the ${end.name.toLowerCase()}` : `Arrive at ${placeTitle(end)}`, done: true, kind: end.type === "exit" ? "exit" : "arrive", ...(extra > 0 && !measured.length ? { raw: extra } : {}) });
+  // Whole metres that add up to the rounded total (largest remainders get the spare metres).
+  const total = Math.round(walked);
+  const parts = steps.filter((step) => step.raw !== undefined);
+  parts.forEach((step) => { step.meters = Math.floor(step.raw); });
+  let spare = total - parts.reduce((sum, step) => sum + step.meters, 0);
+  [...parts].sort((p, q) => (q.raw - Math.floor(q.raw)) - (p.raw - Math.floor(p.raw))).forEach((step) => {
+    if (spare > 0) { step.meters += 1; spare -= 1; }
+  });
+  parts.forEach((step) => { delete step.raw; });
   const seconds = walked / WALK_SPEED;
-  return { steps, meters: Math.round(walked), minutes: Math.max(1, Math.round(seconds / 60)) };
+  return { steps, meters: total, minutes: Math.max(1, Math.round(seconds / 60)) };
 }
 
 // Sections of a grade, from the classroom names on the plan ("Grade 7 Fire Opal" -> "Fire Opal").
