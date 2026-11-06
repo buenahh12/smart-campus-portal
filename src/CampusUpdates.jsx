@@ -80,7 +80,7 @@ export default function CampusUpdates({ onShowMap }) {
         </article>
         <article className="updates-card tone-sage">
           <h3 className="updates-card-title"><span className="updates-icon" aria-hidden="true"><Icon name="sparkle" size={22} /></span> Announcements</h3>
-          <div className="updates-scroll" tabIndex={0} aria-label="Announcements">{notices.length ? notices.map((item) => <div className="notice-item" key={item.id}>
+          <div className="updates-scroll" tabIndex={0} aria-label="Announcements">{notices.length ? notices.map((item) => <div className="notice-item" id={`announcement-${item.id}`} key={item.id}>
             <AnnouncementArt title={item.title} body={item.body} picture={item.picture || "ai"} seed={item.pictureSeed} aiImage={item.pictureData} />
             <b>{item.pinned && <span className="cms-badge good">Pinned</span>}{item.title}</b>
             {item.updatedAt?.toDate && <small>{item.updatedAt.toDate().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</small>}

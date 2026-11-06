@@ -10,7 +10,8 @@ import {
   requestPasswordReset,
 } from "./firebase";
 import Icon from "./Icon";
-import CampusUpdates, { usePublicCollection } from "./CampusUpdates";
+import CampusUpdates, { usePublicCollection, visibleAnnouncements } from "./CampusUpdates";
+import { AnnouncementArt } from "./EventArt";
 import { CMS_COLLECTIONS, GRADE_LEVELS, MAX_SECTION_LENGTH, USER_ROLES, isClosureActive, recordSignIn, recordVisit, todayKey, watchSession } from "./cms";
 import { usePlanVersion } from "./usePlan";
 import { useOfflineApp } from "./offline";
@@ -240,22 +241,31 @@ function OpenInBrowser({ app }) {
 }
 
 // Fades sections in as they scroll into view; everything shows at once when reduced motion is on.
+// Fades sections in as they scroll into view. The mark is a data-revealed attribute, not a class:
+// React rewrites className when a section changes (the search box showing a message), which used
+// to wipe a "visible" class and hide the section again. Sections that appear later are watched too.
 function useReveal() {
   useEffect(() => {
-    const items = [...document.querySelectorAll("[data-reveal]")];
-    const show = (element) => element.classList.add("is-visible");
-    if (!("IntersectionObserver" in window) || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      items.forEach(show);
-      return undefined;
-    }
-    const observer = new IntersectionObserver((entries) => entries.forEach((entry) => {
+    const show = (element) => element.setAttribute("data-revealed", "");
+    const instant = !("IntersectionObserver" in window) || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const observer = instant ? null : new IntersectionObserver((entries) => entries.forEach((entry) => {
       if (entry.isIntersecting) {
         show(entry.target);
         observer.unobserve(entry.target);
       }
     }), { rootMargin: "0px 0px -8% 0px", threshold: 0.12 });
-    items.forEach((element) => observer.observe(element));
-    return () => observer.disconnect();
+    const watch = (root) => {
+      const items = root.matches?.("[data-reveal]") ? [root] : [];
+      items.push(...(root.querySelectorAll?.("[data-reveal]:not([data-revealed])") || []));
+      items.forEach((element) => (instant ? show(element) : observer.observe(element)));
+    };
+    watch(document.body);
+    const added = new MutationObserver((changes) => changes.forEach((change) => change.addedNodes.forEach((node) => node.nodeType === 1 && watch(node))));
+    added.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      added.disconnect();
+      observer?.disconnect();
+    };
   }, []);
 }
 
@@ -631,6 +641,56 @@ function CampusPhotos() {
 }
 
 const SIBOT_KEEP = 3; // questions (with their answers) SiBot keeps on screen
+
+// The newest announcement slides in at the top for 5 seconds (paused while pointed at or focused).
+// Tapping it scrolls to that announcement in "On campus today" and makes it glow for a moment.
+// Each announcement shows once per browser, and again if the school updates it.
+const ANNOUNCEMENT_SEEN_KEY = "sscai-announcement-seen";
+const ANNOUNCEMENT_SECONDS = 5;
+const announcementVersion = (item) => `${item.id}:${item.updatedAt?.toMillis?.() || 0}`;
+
+function AnnouncementPopup({ hidden }) {
+  const announcements = usePublicCollection(CMS_COLLECTIONS.announcements);
+  const [shown, setShown] = useState(null);
+  const [paused, setPaused] = useState(false);
+  const newest = visibleAnnouncements(announcements.items).sort((a, b) => (b.updatedAt?.toMillis?.() || 0) - (a.updatedAt?.toMillis?.() || 0))[0];
+  useEffect(() => {
+    if (!newest || hidden || shown) return;
+    let seen = "";
+    try { seen = localStorage.getItem(ANNOUNCEMENT_SEEN_KEY) || ""; } catch { /* storage blocked: show it */ }
+    if (seen === announcementVersion(newest)) return;
+    setShown(newest);
+  }, [newest, hidden, shown]);
+  const close = () => {
+    try { localStorage.setItem(ANNOUNCEMENT_SEEN_KEY, announcementVersion(shown)); } catch { /* storage unavailable */ }
+    setShown(false);
+  };
+  useEffect(() => {
+    if (!shown || paused || hidden) return undefined;
+    const timer = setTimeout(close, ANNOUNCEMENT_SECONDS * 1000);
+    return () => clearTimeout(timer);
+  });
+  if (!shown || hidden) return null;
+  const open = () => {
+    const id = shown.id;
+    close();
+    document.querySelector("#updates")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setTimeout(() => {
+      const card = document.getElementById(`announcement-${id}`);
+      if (!card) return;
+      card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      card.setAttribute("data-spotlight", "");
+      setTimeout(() => card.removeAttribute("data-spotlight"), 2600);
+    }, 700);
+  };
+  return <aside className="announce-pop" role="status" aria-live="polite" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)}>
+    <button type="button" className="announce-pop-open" onClick={open}>
+      <span className="announce-pop-art" aria-hidden="true"><AnnouncementArt title={shown.title} body={shown.body} picture={shown.picture === "none" ? "art" : shown.picture || "ai"} seed={shown.pictureSeed} aiImage={shown.pictureData} /></span>
+      <span className="announce-pop-text"><small>{shown.pinned ? "Important announcement" : "New announcement"}</small><b>{shown.title}</b><em>Tap to read</em></span>
+    </button>
+    <button type="button" className="announce-pop-close" onClick={close} aria-label="Close the announcement"><Icon name="close" size={16} /></button>
+  </aside>;
+}
 
 function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alreadySignedIn = false, speakAnswers = false }) {
   const [open, setOpen] = useState(false);
@@ -1224,6 +1284,7 @@ export default function App() {
       <AppStatus online={offlineApp.online} updateReady={offlineApp.updateReady} onUpdate={offlineApp.applyUpdate} />
       <InstallPrompt offlineApp={offlineApp} hidden={Boolean(noticeOpen || mapState || arOpen || loginOpen || accountOpen || createAccountOpen || adminLoginOpen || adminView || offlineApp.updateReady)} />
       {noticeOpen && !mapState && !arOpen && !adminView && <PrivacyNotice onDone={() => setNoticeOpen(false)} />}
+      <AnnouncementPopup hidden={Boolean(noticeOpen || mapState || arOpen || loginOpen || accountOpen || createAccountOpen || adminLoginOpen || adminView)} />
       <PolicyDialog />
       <Suspense fallback={<ScreenLoading />}>
       {arOpen && <ArLiveView onClose={() => setArOpen(false)} />}

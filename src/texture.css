@@ -175,14 +175,14 @@ body { background: var(--paper) var(--grain); }
 /* ---------- Motion ---------- */
 /* Scroll reveal: content rises into place once, the first time it scrolls into view. */
 [data-reveal] { opacity: 0; transform: translateY(24px); transition: opacity var(--t-reveal) var(--ease-out) var(--delay, 0ms), transform var(--t-reveal) var(--ease-out) var(--delay, 0ms); }
-[data-reveal].is-visible { opacity: 1; transform: none; }
+[data-reveal][data-revealed] { opacity: 1; transform: none; }
 /* Grids reveal their items one after another (80ms apart) instead of all at once. */
 .ss-ways[data-reveal], .updates-grid[data-reveal] { opacity: 1; transform: none; }
 .ss-ways[data-reveal] > *, .updates-grid[data-reveal] > * { opacity: 0; transform: translateY(24px); transition: opacity var(--t-reveal) var(--ease-out), transform var(--t-reveal) var(--ease-out), box-shadow 260ms var(--ease-out); }
-.ss-ways.is-visible > *, .updates-grid.is-visible > * { opacity: 1; transform: none; }
-.ss-ways.is-visible > :nth-child(2), .updates-grid.is-visible > :nth-child(2) { transition-delay: 80ms, 80ms, 0ms; }
-.ss-ways.is-visible > :nth-child(3), .updates-grid.is-visible > :nth-child(3) { transition-delay: 160ms, 160ms, 0ms; }
-.updates-grid.is-visible > .updates-card:hover { transform: translateY(-4px); transition-delay: 0ms; }
+.ss-ways[data-revealed] > *, .updates-grid[data-revealed] > * { opacity: 1; transform: none; }
+.ss-ways[data-revealed] > :nth-child(2), .updates-grid[data-revealed] > :nth-child(2) { transition-delay: 80ms, 80ms, 0ms; }
+.ss-ways[data-revealed] > :nth-child(3), .updates-grid[data-revealed] > :nth-child(3) { transition-delay: 160ms, 160ms, 0ms; }
+.updates-grid[data-revealed] > .updates-card:hover { transform: translateY(-4px); transition-delay: 0ms; }
 
 /* Mobile menu slides down from the header it belongs to. */
 .ss-nav.open { animation: menu-in 220ms var(--ease-out); }

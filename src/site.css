@@ -153,7 +153,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .ss-offline-steps, .ss-offline-hint, .ss-offline-done { margin: 0; color: #cfdacb; font-size: 15px; line-height: 1.5; }
 .ss-offline-steps { padding-left: 20px; }
 .ss-offline-done { display: flex; align-items: center; gap: 8px; color: var(--sage, #a4bd9c); }
-.ss-ways.is-visible > :nth-child(4) { transition-delay: 240ms, 240ms, 0ms; }
+.ss-ways[data-revealed] > :nth-child(4) { transition-delay: 240ms, 240ms, 0ms; }
 @media (max-width: 900px) {
   .ss-way-offline { grid-template-columns: minmax(0, 1fr); gap: 20px; }
 }
