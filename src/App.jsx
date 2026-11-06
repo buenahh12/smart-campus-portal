@@ -259,7 +259,11 @@ function useReveal() {
   }, []);
 }
 
-function LoginModal({ onClose, onCreate, onSignedIn = () => {} }) {
+// The administrator's username (VITE_ADMIN_USERNAME, "admin1" by default) and Firebase email.
+const ADMIN_USERNAME = (import.meta.env.VITE_ADMIN_USERNAME || "admin1").toLowerCase();
+const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || "";
+
+function LoginModal({ onClose, onCreate, onSignedIn = () => {}, onAdminSignedIn = () => {} }) {
   const [signingIn, setSigningIn] = useState(false);
   const [emailSigningIn, setEmailSigningIn] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
@@ -274,17 +278,37 @@ function LoginModal({ onClose, onCreate, onSignedIn = () => {} }) {
   const handleEmailSignIn = async (event) => {
     event.preventDefault();
     setError("");
+    const typed = loginEmail.trim();
+    const isUsername = !typed.includes("@");
+    // The administrator signs in here with their username, like everyone else.
+    if (isUsername && typed.toLowerCase() === ADMIN_USERNAME) {
+      if (!ADMIN_EMAIL) {
+        setError("Admin sign-in needs VITE_ADMIN_EMAIL configured for the authorized Firebase account.");
+        return;
+      }
+      setEmailSigningIn(true);
+      try {
+        onAdminSignedIn(await loginAsAdmin({ email: ADMIN_EMAIL, password: loginPassword }));
+      } catch (adminError) {
+        setError(isOfflineError(adminError) ? NEEDS_INTERNET : "Username or password is incorrect. Check both and try again.");
+      } finally {
+        setEmailSigningIn(false);
+      }
+      return;
+    }
+    // Just a name, like "juan.delacruz": most families use Gmail, so try name@gmail.com.
+    const email = isUsername ? `${typed}@gmail.com` : typed;
     setEmailSigningIn(true);
     try {
-      const credential = await loginWithEmail({ email: loginEmail, password: loginPassword });
+      const credential = await loginWithEmail({ email, password: loginPassword });
       onSignedIn(credential.user);
     } catch (signInError) {
       setError(isOfflineError(signInError) ? NEEDS_INTERNET : signInError.code === "auth/invalid-credential" || signInError.code === "auth/user-not-found" || signInError.code === "auth/wrong-password"
-        ? "Email or password is incorrect. Check both and try again."
+        ? isUsername ? `We couldn't sign in as ${email}. Check your password, or type your full email address.` : "Email or password is incorrect. Check both and try again."
         : signInError.code === "auth/too-many-requests"
           ? "Too many sign-in attempts. Wait a little and try again, or reset your password."
           : signInError.code === "auth/invalid-email"
-            ? "Enter a valid email address."
+            ? "Type your email (like juan@gmail.com) or your username."
             : signInError.message || "Email sign-in could not be completed.");
     } finally {
       setEmailSigningIn(false);
@@ -382,9 +406,9 @@ function LoginModal({ onClose, onCreate, onSignedIn = () => {} }) {
               </button>}
             <div className="divider"><span>OR USE EMAIL</span></div>
             <form className="email-login-form" onSubmit={handleEmailSignIn}>
-              <label>Email address<input type="email" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} autoComplete="username" placeholder="you@example.com" required /></label>
+              <label>Email or username<input type="text" inputMode="email" autoCapitalize="none" spellCheck={false} value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} autoComplete="username" placeholder="juan@gmail.com or juan" required /></label>
               <label>Password<div className="password-field"><input type={showLoginPassword ? "text" : "password"} value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} autoComplete="current-password" placeholder="Your password" required /><button type="button" className="password-visibility" onClick={() => setShowLoginPassword((visible) => !visible)} aria-label={showLoginPassword ? "Hide password" : "Show password"}><Icon name={showLoginPassword ? "eyeOff" : "eye"} size={18} /></button></div></label>
-              <button className="password-reset-inline" type="button" onClick={() => { setResetEmail(loginEmail); setResetMode(true); setError(""); setResetSent(false); }}>Forgot password?</button>
+              <button className="password-reset-inline" type="button" onClick={() => { const typed = loginEmail.trim(); setResetEmail(typed.includes("@") ? typed : typed && typed.toLowerCase() !== ADMIN_USERNAME ? `${typed}@gmail.com` : ""); setResetMode(true); setError(""); setResetSent(false); }}>Forgot password?</button>
               {error && <p className="auth-error" role="alert">{error}</p>}
               <button className="visitor-button" type="submit" disabled={emailSigningIn}>{emailSigningIn ? "Signing in..." : "Sign in with email"}</button>
             </form>
@@ -500,9 +524,8 @@ function AdminLogin({ onClose, onSuccess }) {
   const submit = async (event) => {
     event.preventDefault();
     setError("");
-    const adminUsername = import.meta.env.VITE_ADMIN_USERNAME || "admin1";
-    const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
-    if (username.trim().toLowerCase() !== adminUsername.toLowerCase()) {
+    const adminEmail = ADMIN_EMAIL;
+    if (username.trim().toLowerCase() !== ADMIN_USERNAME) {
       setError("The administrator username or password is incorrect.");
       return;
     }
@@ -1205,7 +1228,7 @@ export default function App() {
       <Suspense fallback={<ScreenLoading />}>
       {arOpen && <ArLiveView onClose={() => setArOpen(false)} />}
       {mapState && <CampusMap onClose={() => setMapState(null)} initialFloor={mapState.floor || 2} initialDestination={mapState.destination || null} initialEmergency={Boolean(mapState.emergency)} />}
-      {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} onCreate={openCreateAccount} onSignedIn={(user) => { setSignedInUser(user); setLoginOpen(false); setAccountOpen(true); }} />}
+      {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} onCreate={openCreateAccount} onSignedIn={(user) => { setSignedInUser(user); setLoginOpen(false); setAccountOpen(true); }} onAdminSignedIn={(user) => { setLoginOpen(false); setSignedInUser(user); setRole("admin"); setAdminView("content"); }} />}
       {accountOpen && signedInUser && <MyCampus
         user={signedInUser}
         onClose={() => setAccountOpen(false)}
