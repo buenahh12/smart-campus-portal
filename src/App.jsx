@@ -18,6 +18,7 @@ import { useOfflineApp } from "./offline";
 import { BUILDING_NAME, FLOORS, PLACES, findPlaceKey, floorShort, placeByKey, placeTitle, sectionsOf, floorLabel as planFloorLabel } from "./floorPlans";
 import { searchPlace } from "./placeSearch";
 import { PolicyDialog, PrivacyNotice, privacyNoticeSeen } from "./Policies";
+import { FeedbackDialog, openFeedback } from "./Feedback";
 
 // Where the person said they are, last time they used the floor plan (to pick the nearest CR).
 const savedStart = () => {
@@ -156,6 +157,8 @@ const MyCampus = lazyScreen(loadMyCampus);
 const AdminCms = lazyScreen(() => import("./AdminCms"));
 const AdminAnalytics = lazyScreen(() => import("./AdminAnalytics"));
 const AdminSignIns = lazyScreen(() => import("./AdminSignIns"));
+const AdminFeedback = lazyScreen(() => import("./Feedback"));
+const AdminChangeLog = lazyScreen(() => import("./AdminChangeLog"));
 
 // Fetch the screens visitors use most once the page is idle, so they still open if the
 // connection drops later.
@@ -692,6 +695,9 @@ function AnnouncementPopup({ hidden }) {
   </aside>;
 }
 
+// The role shown with a feedback message (no names or emails unless they choose to be replied to).
+const feedbackRole = (role) => ({ admin: "Administrator", visitor: "Visitor (no account)", user: "Signed in", guest: "Guest" }[role] || "Guest");
+
 function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alreadySignedIn = false, speakAnswers = false }) {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
@@ -935,6 +941,12 @@ export default function App() {
   usePrefetchScreens();
   const offlineApp = useOfflineApp();
   const [loginOpen, setLoginOpen] = useState(false);
+  const [feedbackStart, setFeedbackStart] = useState(null); // open feedback form, with what it is about
+  useEffect(() => {
+    const open = (event) => setFeedbackStart(event.detail || {});
+    window.addEventListener("sscai:feedback", open);
+    return () => window.removeEventListener("sscai:feedback", open);
+  }, []);
   const [noticeOpen, setNoticeOpen] = useState(() => !privacyNoticeSeen());
   const [menuOpen, setMenuOpen] = useState(false);
   const [floor, setFloor] = useState(2);
@@ -1277,7 +1289,7 @@ export default function App() {
         </div>
         <div className="ss-container ss-footer-bottom">
           <span>© 2026 Saint Simon of Cyrene Academy, Inc.</span>
-          <span className="ss-footer-links"><a href="#privacy">Privacy Policy</a> <a href="#terms">Terms of Use</a> <a href="#top">Back to top</a></span>
+          <span className="ss-footer-links"><button type="button" className="ss-footer-feedback" onClick={() => openFeedback()}>Send feedback</button> <a href="#privacy">Privacy Policy</a> <a href="#terms">Terms of Use</a> <a href="#top">Back to top</a></span>
         </div>
       </footer>
       {!accountOpen && !loginOpen && !mapState && !arOpen && <SiiBot onSignIn={openLogin} onSignOut={handleSignOut} onOpenAccount={() => setAccountOpen(true)} alreadySignedIn={Boolean(signedInUser)} onNavigate={navigateTo} onOpenMap={setMapState} />}
@@ -1286,6 +1298,7 @@ export default function App() {
       {noticeOpen && !mapState && !arOpen && !adminView && <PrivacyNotice onDone={() => setNoticeOpen(false)} />}
       <AnnouncementPopup hidden={Boolean(noticeOpen || mapState || arOpen || loginOpen || accountOpen || createAccountOpen || adminLoginOpen || adminView)} />
       <PolicyDialog />
+      {feedbackStart && <FeedbackDialog user={signedInUser} role={feedbackRole(role)} start={feedbackStart} onClose={() => setFeedbackStart(null)} />}
       <Suspense fallback={<ScreenLoading />}>
       {arOpen && <ArLiveView onClose={() => setArOpen(false)} />}
       {mapState && <CampusMap onClose={() => setMapState(null)} initialFloor={mapState.floor || 2} initialDestination={mapState.destination || null} initialEmergency={Boolean(mapState.emergency)} />}
@@ -1305,9 +1318,11 @@ export default function App() {
       />}
       {createAccountOpen && <CreateAccountModal onClose={() => setCreateAccountOpen(false)} onCreated={(user) => { setSignedInUser(user); setCreateAccountOpen(false); setAccountOpen(true); }} />}
       {adminLoginOpen && <AdminLogin onClose={() => setAdminLoginOpen(false)} onSuccess={(user) => { setAdminLoginOpen(false); setLoginOpen(false); setSignedInUser(user); setRole("admin"); setAdminView("content"); }} />}
-      {isAdmin && adminView === "analytics" && <AdminAnalytics onClose={() => setAdminView(null)} onOpenContent={() => setAdminView("content")} onOpenSignIns={() => setAdminView("signins")} />}
+      {isAdmin && adminView === "analytics" && <AdminAnalytics onClose={() => setAdminView(null)} onOpenContent={() => setAdminView("content")} onOpenSignIns={() => setAdminView("signins")} onOpenFeedback={() => setAdminView("feedback")} onOpenLog={() => setAdminView("log")} />}
+      {isAdmin && adminView === "feedback" && <AdminFeedback onClose={() => setAdminView(null)} onOpenContent={() => setAdminView("content")} onOpenVisits={() => setAdminView("analytics")} onOpenSignIns={() => setAdminView("signins")} onOpenLog={() => setAdminView("log")} />}
+      {isAdmin && adminView === "log" && <AdminChangeLog onClose={() => setAdminView(null)} onOpenContent={() => setAdminView("content")} onOpenVisits={() => setAdminView("analytics")} onOpenSignIns={() => setAdminView("signins")} onOpenFeedback={() => setAdminView("feedback")} />}
       {isAdmin && adminView === "signins" && <AdminSignIns onClose={() => setAdminView(null)} onOpenContent={() => setAdminView("content")} onOpenVisits={() => setAdminView("analytics")} />}
-      {isAdmin && adminView === "content" && <AdminCms onClose={() => setAdminView(null)} onOpenAnalytics={() => setAdminView("analytics")} onOpenSignIns={() => setAdminView("signins")} />}
+      {isAdmin && adminView === "content" && <AdminCms onClose={() => setAdminView(null)} onOpenAnalytics={() => setAdminView("analytics")} onOpenSignIns={() => setAdminView("signins")} onOpenFeedback={() => setAdminView("feedback")} onOpenLog={() => setAdminView("log")} />}
       </Suspense>
     </div>
   );

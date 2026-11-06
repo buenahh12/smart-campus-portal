@@ -52,21 +52,80 @@ export function watchCollection(name, onData, onError = () => {}, { publicOnly =
   );
 }
 
+// ---------- Content update log ----------
+// changeLog/{id} = one line per admin change: what kind of item, which one, what was done, which
+// fields changed, by whom and when. Append-only (firestore.rules): lines can't be edited or deleted.
+// Logging never blocks the change itself: if a line can't be written, the change still stands.
+export const LOG_TYPES = {
+  announcements: 'Announcement', pathwayClosures: 'Pathway restriction', rooms: 'Room', offices: 'Office',
+  mapRooms: 'Floor plan room', planFloors: 'Added floor', feedback: 'Feedback',
+};
+const LOG_SKIP_FIELDS = new Set(['updatedAt', 'updatedBy', 'pictureData', 'pictureSeed', 'rooms', 'halls', 'links']);
+const titleOf = (data = {}) => String(data.title || data.name || data.pathway || data.label || data.building || '').slice(0, 120);
+const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+async function logChange(name, itemId, action, title, before = null, after = null) {
+  if (!db || !LOG_TYPES[name]) return;
+  let changed = [];
+  if (before && after) changed = Object.keys({ ...before, ...after }).filter((key) => !LOG_SKIP_FIELDS.has(key) && !same(before[key], after[key]));
+  if (before && after && (before.pictureData || '') !== (after.pictureData || '')) changed.push('picture');
+  try {
+    await addDoc(collection(db, 'changeLog'), {
+      type: name, itemId: String(itemId).slice(0, 80), action, title: String(title || '').slice(0, 120),
+      fields: changed.slice(0, 12).join(', ').slice(0, 200),
+      by: auth.currentUser?.email || '', at: serverTimestamp(),
+    });
+  } catch (error) {
+    console.warn('The change log line could not be saved:', error);
+  }
+}
+const actionFor = (before, after) => {
+  if (!before) return 'added';
+  if (before.published === false && after.published === true) return 'published';
+  if (before.published === true && after.published === false) return 'unpublished';
+  if (before.active === false && after.active === true) return 'turned on';
+  if (before.active === true && after.active === false) return 'turned off';
+  return 'edited';
+};
+const previous = async (name, id) => {
+  if (!LOG_TYPES[name]) return null;
+  try {
+    const snapshot = await getDoc(doc(db, name, id));
+    return snapshot.exists() ? snapshot.data() : null;
+  } catch {
+    return null;
+  }
+};
+
 export async function saveItem(name, id, data) {
   if (!db) throw notConfigured();
   const payload = { ...data, updatedAt: serverTimestamp(), updatedBy: auth.currentUser?.email || auth.currentUser?.uid || '' };
   if (id) {
+    const before = await previous(name, id);
     await updateDoc(doc(db, name, id), payload);
+    logChange(name, id, actionFor(before, data), titleOf(data), before, data);
     return id;
   }
   const created = await addDoc(collection(db, name), payload);
+  logChange(name, created.id, 'added', titleOf(data));
   return created.id;
 }
 
 // Creates or fully replaces the document with a known id (used for floor plan rooms).
-export function setItem(name, id, data) {
-  if (!db) return Promise.reject(notConfigured());
-  return setDoc(doc(db, name, id), { ...data, updatedAt: serverTimestamp(), updatedBy: auth.currentUser?.email || auth.currentUser?.uid || '' });
+export async function setItem(name, id, data) {
+  if (!db) throw notConfigured();
+  const before = await previous(name, id);
+  await setDoc(doc(db, name, id), { ...data, updatedAt: serverTimestamp(), updatedBy: auth.currentUser?.email || auth.currentUser?.uid || '' });
+  logChange(name, id, actionFor(before, data), titleOf(data), before, data);
+}
+
+// Admin only, newest first, kept live.
+export function watchChangeLog(onData, onError = () => {}) {
+  if (!db) {
+    onError(notConfigured());
+    return () => {};
+  }
+  return onSnapshot(query(collection(db, 'changeLog'), orderBy('at', 'desc'), limit(1000)), (snapshot) => onData(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))), onError);
 }
 
 // One document, or null when it does not exist.
@@ -76,10 +135,12 @@ export async function readItem(name, id) {
   return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
 }
 
-export const deleteItem = (name, id) => {
-  if (!db) return Promise.reject(notConfigured());
-  return deleteDoc(doc(db, name, id));
-};
+export async function deleteItem(name, id) {
+  if (!db) throw notConfigured();
+  const before = await previous(name, id);
+  await deleteDoc(doc(db, name, id));
+  if (before) logChange(name, id, name === 'mapRooms' ? 'reset' : 'deleted', titleOf(before));
+}
 
 // Reports the signed-in user and their role. The role comes from the "admin"
 // custom claim inside the Firebase ID token (a signed JWT), so it cannot be
@@ -274,4 +335,59 @@ export function setEmailUpdates(user, name, enabled) {
   if (!db) return Promise.reject(notConfigured());
   const ref = doc(db, 'subscribers', user.uid);
   return enabled ? setDoc(ref, { email: user.email, name: name || '', updatedAt: serverTimestamp() }) : deleteDoc(ref);
+}
+
+// ---------- Feedback ----------
+// feedback/{id} = one message from anyone (signed in or not). Only the administrator can read,
+// mark or delete it (see firestore.rules). The email is kept only if they ticked "may reply".
+export const FEEDBACK_KINDS = [
+  { value: 'directions', label: 'Wrong directions or map' },
+  { value: 'room', label: 'Wrong room or office info' },
+  { value: 'idea', label: 'An idea' },
+  { value: 'problem', label: "Something isn't working" },
+  { value: 'other', label: 'Something else' },
+];
+export const FEEDBACK_RATINGS = [
+  { value: 3, face: '😀', label: 'Love it' },
+  { value: 2, face: '🙂', label: "It's okay" },
+  { value: 1, face: '🙁', label: 'Not good' },
+];
+
+export function sendFeedback({ kind, rating = 0, message, page = '', user = null, role = '', replyOk = false }) {
+  if (!db) return Promise.reject(notConfigured());
+  const signedIn = Boolean(user && !user.isAnonymous);
+  return addDoc(collection(db, 'feedback'), {
+    kind,
+    rating: Number(rating) || 0,
+    message: String(message).trim().slice(0, 1000),
+    page: String(page).slice(0, 80),
+    role: String(role || (user?.isAnonymous ? 'Visitor (no account)' : signedIn ? 'Signed in' : 'Guest')).slice(0, 30),
+    uid: user?.uid || '',
+    email: replyOk && signedIn ? user.email || '' : '',
+    status: 'new',
+    createdAt: serverTimestamp(),
+  });
+}
+
+// Newest first, kept live. Admin only.
+export function watchFeedback(onData, onError = () => {}) {
+  if (!db) {
+    onError(notConfigured());
+    return () => {};
+  }
+  return onSnapshot(query(collection(db, 'feedback'), orderBy('createdAt', 'desc'), limit(500)), (snapshot) => onData(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))), onError);
+}
+
+const feedbackTitle = (data) => String(data?.message || '').slice(0, 60);
+export async function setFeedbackStatus(id, status) {
+  if (!db) throw notConfigured();
+  const before = await previous('feedback', id);
+  await updateDoc(doc(db, 'feedback', id), { status });
+  logChange('feedback', id, `marked ${status}`, feedbackTitle(before));
+}
+export async function deleteFeedback(id) {
+  if (!db) throw notConfigured();
+  const before = await previous('feedback', id);
+  await deleteDoc(doc(db, 'feedback', id));
+  logChange('feedback', id, 'deleted', feedbackTitle(before));
 }

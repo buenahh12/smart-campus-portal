@@ -3,6 +3,7 @@ import Icon from "./Icon";
 import { usePublicCollection } from "./CampusUpdates";
 import { CMS_COLLECTIONS, isClosureActive } from "./cms";
 import { usePlanVersion } from "./usePlan";
+import { openFeedback } from "./Feedback";
 import {
   FLOORS,
   PLACES,
@@ -686,6 +687,7 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
                       </button>
                     </li>)}
                   </ol>
+                  <button type="button" className="map-feedback-link" onClick={() => openFeedback({ kind: "directions", page: `Route: ${placeTitle(route.start)} to ${placeTitle(route.end)}`.slice(0, 80) })}>Something wrong with these directions? Tell us</button>
                 </>
                 : <p className="map-empty">Choose where you are and where you&apos;re going, or tap a room on the plan.</p>}
           </div>
