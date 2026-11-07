@@ -998,13 +998,18 @@ export default function App() {
     setLoginOpen(false);
     setCreateAccountOpen(true);
   };
-  // The administrator's private way in: the site address followed by #admin. Nothing on the site
-  // links to it; the admin account and the database rules still guard everything behind it.
+  // The administrator's private ways in: signing in with the admin username, or the site address
+  // followed by #admin. Nothing on the site shows or links to the admin side (no Admin button);
+  // the admin account and the database rules guard everything behind it. Already signed in as the
+  // admin, #admin goes straight to the Content manager.
+  const roleRef = useRef(role);
+  roleRef.current = role;
   useEffect(() => {
     const check = () => {
       if (location.hash !== "#admin") return;
       history.replaceState(null, "", location.pathname + location.search);
-      setAdminLoginOpen(true);
+      if (roleRef.current === "admin") setAdminView("content");
+      else setAdminLoginOpen(true);
     };
     check();
     window.addEventListener("hashchange", check);
@@ -1088,7 +1093,6 @@ export default function App() {
             <a className="ss-nav-link" href="#visit" onClick={() => setMenuOpen(false)}>Visit</a>
             <div className="ss-nav-actions">
               {offlineApp.canInstall && <button type="button" className="ss-btn ss-btn-quiet" onClick={() => { setMenuOpen(false); offlineApp.install(); }}>Install app</button>}
-              {isAdmin &&<button type="button" className="ss-btn ss-btn-quiet" onClick={() => { setMenuOpen(false); setAdminView("content"); }}>Admin</button>}
               {signedInUser
                 ? <button type="button" className="ss-btn ss-btn-primary" onClick={() => { setMenuOpen(false); setAccountOpen(true); }}>My Campus</button>
                 : <button type="button" className="ss-btn ss-btn-primary" onClick={openLogin}>Sign in</button>}
