@@ -320,8 +320,14 @@ export function buildRoute(route, ballHeight = 0.6) {
     const point = new THREE.Vector3(x, (floorLevel - 1) * FLOOR_HEIGHT + ballHeight, z);
     if (!points.length || points[points.length - 1].distanceTo(point) > 0.05) points.push(point);
   };
+  // A stairwell's own point (its middle) is left out where the route changes floor there: the
+  // trail goes from the stair entrance straight onto the steps, and off them to the hallway.
+  const changesFloor = (index) => {
+    const node = nodes[index];
+    return node.kind === "room" && [nodes[index - 1], nodes[index + 1]].some((other) => other && other.floor !== node.floor);
+  };
   nodes.forEach((node, index) => {
-    push(node.x, node.y, node.floor);
+    if (!changesFloor(index)) push(node.x, node.y, node.floor);
     const next = nodes[index + 1];
     if (next && next.floor !== node.floor && node.kind === "room") stairClimb(node, next).forEach(([px, py, level]) => push(px, py, level));
   });
