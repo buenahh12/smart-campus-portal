@@ -293,9 +293,13 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
     const stepWalk = (walk, time) => {
       const { curve, length, ball, halo, floors: routeFloors, ballHeight } = walk.group.userData;
       if (walk.started === undefined) walk.started = time;
+      const dt = Math.min(0.1, walk.last === undefined ? 0 : (time - walk.last) / 1000);
+      walk.last = time;
       // The ball always walks the route (it is the directions, not decoration); with reduced motion
       // only the camera stays still and the glow does not pulse.
       const travelled = ((time - walk.started) / 1000 * BALL_SPEED) % (length + END_PAUSE * BALL_SPEED);
+      const restarted = walk.travelled !== undefined && travelled < walk.travelled - 1;
+      walk.travelled = travelled;
       const point = curve.getPointAt(Math.min(1, travelled / length));
       ball.position.copy(point);
       if (!reduceMotion) {
@@ -303,43 +307,62 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
         ball.position.y += Math.abs(Math.sin(time / 180)) * 0.45;
       }
       const pov = scene.current.pov;
-      const level = Math.min(Math.max(...routeFloors), Math.max(1, Math.floor((point.y - ballHeight) / FLOOR_HEIGHT + 0.5) + 1));
-      if (level !== walk.level || pov !== walk.pov) {
-        walk.level = level;
-        walk.pov = pov;
-        const top = Math.max(...routeFloors);
-        floors.forEach((item) => {
-          // POV: only the floor you are on (and the one below, seen down the stairs); overview: the route's floors.
-          item.group.visible = pov ? item.floor <= level && item.floor >= level - 1 : item.floor <= top;
-          const opacity = item.floor === level ? 1 : pov ? 0.35 : routeFloors.includes(item.floor) ? 0.22 : 0.1;
-          item.materials.forEach((material) => {
-            const wall = pov && item.floor === level && material.userData.wall;
-            material.opacity = material.isLineBasicMaterial ? opacity * 0.55 : wall ? 0.28 : opacity;
-            material.depthWrite = item.floor === level && !wall;
-          });
+      const feet = point.y - ballHeight; // the height the pin stands at
+      // The floor the pin is on: it only becomes the upper floor once the pin is at (almost) its
+      // level, so on the stairs the floor above stays out of the way.
+      const level = Math.min(Math.max(...routeFloors), Math.max(1, Math.floor((feet + 0.15) / FLOOR_HEIGHT) + 1));
+      const top = Math.max(...routeFloors);
+      // Each floor's target look; opacities then ease toward it every frame (a soft fade).
+      floors.forEach((item) => {
+        let target;
+        if (pov) target = item.floor === level ? 1 : item.floor === level - 1 ? 0.35 : 0;
+        else target = item.floor > top ? 0 : item.floor === level ? 1 : routeFloors.includes(item.floor) ? 0.22 : 0.1;
+        const now = item.fade ?? target;
+        const next = restarted || pov !== walk.pov ? target : now + (target - now) * Math.min(1, dt * 5);
+        item.fade = next;
+        item.group.visible = next > 0.02;
+        item.materials.forEach((material) => {
+          const wall = pov && item.floor === level && material.userData.wall;
+          material.opacity = material.isLineBasicMaterial ? next * 0.55 : wall ? Math.min(next, 0.28) : next;
+          material.depthWrite = next > 0.95 && !wall;
         });
-      }
+      });
+      walk.pov = pov;
+      walk.level = level;
       ball.scale.setScalar(pov ? 0.38 : 0.7);
       if (pov) {
-        // Eye level, a few steps behind the pin, looking where it is going. Up and down the stairs
-        // the camera climbs with it.
+        // Eye level, a few steps behind the pin, looking where it is going. The camera turns at a
+        // steady pace (so the U-turn on a stair landing is a smooth swing, not a flip) and climbs
+        // with the pin. On a restart it cuts straight back to the start.
         const ahead = curve.getPointAt(Math.min(1, (travelled + 5) / length));
         const behind = curve.getPointAt(Math.max(0, (travelled - 5) / length));
-        const heading = ahead.clone().sub(behind).setY(0);
-        if (heading.lengthSq() < 0.01) heading.copy(walk.heading || new THREE.Vector3(0, 0, -1));
-        heading.normalize();
-        walk.heading = walk.heading ? walk.heading.lerp(heading, reduceMotion ? 1 : 0.08).normalize() : heading;
-        const eye = point.clone().addScaledVector(walk.heading, -8.5);
-        eye.y = point.y - ballHeight + 3.8;
-        camera.position.lerp(eye, reduceMotion ? 1 : 0.15);
-        const look = point.clone().addScaledVector(walk.heading, 6);
-        look.y = ahead.y - ballHeight + 0.6;
-        walk.look = walk.look ? walk.look.lerp(look, reduceMotion ? 1 : 0.15) : look;
+        const direction = ahead.clone().sub(behind).setY(0);
+        const wanted = direction.lengthSq() < 0.01 ? walk.angle ?? 0 : Math.atan2(direction.x, direction.z);
+        if (walk.angle === undefined || restarted || reduceMotion) walk.angle = wanted;
+        else {
+          let turn = wanted - walk.angle;
+          turn = Math.atan2(Math.sin(turn), Math.cos(turn)); // the short way round
+          const maxTurn = 1.1 * dt; // radians a second: a calm swing round the stair landing
+          walk.angle += Math.max(-maxTurn, Math.min(maxTurn, turn));
+        }
+        const heading = new THREE.Vector3(Math.sin(walk.angle), 0, Math.cos(walk.angle));
+        const eye = point.clone().addScaledVector(heading, -8.5);
+        eye.y = feet + 3.8;
+        const look = point.clone().addScaledVector(heading, 6);
+        look.y = feet + 0.6 + (ahead.y - point.y) * 0.6;
+        if (restarted || !walk.look || reduceMotion) {
+          camera.position.copy(eye);
+          walk.look = look;
+        } else {
+          const ease = Math.min(1, dt * 6);
+          camera.position.lerp(eye, ease);
+          walk.look.lerp(look, ease);
+        }
         camera.lookAt(walk.look);
         return;
       }
-      const aim = new THREE.Vector3(point.x * 0.6, point.y - ballHeight, point.z * 0.6);
-      const move = aim.sub(controls.target).multiplyScalar(reduceMotion ? 0 : 0.05);
+      const aim = new THREE.Vector3(point.x * 0.6, feet, point.z * 0.6);
+      const move = aim.sub(controls.target).multiplyScalar(reduceMotion ? 0 : Math.min(1, dt * 3));
       controls.target.add(move);
       camera.position.add(move);
     };
