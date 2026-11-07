@@ -276,29 +276,40 @@ export function buildExterior() {
 }
 
 // ---------- The route: a green trail and a glowing ball that walks it ----------
-// Going between floors: up (or down) the first flight to the half landing at the far end of the
-// stairwell, across the landing, then the second flight back to the entrance side, one floor up.
-// Straight stairs (no U shape) are one ramp across the stairwell. Plan units, floors as numbers.
-function stairClimb(node, next) {
-  const room = FLOORS.find((plan) => plan.floor === node.floor)?.rooms.find((item) => item.id === node.room);
-  if (!room) return [];
+// Where things are in a stairwell: t runs from the entrance end (0) to the far end (1), u across
+// it (0 to 1). The first flight is u < 0.5, the second u > 0.5; the half landing is t > LANDING.
+export const STAIR = { FIRST: 0.1, LANDING: 0.78 };
+export function stairFrame(room) {
   const [x, y, w, h] = room.rect;
   const vertical = h >= w;
   const door = room.door || [x + w / 2, y + h / 2];
   const nearStart = vertical ? door[1] - y < h / 2 : door[0] - x < w / 2;
-  const along = (t) => (nearStart ? t : 1 - t); // 0 at the entrance end, 1 at the far end
-  const at = (t, u) => (vertical ? [x + w * u, y + h * along(t)] : [x + w * along(t), y + h * u]);
-  const from = node.floor;
-  const to = next.floor;
-  const mid = (from + to) / 2;
-  if (room.shape !== "u") return [[...at(0.1, 0.5), from], [...at(0.9, 0.5), to]];
-  return [
-    [...at(0.12, 0.28), from],
-    [...at(0.8, 0.28), mid],
-    [...at(0.92, 0.5), mid],
-    [...at(0.8, 0.72), mid],
-    [...at(0.12, 0.72), to],
-  ];
+  const along = (t) => (nearStart ? t : 1 - t);
+  return {
+    at: (t, u) => (vertical ? [x + w * u, y + h * along(t)] : [x + w * along(t), y + h * u]),
+    length: (vertical ? h : w) * M,
+    width: (vertical ? w : h) * M,
+    vertical,
+  };
+}
+
+// Going between floors: up (or down) the first flight to the half landing at the far end of the
+// stairwell, across the landing, then the second flight back to the entrance side, one floor up.
+// Straight stairs (no U shape) are one ramp across the stairwell. Plan units, floors as numbers.
+function stairClimb(node, next) {
+  // The flights are in the lower floor's stairwell (they rise from it to the floor above).
+  const stairId = FLOORS.find((plan) => plan.floor === node.floor)?.rooms.find((item) => item.id === node.room)?.stair;
+  const lower = Math.min(node.floor, next.floor);
+  const room = FLOORS.find((plan) => plan.floor === lower)?.rooms.find((item) => stairId && item.stair === stairId);
+  if (!room) return [];
+  const { at } = stairFrame(room);
+  const up = next.floor > node.floor;
+  // Fraction of the climb at each point: entrance (0), the half landing (0.5), the floor above (1).
+  const climb = room.shape === "u"
+    ? [[STAIR.FIRST, 0.25, 0], [STAIR.LANDING, 0.25, 0.5], [(STAIR.LANDING + 1) / 2, 0.5, 0.5], [STAIR.LANDING, 0.75, 0.5], [STAIR.FIRST, 0.75, 1]]
+    : [[STAIR.FIRST, 0.5, 0], [0.88, 0.5, 1]];
+  const points = climb.map(([t, u, f]) => [...at(t, u), lower + f]);
+  return up ? points : points.reverse();
 }
 
 export function buildRoute(route, ballHeight = 0.6) {

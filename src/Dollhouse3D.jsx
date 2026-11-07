@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { BUILDING_NAME, FLOORS, METERS_PER_UNIT as M, PLAN_HEIGHT, PLAN_WIDTH } from "./floorPlans";
-import { buildExterior, buildRoute } from "./building3d";
+import { STAIR, buildExterior, buildRoute, stairFrame } from "./building3d";
+import { furnishFloor, scaleUv, tileTexture, woodTexture } from "./interior3d";
 
 // 3D dollhouse of the Main Academic Building, built from the same rectangles as the 2D
 // floor plan. The building method (floor slabs, 2.5 m walls with door gaps, stacked floors)
@@ -15,10 +16,11 @@ const WALL_THICKNESS = 0.15;
 const SLAB = 0.2;
 const DOOR_WIDTH = 1.0;
 
+// Like an architect's model: white walls, wood floors in rooms, light tiles in hallways and C.R.s.
 const COLORS = {
   hall: "#ebe4d3",
-  wall: "#f6efe1",
-  edge: "#4a564f",
+  wall: "#f7f5ef",
+  edge: "#b9b3a6",
   stairs: "#e8c9a0",
   exit: "#e9a99f",
   deck: "#d7e0d1",
@@ -66,26 +68,61 @@ function buildFloor(plan, materialFor) {
     edges.position.copy(mesh.position);
     group.add(edges);
   };
-  const slab = ([x, y, w, h], color, lift = 0) => {
+  const slab = ([x, y, w, h], color, lift = 0, texture = "") => {
     const [cx, cz] = toWorld(x + w / 2, y + h / 2);
-    box(w * M, SLAB, h * M, color, cx, SLAB / 2 + lift, cz);
+    if (!texture) {
+      box(w * M, SLAB, h * M, color, cx, SLAB / 2 + lift, cz);
+      return;
+    }
+    const mesh = new THREE.Mesh(scaleUv(new THREE.BoxGeometry(w * M, SLAB, h * M), w * M, h * M), materialFor("#ffffff", false, texture));
+    mesh.position.set(cx, SLAB / 2 + lift, cz);
+    group.add(mesh);
   };
+  const floorTexture = (item) => (item.type === "cr" ? "crtile" : ["classroom", "office", "lab", "facility"].includes(item.type) ? "wood" : "");
 
-  plan.halls.forEach((hall) => slab(hall.rect, COLORS.hall));
+  plan.halls.forEach((hall) => slab(hall.rect, COLORS.hall, 0, "tile"));
   plan.rooms.forEach((item) => {
     if (item.type === "void") return; // open court: nothing to stand on
-    slab(item.rect, roomColor(item), 0.01);
+    const fromBelow = item.type === "stairs" && FLOORS.find((other) => other.building === plan.building && other.level === plan.level - 1)?.rooms.some((room) => room.stair && room.stair === item.stair);
+    if (!fromBelow) slab(item.rect, roomColor(item), 0.01, floorTexture(item));
     if (item.type === "deck") return;
     if (item.type === "stairs") {
-      // A few steps rising across the stairwell so it reads as stairs from above.
-      const [x, y, w, h] = item.rect;
-      const steps = 5;
-      for (let i = 0; i < steps; i += 1) {
-        const [cx, cz] = toWorld(x + w / 2, y + (h * (i + 0.5)) / steps);
-        box(w * M * 0.8, 0.25 * (i + 1), (h * M) / steps, COLORS.stairs, cx, SLAB + 0.125 * (i + 1), cz);
+      // A real staircase up to the floor above (if the same stairs continue there): for U-shaped
+      // stairs, a flight out to the half landing at the far end and a flight back; otherwise one
+      // straight flight. Each step is a solid block, like a concrete stair.
+      const above = FLOORS.find((other) => other.building === plan.building && other.level === plan.level + 1)?.rooms.some((room) => room.stair && room.stair === item.stair);
+      if (above) {
+        const frame = stairFrame(item);
+        const STEPS = 10;
+        const half = FLOOR_HEIGHT / 2;
+        const step = (t0, t1, u0, u1, top) => {
+          const [ax, az] = toWorld(...frame.at(t0, u0));
+          const [bx, bz] = toWorld(...frame.at(t1, u1));
+          box(Math.abs(bx - ax), top, Math.abs(bz - az), COLORS.stairs, (ax + bx) / 2, SLAB + top / 2, (az + bz) / 2);
+        };
+        const span = STAIR.LANDING - STAIR.FIRST;
+        if (item.shape === "u") {
+          for (let i = 0; i < STEPS; i += 1) {
+            step(STAIR.FIRST + (span * i) / STEPS, STAIR.FIRST + (span * (i + 1)) / STEPS, 0.04, 0.49, (half * (i + 1)) / STEPS);
+            step(STAIR.LANDING - (span * (i + 1)) / STEPS, STAIR.LANDING - (span * i) / STEPS, 0.51, 0.96, half + (half * (i + 1)) / STEPS - SLAB);
+          }
+          step(STAIR.LANDING, 0.98, 0.04, 0.96, half);
+          // The low wall between the two flights.
+          const [ax, az] = toWorld(...frame.at(STAIR.FIRST, 0.5));
+          const [bx, bz] = toWorld(...frame.at(STAIR.LANDING, 0.5));
+          box(frame.vertical ? 0.12 : Math.abs(bx - ax), FLOOR_HEIGHT - 0.4, frame.vertical ? Math.abs(bz - az) : 0.12, COLORS.wall, (ax + bx) / 2, SLAB + (FLOOR_HEIGHT - 0.4) / 2, (az + bz) / 2);
+        } else {
+          for (let i = 0; i < STEPS * 2; i += 1) step(STAIR.FIRST + ((0.88 - STAIR.FIRST) * i) / (STEPS * 2), STAIR.FIRST + ((0.88 - STAIR.FIRST) * (i + 1)) / (STEPS * 2), 0.08, 0.92, (FLOOR_HEIGHT * (i + 1)) / (STEPS * 2) - SLAB / 2);
+        }
       }
     }
+    // Stairs are open to the hallway on the side you walk in (as on the 2D plan).
+    const stairsOpen = item.type === "stairs" && item.door;
     wallSegments(item.rect, item.door).forEach(({ a, b }) => {
+      if (stairsOpen) {
+        const onDoorEdge = a[1] === b[1] ? Math.abs(item.door[1] - a[1]) < 0.6 : Math.abs(item.door[0] - a[0]) < 0.6;
+        if (onDoorEdge) return;
+      }
       const [ax, az] = toWorld(...a);
       const [bx, bz] = toWorld(...b);
       const length = Math.hypot(bx - ax, bz - az);
@@ -95,6 +132,7 @@ function buildFloor(plan, materialFor) {
         (ax + bx) / 2, SLAB + WALL_HEIGHT / 2, (az + bz) / 2);
     });
   });
+  group.add(furnishFloor(plan, toWorld, M, materialFor, SLAB));
   group.position.y = (plan.floor - 1) * FLOOR_HEIGHT;
   return group;
 }
@@ -145,12 +183,15 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
     // Only the main building: floors added there stack on top; other buildings are not drawn.
     const floors = FLOORS.filter((plan) => plan.building === BUILDING_NAME).map((plan) => {
       const materials = new Map();
-      const materialFor = (color, line = false) => {
-        const key = `${color}${line}`;
+      const TEXTURES = { wood: woodTexture, tile: () => tileTexture(), crtile: () => tileTexture("#dfe9ee") };
+      const materialFor = (color, line = false, texture = "") => {
+        const key = `${color}${line}${texture}`;
         if (!materials.has(key)) {
-          materials.set(key, line
+          const made = line
             ? new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.55 })
-            : new THREE.MeshLambertMaterial({ color, transparent: true }));
+            : new THREE.MeshLambertMaterial({ color, transparent: true, ...(texture ? { map: TEXTURES[texture]() } : {}) });
+          made.userData.wall = color === COLORS.wall; // see-through in Walk view, so walls never hide the pin
+          materials.set(key, made);
         }
         return materials.get(key);
       };
@@ -229,12 +270,13 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
           item.group.visible = pov ? item.floor <= level && item.floor >= level - 1 : item.floor <= top;
           const opacity = item.floor === level ? 1 : pov ? 0.35 : routeFloors.includes(item.floor) ? 0.22 : 0.1;
           item.materials.forEach((material) => {
-            material.opacity = material.isLineBasicMaterial ? opacity * 0.55 : opacity;
-            material.depthWrite = item.floor === level;
+            const wall = pov && item.floor === level && material.userData.wall;
+            material.opacity = material.isLineBasicMaterial ? opacity * 0.55 : wall ? 0.28 : opacity;
+            material.depthWrite = item.floor === level && !wall;
           });
         });
       }
-      ball.scale.setScalar(pov ? 0.55 : 1);
+      ball.scale.setScalar(pov ? 0.38 : 0.7);
       if (pov) {
         // Eye level, a few steps behind the pin, looking where it is going. Up and down the stairs
         // the camera climbs with it.
