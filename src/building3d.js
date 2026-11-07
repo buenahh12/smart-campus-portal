@@ -17,7 +17,7 @@ const Z0 = -D / 2;
 const toWorld = (x, y) => [(x - PLAN_WIDTH / 2) * M, (y - PLAN_HEIGHT / 2) * M];
 
 const COLORS = {
-  lime: "#8fd44c",
+  lime: "#85c845",
   limeLight: "#a6e263",
   base: "#2f7a36",
   teal: "#86cdb5",
@@ -133,6 +133,55 @@ function signTexture() {
   return texture;
 }
 
+// A tarpaulin banner: a colour band, a title and a few lines, like the ones on the ground floor.
+function bannerTexture(title, colors, subtitle = "") {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 256;
+  const g = canvas.getContext("2d");
+  const gradient = g.createLinearGradient(0, 0, 512, 256);
+  gradient.addColorStop(0, colors[0]);
+  gradient.addColorStop(1, colors[1]);
+  g.fillStyle = gradient;
+  g.fillRect(0, 0, 512, 256);
+  g.fillStyle = "rgba(255,255,255,.18)";
+  for (let i = 0; i < 6; i += 1) g.fillRect(0, 150 + i * 14, 512 - i * 60, 5);
+  g.fillStyle = colors[2] || "#ffffff";
+  g.font = "italic 900 54px Georgia, serif";
+  g.textAlign = "center";
+  g.fillText(title, 256, 92);
+  if (subtitle) {
+    g.font = "700 30px Arial, sans-serif";
+    g.fillText(subtitle, 256, 136);
+  }
+  g.strokeStyle = "rgba(0,0,0,.35)";
+  g.lineWidth = 8;
+  g.strokeRect(4, 4, 504, 248);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+// Steel mesh for the fire-escape railings (see-through).
+let meshTexture = null;
+function steelMesh() {
+  if (meshTexture) return meshTexture;
+  const canvas = document.createElement("canvas");
+  canvas.width = 64;
+  canvas.height = 64;
+  const g = canvas.getContext("2d");
+  g.strokeStyle = "#1f5a40";
+  g.lineWidth = 3;
+  for (let i = 0; i <= 64; i += 16) {
+    g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 64); g.stroke();
+    g.beginPath(); g.moveTo(0, i); g.lineTo(64, i); g.stroke();
+  }
+  meshTexture = new THREE.CanvasTexture(canvas);
+  meshTexture.wrapS = THREE.RepeatWrapping;
+  meshTexture.wrapT = THREE.RepeatWrapping;
+  return meshTexture;
+}
+
 export function buildExterior() {
   const group = new THREE.Group();
   const materials = new Map();
@@ -241,17 +290,128 @@ export function buildExterior() {
   const [fx2] = toWorld(26, 0);
   const fz = Z0 - 1.4;
   const steel = solid(COLORS.steel);
+  const meshMaterial = mat("mesh", () => new THREE.MeshLambertMaterial({ map: steelMesh(), transparent: true, alphaTest: 0.3, side: THREE.DoubleSide }));
+  // A landing: a steel deck at each end, with a mesh railing on its three open sides and posts.
+  const landing = (x, y) => {
+    add(new THREE.BoxGeometry(3, 0.15, 2.4), steel, x, y + 0.07, fz);
+    const front = add(new THREE.PlaneGeometry(3, 1.05), meshMaterial, x, y + 0.6, fz - 1.2);
+    front.material.map.repeat.set(6, 2);
+    [-1.5, 1.5].forEach((dx) => {
+      const side = add(new THREE.PlaneGeometry(2.4, 1.05), meshMaterial, x + dx, y + 0.6, fz);
+      side.rotation.y = Math.PI / 2;
+    });
+    add(new THREE.BoxGeometry(3.1, 0.07, 0.07), steel, x, y + 1.1, fz - 1.2);
+    [[-1.5, -1.2], [1.5, -1.2], [-1.5, 1.1], [1.5, 1.1]].forEach(([dx, dz]) => add(new THREE.BoxGeometry(0.07, 1.1, 0.07), steel, x + dx, y + 0.55, fz + dz));
+    // Legs down to the ground on the first landing.
+    if (y < FLOOR_HEIGHT * 1.5) [[-1.4, -1.1], [1.4, -1.1]].forEach(([dx, dz]) => add(new THREE.BoxGeometry(0.12, y, 0.12), steel, x + dx, y / 2, fz + dz));
+  };
   for (let level = 1; level <= 4; level += 1) {
     const y = level * FLOOR_HEIGHT;
-    if (level > 1) add(new THREE.BoxGeometry(fx2 - fx1, 0.15, 2.2), steel, (fx1 + fx2) / 2, y - FLOOR_HEIGHT + 0.07, fz);
-    const [from, to] = level % 2 ? [fx1, fx2] : [fx2, fx1];
+    const [from, to] = level % 2 ? [fx1 + 1.5, fx2 - 1.5] : [fx2 - 1.5, fx1 + 1.5];
     const run = Math.abs(to - from);
-    const flight = add(new THREE.BoxGeometry(Math.hypot(run, FLOOR_HEIGHT), 0.22, 1.6), steel, (from + to) / 2, y - FLOOR_HEIGHT / 2, fz);
-    flight.rotation.z = Math.sign(to - from) * Math.atan2(FLOOR_HEIGHT, run);
-    const rail = add(new THREE.BoxGeometry(Math.hypot(run, FLOOR_HEIGHT), 0.08, 0.08), steel, (from + to) / 2, y - FLOOR_HEIGHT / 2 + 1, fz - 0.8);
-    rail.rotation.z = flight.rotation.z;
+    const angle = Math.sign(to - from) * Math.atan2(FLOOR_HEIGHT, run);
+    const slope = Math.hypot(run, FLOOR_HEIGHT);
+    // Open steps (a stringer on each side and treads), a handrail with posts above.
+    [-0.7, 0.7].forEach((dz) => {
+      const stringer = add(new THREE.BoxGeometry(slope, 0.22, 0.08), steel, (from + to) / 2, y - FLOOR_HEIGHT / 2, fz + dz);
+      stringer.rotation.z = angle;
+    });
+    const treads = 12;
+    for (let i = 0; i < treads; i += 1) {
+      const t = (i + 0.5) / treads;
+      add(new THREE.BoxGeometry(0.28, 0.05, 1.35), steel, from + (to - from) * t, y - FLOOR_HEIGHT + FLOOR_HEIGHT * t, fz);
+    }
+    const rail = add(new THREE.BoxGeometry(slope, 0.06, 0.06), steel, (from + to) / 2, y - FLOOR_HEIGHT / 2 + 1, fz - 0.75);
+    rail.rotation.z = angle;
+    for (let i = 1; i < 4; i += 1) {
+      const t = i / 4;
+      add(new THREE.BoxGeometry(0.05, 1, 0.05), steel, from + (to - from) * t, y - FLOOR_HEIGHT + FLOOR_HEIGHT * t + 0.5, fz - 0.75);
+    }
+    landing(level % 2 ? fx2 - 1.5 : fx1 + 1.5, y);
   }
-  add(new THREE.BoxGeometry(fx2 - fx1, 0.15, 2.2), steel, (fx1 + fx2) / 2, H4 + 0.07, fz);
+  landing(fx1 + 1.5, FLOOR_HEIGHT * 0.02);
+
+  // Aircon units on the walls: boxy window units under some windows, split units with a round fan.
+  const unit = (x, y, z, outward, split) => {
+    const turn = Math.atan2(outward[0], outward[1]);
+    if (split) {
+      const body = add(soft(0.9, 0.62, 0.32, 0.05), solid("#f1f1ee"), x + outward[0] * 0.4, y, z + outward[1] * 0.4);
+      body.rotation.y = turn;
+      const fan = add(new THREE.CylinderGeometry(0.22, 0.22, 0.05, 20), solid("#6f7476"), x + outward[0] * 0.58 - (outward[1] ? 0.12 : 0), y, z + outward[1] * 0.58 + (outward[0] ? 0.12 : 0));
+      fan.rotation.x = outward[1] ? Math.PI / 2 : 0;
+      fan.rotation.z = outward[0] ? Math.PI / 2 : 0;
+      add(new THREE.BoxGeometry(outward[1] ? 0.05 : 0.6, 0.05, outward[1] ? 0.6 : 0.05), solid("#9aa0a3"), x + outward[0] * 0.25, y - 0.38, z + outward[1] * 0.25);
+    } else {
+      const box = add(soft(0.72, 0.48, 0.55, 0.04), solid("#e8e4d8"), x + outward[0] * 0.3, y, z + outward[1] * 0.3);
+      box.rotation.y = turn;
+      const grille = add(new THREE.PlaneGeometry(0.6, 0.32), solid("#a9a79e"), x + outward[0] * 0.59, y, z + outward[1] * 0.59);
+      grille.rotation.y = turn;
+    }
+  };
+  // Spread along a wall, between the windows, on chosen floors, in a fixed pattern.
+  const units = (x1, z1, x2, z2, outward, levels, every) => {
+    const length = Math.hypot(x2 - x1, z2 - z1);
+    const count = Math.max(1, Math.floor((length - 4) / 5.5));
+    for (let i = 0; i < count; i += 1) {
+      for (const level of levels) {
+        if ((i + level) % every) continue;
+        const t = (i + 1) / count - 0.5 / count + 0.32 / count;
+        const x = x1 + (x2 - x1) * Math.min(0.97, t);
+        const z = z1 + (z2 - z1) * Math.min(0.97, t);
+        unit(x, level * FLOOR_HEIGHT + (i % 3 === 0 ? 0.9 : 2.4), z, outward, (i + level) % 3 !== 0);
+      }
+    }
+  };
+  units(X0, D / 2, -X0, D / 2, [0, 1], [0, 1, 2], 2);
+  units(X0, D / 2, deckX, D / 2, [0, 1], [3], 3);
+  units(-X0, Z0, X0, Z0, [0, -1], [0, 1, 2, 3], 2);
+  units(-X0, Z0, -X0, D / 2, [1, 0], [0, 1, 2], 3);
+
+  // Tarpaulin banners on the ground floor at the front.
+  const banners = [
+    ["Congratulations!", ["#3a2a52", "#7a4d8c", "#f5d76e"], "Board passer"],
+    ["Congratulations!", ["#5c2a2a", "#a8513d", "#ffe9a8"], "Top achiever"],
+    ["Congratulations!", ["#1f3c6e", "#4f7fbf", "#ffffff"], "Licensed teacher"],
+    ["NOW ACCEPTING", ["#f5c04a", "#f28c3a", "#1d4f8a"], "ENROLLEES"],
+    ["CHAMPION", ["#1d6b3c", "#2fae63", "#ffffff"], "Sports fest"],
+  ];
+  const [b0] = toWorld(4, 0);
+  banners.forEach(([title, colors, subtitle], i) => {
+    const wide = i === 3;
+    const w = wide ? 9 : 2.6;
+    const x = wide ? b0 + 34 : b0 + i * 3.2 + (i === 4 ? 10 : 0);
+    const tarp = add(new THREE.PlaneGeometry(w, 1.6), mat(`banner${i}`, () => new THREE.MeshLambertMaterial({ map: bannerTexture(title, colors, subtitle) })), x, wide ? FLOOR_HEIGHT * 0.62 + 1.6 : 2.2, D / 2 + 0.2);
+    tarp.castShadow = false;
+  });
+
+  // Electric wires: concrete poles in front and behind, with black wires sagging between them
+  // and a few dropping to the building.
+  const wireMaterial = mat("wire", () => new THREE.MeshBasicMaterial({ color: "#1c1c1c" }));
+  const pole = (x, z) => {
+    add(new THREE.CylinderGeometry(0.22, 0.3, 11, 10), solid("#8f8a80"), x, 5.5, z);
+    add(new THREE.BoxGeometry(2.4, 0.18, 0.18), solid("#6b665c"), x, 10.2, z);
+  };
+  const wire = (a, b, sag) => {
+    const mid = a.clone().lerp(b, 0.5);
+    mid.y -= sag;
+    const curve = new THREE.QuadraticBezierCurve3(a, mid, b);
+    const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.035, 5, false), wireMaterial);
+    group.add(tube);
+  };
+  const poles = [[X0 - 3, D / 2 + 4.5], [-6, D / 2 + 4.5], [-X0 + 3, D / 2 + 4.5], [X0 - 3, Z0 - 5], [-X0 + 3, Z0 - 5]];
+  poles.forEach(([x, z]) => pole(x, z));
+  const span = (p, q, count) => {
+    for (let i = 0; i < count; i += 1) {
+      const h = 9.2 + (i % 4) * 0.28;
+      const off = (i % 3) * 0.35 - 0.35;
+      wire(new THREE.Vector3(p[0], h, p[1] + off), new THREE.Vector3(q[0], h - 0.1, q[1] + off), 1.1 + (i % 5) * 0.35);
+    }
+  };
+  span(poles[0], poles[1], 8);
+  span(poles[1], poles[2], 8);
+  span(poles[3], poles[4], 10);
+  // Drops to the walls.
+  [[-6, D / 2 + 4.5, -8, D / 2 + 0.3, 6.5], [-6, D / 2 + 4.5, -2, D / 2 + 0.3, 3], [X0 - 3, D / 2 + 4.5, X0 + 2, D / 2 + 0.3, 5], [X0 - 3, Z0 - 5, X0 + 6, Z0 - 0.3, 6], [-X0 + 3, Z0 - 5, -X0 - 6, Z0 - 0.3, 7]].forEach(([ax, az, bx, bz, by]) => wire(new THREE.Vector3(ax, 9.4, az), new THREE.Vector3(bx, by, bz), 0.6));
 
   // A rounded stone base plate under the building, with a pale path to the entrance.
   add(soft(W + 18, 1.2, D + 18, 0.6), solid("#cfcbc2"), 0, -0.6, 0);
