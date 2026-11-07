@@ -958,6 +958,7 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [floor, setFloor] = useState(2);
   const [highlight3d, setHighlight3d] = useState(null); // a place key lit up in the 3D view
+  const [view3d, setView3d] = useState("outside"); // the home 3D card: the building's outside, or its floors
   const [mapState, setMapState] = useState(null);
   // A link ending in #ar-live or ?ar-live (for example from a printed QR code, or the hand-over
   // from Messenger to Chrome) opens AR live view directly.
@@ -1189,10 +1190,14 @@ export default function App() {
                     <b>{planFloorLabel(floor)}</b>
                   </div>
                   <div className="floor-buttons" role="group" aria-label="Choose a floor" style={{ gridTemplateColumns: `repeat(${mainFloors().length}, minmax(0, 1fr))` }}>
-                    {mainFloors().map((item) => <button key={item} type="button" className={floor === item ? "active" : ""} aria-pressed={floor === item} onClick={() => setFloor(item)}>{floorShort(item)}</button>)}
+                    {mainFloors().map((item) => <button key={item} type="button" className={floor === item ? "active" : ""} aria-pressed={floor === item} onClick={() => { setFloor(item); setView3d("inside"); }}>{floorShort(item)}</button>)}
+                  </div>
+                  <div className="va-segment home-3d-views" role="group" aria-label="3D view">
+                    <button type="button" className={view3d === "outside" ? "active" : ""} aria-pressed={view3d === "outside"} onClick={() => setView3d("outside")}>Outside</button>
+                    <button type="button" className={view3d === "inside" ? "active" : ""} aria-pressed={view3d === "inside"} onClick={() => setView3d("inside")}>Inside</button>
                   </div>
                   <Suspense fallback={<MiniPlan floor={floor} onOpen={() => setMapState({ floor })} />}>
-                    <Dollhouse3D key={planVersion} floor={floor} highlight={highlight3d} onOpen={() => setMapState({ floor })} label={`3D model of the ${planFloorLabel(floor).toLowerCase()}`}
+                    <Dollhouse3D key={planVersion} floor={floor} highlight={highlight3d} view={view3d} zoom onOpen={() => setMapState({ floor })} label={`3D model of the ${planFloorLabel(floor).toLowerCase()}`}
                       fallback={<MiniPlan floor={floor} onOpen={() => setMapState({ floor })} />} />
                     {highlight3d && placeByKey(highlight3d) && <p className="ss-3d-showing"><Icon name="location" size={16} /> Showing <b>{placeTitle(placeByKey(highlight3d))}</b> · {planFloorLabel(placeByKey(highlight3d).floor)}<button type="button" onClick={() => setHighlight3d(null)} aria-label="Stop showing this room">Clear</button></p>}
                   </Suspense>
@@ -1319,6 +1324,7 @@ export default function App() {
         onShowMap={(place) => { setAccountOpen(false); setMapState({ destination: place?.mapKey || findPlaceKey(place?.room, place?.name), floor: place?.floor }); }}
         onShow3D={(place) => {
           setAccountOpen(false);
+          setView3d("inside");
           setFloor(place.floor);
           setHighlight3d(place.mapKey);
           setTimeout(() => document.querySelector(".ss-dollhouse")?.scrollIntoView({ behavior: "smooth", block: "center" }), 200);

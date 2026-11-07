@@ -274,16 +274,28 @@ export function buildRoute(route, ballHeight = 0.6) {
   const trailMaterial = new THREE.MeshBasicMaterial({ color: "#2ddf87", transparent: true, opacity: 0.7, depthTest: false });
   const trail = new THREE.Mesh(new THREE.TubeGeometry(curve, Math.max(40, points.length * 10), 0.16, 8, false), trailMaterial);
   trail.renderOrder = 5;
-  const ballMaterial = new THREE.MeshBasicMaterial({ color: "#ffe27a", depthTest: false });
-  const haloMaterial = new THREE.MeshBasicMaterial({ color: "#ffd45c", transparent: true, opacity: 0.35, depthTest: false });
+  // The guide: the green map pin (like the 2D map's) walking the route, with a soft green glow
+  // on the floor under it. Drawn on top of walls so it is never hidden.
+  // transparent (at full opacity) so it is drawn after the see-through floors, on top of them.
+  const ballMaterial = new THREE.MeshBasicMaterial({ color: "#1fb866", transparent: true, opacity: 1, depthTest: false });
+  const haloMaterial = new THREE.MeshBasicMaterial({ color: "#2ddf87", transparent: true, opacity: 0.4, depthTest: false, side: THREE.DoubleSide });
+  const dotMaterial = new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 1, depthTest: false });
   const ball = new THREE.Group();
-  const core = new THREE.Mesh(new THREE.SphereGeometry(0.9, 28, 20), ballMaterial);
-  const halo = new THREE.Mesh(new THREE.SphereGeometry(1.7, 28, 20), haloMaterial);
-  core.renderOrder = 7;
-  halo.renderOrder = 6;
-  ball.add(halo, core);
-  const light = new THREE.PointLight("#ffd45c", 6, 10);
-  ball.add(light);
+  const floorAt = -ballHeight + 0.15;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(1.15, 28, 20), ballMaterial);
+  head.position.y = floorAt + 3.1;
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.95, 2.1, 28), ballMaterial);
+  tip.rotation.x = Math.PI;
+  tip.position.y = floorAt + 1.6;
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.48, 20, 14), dotMaterial);
+  dot.position.set(0, floorAt + 3.15, 0);
+  dot.scale.set(1, 1, 0.4);
+  const halo = new THREE.Mesh(new THREE.RingGeometry(0.2, 1.5, 32), haloMaterial);
+  halo.rotation.x = -Math.PI / 2;
+  halo.position.y = floorAt;
+  [halo, tip, head, dot].forEach((mesh, i) => { mesh.renderOrder = 10 + i; });
+  ball.add(halo, tip, head, dot);
+  ball.userData.dot = dot;
   const startMaterial = new THREE.MeshBasicMaterial({ color: "#3b82f6", transparent: true, opacity: 0.85, depthTest: false, side: THREE.DoubleSide });
   const start = new THREE.Mesh(new THREE.RingGeometry(0.6, 1.1, 32), startMaterial);
   start.rotation.x = -Math.PI / 2;
@@ -291,7 +303,7 @@ export function buildRoute(route, ballHeight = 0.6) {
   start.renderOrder = 6;
   group.add(trail, start, ball);
   const floors = [...new Set(nodes.map((node) => node.floor))];
-  group.userData = { curve, length: curve.getLength(), ball, halo, floors, materials: [trailMaterial, ballMaterial, haloMaterial, startMaterial], ballHeight };
+  group.userData = { curve, length: curve.getLength(), ball, halo, floors, materials: [trailMaterial, ballMaterial, haloMaterial, dotMaterial, startMaterial], ballHeight };
   return group;
 }
 

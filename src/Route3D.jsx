@@ -49,13 +49,13 @@ export default function Route3DView({ start, end, onClose, onOpenMap }) {
     <header className="route3d-head">
       <div>
         <p className="kicker">{"// 3D DIRECTIONS"}</p>
-        <h2 id="route3d-title">Follow the glowing ball</h2>
+        <h2 id="route3d-title">Follow the green pin</h2>
       </div>
       <button type="button" className="route3d-close" onClick={onClose} aria-label="Close 3D directions"><Icon name="close" /></button>
     </header>
     <div className="route3d-body">
       <div className="route3d-stage">
-        <Dollhouse3D className="route3d-canvas" floor={showing?.end.floor || 1} route={view === "inside" ? showing : null} highlight={showing?.end.key || null} view={view}
+        <Dollhouse3D zoom className="route3d-canvas" floor={showing?.end.floor || 1} route={view === "inside" ? showing : null} highlight={showing?.end.key || null} view={view}
           label={showing ? `3D route from ${placeTitle(showing.start)} to ${placeTitle(showing.end)}` : "3D model of the Main Academic Building"}
           fallback={<p className="route3d-fallback">3D isn&apos;t available on this device. Use the 2D floor plan instead.</p>} />
         <div className="va-segment route3d-views" role="group" aria-label="View">

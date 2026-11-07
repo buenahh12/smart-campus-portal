@@ -105,7 +105,8 @@ function buildFloor(plan, materialFor) {
 const BALL_SPEED = 4.5; // metres a second
 const END_PAUSE = 1.6; // seconds at the destination before it starts again
 
-export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight = null, view = "inside", route = null, className = "", openLabel = "Open plan" }) {
+// zoom: allow zooming (pinch, mouse wheel, and + / - buttons).
+export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight = null, view = "inside", route = null, className = "", openLabel = "Open plan", zoom = false }) {
   const holder = useRef(null);
   const scene = useRef(null);
   const [failed, setFailed] = useState(false);
@@ -163,7 +164,9 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableZoom = false;
+    controls.enableZoom = zoom;
+    controls.minDistance = 18;
+    controls.maxDistance = 170;
     controls.enablePan = false;
     controls.enableDamping = true;
     controls.minPolarAngle = 0.35;
@@ -206,7 +209,10 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
       const travelled = ((time - walk.started) / 1000 * BALL_SPEED) % (length + END_PAUSE * BALL_SPEED);
       const point = curve.getPointAt(Math.min(1, travelled / length));
       ball.position.copy(point);
-      if (!reduceMotion) halo.scale.setScalar(1 + Math.sin(time / 220) * 0.12);
+      if (!reduceMotion) {
+        halo.scale.setScalar(1 + Math.sin(time / 220) * 0.12);
+        ball.position.y += Math.abs(Math.sin(time / 180)) * 0.45;
+      }
       const level = Math.min(Math.max(...routeFloors), Math.max(1, Math.round((point.y - ballHeight) / FLOOR_HEIGHT) + 1));
       if (level !== walk.level) {
         walk.level = level;
@@ -275,6 +281,7 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
     marker.userData = { pin, pinY: pin.position.y, floor: plan.floor };
     current.world.add(marker);
     current.marker = marker;
+    pin.visible = !current.walk;
     marker.visible = Boolean(route) || plan.floor === floor;
     current.render();
     return () => {
@@ -295,6 +302,7 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
     if (!group) return undefined;
     current.world.add(group);
     current.walk = { group, level: null };
+    if (current.marker) current.marker.userData.pin.visible = false;
     current.controls.autoRotate = false;
     current.render();
     return () => {
@@ -302,6 +310,7 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
       group.traverse((item) => item.geometry?.dispose());
       group.userData.materials.forEach((material) => material.dispose());
       if (current.walk?.group === group) current.walk = null;
+      if (current.marker) current.marker.userData.pin.visible = true;
       current.render();
     };
   }, [route]);
@@ -336,11 +345,24 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
     showFloor(current, floor);
   }, [floor]);
 
+  const zoomBy = (factor) => {
+    const current = scene.current;
+    if (!current) return;
+    const offset = current.camera.position.clone().sub(current.controls.target);
+    offset.setLength(Math.min(170, Math.max(18, offset.length() * factor)));
+    current.camera.position.copy(current.controls.target).add(offset);
+    current.render();
+  };
+
   if (failed) return fallback;
   return <div className={`ss-dollhouse ${className}`}>
     <div ref={holder} className="ss-dollhouse-canvas" role="img" aria-label={label} />
     {onOpen && <button type="button" className="ss-dollhouse-open" onClick={onOpen}>{openLabel}</button>}
-    <span className="ss-dollhouse-hint" aria-hidden="true">Drag to turn · two fingers on phones</span>
+    {zoom && <div className="ss-dollhouse-zoom" role="group" aria-label="Zoom">
+      <button type="button" onClick={() => zoomBy(0.75)} aria-label="Zoom in">+</button>
+      <button type="button" onClick={() => zoomBy(1.33)} aria-label="Zoom out">−</button>
+    </div>}
+    <span className="ss-dollhouse-hint" aria-hidden="true">{zoom ? "Drag to turn · pinch or scroll to zoom" : "Drag to turn · two fingers on phones"}</span>
   </div>;
 }
 

@@ -398,3 +398,11 @@ body .student-portal-shell .mc-welcome-skip { justify-self: center; min-height: 
 .log-text small, .log-when { color: var(--muted, #5d6a5e); font-size: 13px; }
 .log-when { text-align: right; }
 @media (max-width: 640px) { .log-item { grid-template-columns: 1fr; } .log-when { text-align: left; } }
+
+/* 3D: + / - zoom buttons, and the Outside / Inside switch on the home card. */
+.ss-dollhouse-zoom { position: absolute; z-index: 2; top: 56px; right: 10px; display: grid; gap: 6px; }
+.route3d-canvas .ss-dollhouse-zoom { top: 16px; right: 16px; }
+.ss-dollhouse-zoom button { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--line, #e2d7c2); border-radius: 50%; color: var(--forest, #1c3a2a); background: var(--surface, #fffcf5); box-shadow: 0 4px 12px rgba(30, 30, 20, .18); font-size: 24px; font-weight: 800; line-height: 1; }
+.home-3d-views { margin: 0 0 10px; }
+.home-3d-views button { min-height: 38px; padding: 0 16px; }
+.ss-way .ss-dollhouse { height: 260px; background: radial-gradient(80% 80% at 50% 30%, #fdf1e4 0%, #f2d9c4 100%); }
