@@ -227,6 +227,35 @@ service cloud.firestore {
         && data().at == request.time;
     }
 
+    // Feedback: anyone may send one short message (no sign-in needed). A signed-in sender's uid
+    // and email must be their own, and the email is optional. Only the administrator can read,
+    // mark (status only) or delete feedback.
+    match /feedback/{id} {
+      allow create: if data().keys().hasOnly(['kind', 'rating', 'message', 'page', 'role', 'uid', 'email', 'status', 'createdAt'])
+        && data().kind in ['directions', 'room', 'idea', 'problem', 'other']
+        && data().rating is int && data().rating >= 0 && data().rating <= 3
+        && text('message', true, 1000) && text('page', false, 80) && text('role', false, 30)
+        && data().status == 'new' && data().createdAt == request.time
+        && (data().uid == '' || (request.auth != null && data().uid == request.auth.uid))
+        && (data().email == '' || (request.auth != null && data().email == request.auth.token.get('email', '')));
+      allow read, delete: if isAdmin();
+      allow update: if isAdmin()
+        && data().diff(resource.data).affectedKeys().hasOnly(['status'])
+        && data().status in ['new', 'seen', 'done'];
+    }
+
+    // Content update log: one line per admin change, written by the admin, readable only by the
+    // admin, and never changed or deleted afterwards (no update or delete rule).
+    match /changeLog/{id} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && data().keys().hasOnly(['type', 'itemId', 'action', 'title', 'fields', 'by', 'at'])
+        && data().type in ['announcements', 'pathwayClosures', 'rooms', 'offices', 'mapRooms', 'planFloors', 'feedback']
+        && data().action in ['added', 'edited', 'published', 'unpublished', 'turned on', 'turned off', 'deleted', 'reset', 'marked new', 'marked seen', 'marked done']
+        && text('itemId', true, 80) && text('title', false, 120) && text('fields', false, 200)
+        && data().by == request.auth.token.email && data().at == request.time;
+    }
+
     // Anything not listed above is closed by default.
     match /{document=**} {
       allow read, write: if false;
