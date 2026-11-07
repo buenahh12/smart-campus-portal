@@ -216,3 +216,133 @@ export function furnishFloor(plan, toWorld, M, materialFor, slabTop) {
   }
   return group;
 }
+
+// Grey concrete with faint trowel marks and joints every 2 m (hallways, as in the photos).
+export const concreteTexture = () => canvasTexture("concrete", (g) => {
+  g.fillStyle = "#a9aaa5";
+  g.fillRect(0, 0, 256, 256);
+  let seed = 3;
+  const random = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  for (let i = 0; i < 400; i += 1) {
+    const shade = 150 + Math.round(random() * 40);
+    g.fillStyle = `rgba(${shade}, ${shade}, ${shade - 4}, .25)`;
+    g.fillRect(random() * 256, random() * 256, 2 + random() * 10, 1 + random() * 3);
+  }
+  g.fillStyle = "rgba(70, 70, 66, .35)";
+  g.fillRect(0, 0, 256, 2);
+  g.fillRect(0, 0, 2, 256);
+});
+
+// Hexagon paving stones (the courtyard).
+export const hexTexture = () => canvasTexture("hex", (g) => {
+  g.fillStyle = "#4f524f";
+  g.fillRect(0, 0, 256, 256);
+  const r = 18;
+  const w = Math.sqrt(3) * r;
+  for (let row = -1; row < 10; row += 1) {
+    for (let col = -1; col < 10; col += 1) {
+      const cx = col * w + (row % 2 ? w / 2 : 0);
+      const cy = row * r * 1.5;
+      const tone = 105 + ((row * 7 + col * 3) % 5) * 6;
+      g.fillStyle = `rgb(${tone}, ${tone + 2}, ${tone - 2})`;
+      g.beginPath();
+      for (let k = 0; k < 6; k += 1) {
+        const a = Math.PI / 6 + (k * Math.PI) / 3;
+        const px = cx + (r - 2) * Math.cos(a);
+        const py = cy + (r - 2) * Math.sin(a);
+        if (k) g.lineTo(px, py); else g.moveTo(px, py);
+      }
+      g.closePath();
+      g.fill();
+    }
+  }
+});
+
+// Things standing in a place, as instanced boxes and a few round shapes (one draw per kind).
+function instancer(materialFor) {
+  const pieces = new Map();
+  return {
+    put(geometryKey, makeGeometry, color, x, y, z) {
+      const key = `${geometryKey}|${color}`;
+      if (!pieces.has(key)) pieces.set(key, { makeGeometry, color, list: [] });
+      pieces.get(key).list.push([x, y, z]);
+    },
+    build() {
+      const group = new THREE.Group();
+      const matrix = new THREE.Matrix4();
+      for (const { makeGeometry, color, list } of pieces.values()) {
+        const mesh = new THREE.InstancedMesh(makeGeometry(), materialFor(color), list.length);
+        list.forEach(([x, y, z], index) => { matrix.makeTranslation(x, y, z); mesh.setMatrixAt(index, matrix); });
+        group.add(mesh);
+      }
+      return group;
+    },
+  };
+}
+
+// Around the open court on the upper floors: a low green wall with a steel bar grille above it
+// (as in the hallway photo), and green columns at the corners and every few metres.
+export function courtRailing(rect, toWorld, M, materialFor, slabTop, colors) {
+  const items = instancer(materialFor);
+  const [x, y, w, h] = rect;
+  const [x0, z0] = toWorld(x, y);
+  const [x1, z1] = toWorld(x + w, y + h);
+  const edges = [[x0, z0, x1, z0], [x1, z0, x1, z1], [x1, z1, x0, z1], [x0, z1, x0, z0]];
+  for (const [ax, az, bx, bz] of edges) {
+    const length = Math.hypot(bx - ax, bz - az);
+    const along = [(bx - ax) / length, (bz - az) / length];
+    // Low wall in 1 m pieces (one shape, instanced).
+    for (let d = 0.5; d < length; d += 1) {
+      const px = ax + along[0] * d;
+      const pz = az + along[1] * d;
+      items.put("parapet" + (along[0] ? "x" : "z"), () => new THREE.BoxGeometry(along[0] ? 1 : 0.15, 1, along[0] ? 0.15 : 1), colors.wall, px, slabTop + 0.5, pz);
+      items.put("base" + (along[0] ? "x" : "z"), () => new THREE.BoxGeometry(along[0] ? 1 : 0.17, 0.18, along[0] ? 0.17 : 1), colors.base, px, slabTop + 0.09, pz);
+    }
+    // Bars every 15 cm from the wall to 2.4 m, and a top and middle rail.
+    for (let d = 0.08; d < length; d += 0.15) items.put("bar", () => new THREE.BoxGeometry(0.025, 1.4, 0.025), colors.bars, ax + along[0] * d, slabTop + 1.7, az + along[1] * d);
+    for (const top of [1.6, 2.4]) {
+      for (let d = 0.5; d < length; d += 1) items.put("rail" + (along[0] ? "x" : "z"), () => new THREE.BoxGeometry(along[0] ? 1 : 0.03, 0.03, along[0] ? 0.03 : 1), colors.bars, ax + along[0] * d, slabTop + top, az + along[1] * d);
+    }
+    // Columns.
+    const columns = Math.max(1, Math.round(length / 5));
+    for (let k = 0; k <= columns; k += 1) items.put("column", () => new THREE.BoxGeometry(0.4, 3.3, 0.4), colors.column, ax + along[0] * (length * k / columns), slabTop + 1.65, az + along[1] * (length * k / columns));
+  }
+  return items.build();
+}
+
+// The courtyard on the ground floor: hexagon pavers (drawn by the caller), planters with plants
+// along the edges, two green garden umbrellas over tables with chairs, and the red tiered fountain.
+export function courtyard(rect, toWorld, M, materialFor, slabTop) {
+  const items = instancer(materialFor);
+  const group = new THREE.Group();
+  const [x, y, w, h] = rect;
+  const [x0, z0] = toWorld(x, y);
+  const [x1, z1] = toWorld(x + w, y + h);
+  const width = x1 - x0;
+  const depth = z1 - z0;
+  // Planters with leafy plants along the long sides.
+  for (let d = 1.2; d < width - 1; d += 1.6) {
+    for (const z of [z0 + 0.6, z1 - 0.6]) {
+      items.put("planter", () => new THREE.BoxGeometry(1.2, 0.4, 0.6), "#5a7d4a", x0 + d, slabTop + 0.2, z);
+      items.put("plant", () => new THREE.SphereGeometry(0.45, 10, 8), d % 3.2 < 1.6 ? "#3f8a3a" : "#5aa548", x0 + d, slabTop + 0.75, z);
+    }
+  }
+  // Columns around the court (holding up the floor above).
+  for (let d = 0; d <= width; d += width / 6) for (const z of [z0, z1]) items.put("column", () => new THREE.BoxGeometry(0.45, 3.3, 0.45), "#4fae3e", x0 + d, slabTop + 1.65, z);
+  for (let d = depth / 3; d < depth; d += depth / 3) for (const x of [x0, x1]) items.put("column", () => new THREE.BoxGeometry(0.45, 3.3, 0.45), "#4fae3e", x, slabTop + 1.65, z0 + d);
+  // Umbrellas with tables and chairs.
+  const umbrella = (cx, cz) => {
+    items.put("pole", () => new THREE.CylinderGeometry(0.04, 0.04, 2.3, 8), "#5d5d5d", cx, slabTop + 1.15, cz);
+    items.put("canopy", () => new THREE.ConeGeometry(1.6, 0.6, 8), "#2f7a4f", cx, slabTop + 2.35, cz);
+    items.put("table", () => new THREE.BoxGeometry(1.6, 0.06, 0.8), "#2f3a35", cx, slabTop + 0.74, cz);
+    for (const [dx, dz] of [[-0.55, -0.7], [0.55, -0.7], [-0.55, 0.7], [0.55, 0.7]]) items.put("chair", () => new THREE.BoxGeometry(0.42, 0.45, 0.42), "#3aa58a", cx + dx, slabTop + 0.23, cz + dz);
+  };
+  umbrella(x0 + width * 0.18, z0 + depth * 0.35);
+  umbrella(x0 + width * 0.32, z0 + depth * 0.35);
+  // The red fountain: three tiers.
+  const fx = x0 + width * 0.08;
+  const fz = z0 + depth * 0.3;
+  [[0.7, 0.3, 0.15], [0.45, 0.25, 0.75], [0.25, 0.2, 1.25]].forEach(([r, hgt, yy]) => items.put(`fountain${r}`, () => new THREE.CylinderGeometry(r, r * 0.8, hgt, 18), "#c0392b", fx, slabTop + yy, fz));
+  group.add(items.build());
+  return group;
+}

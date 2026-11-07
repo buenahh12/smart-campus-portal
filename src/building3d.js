@@ -299,6 +299,12 @@ export function buildExterior() {
     return mesh;
   };
   const glass = mat("glass", () => new THREE.MeshStandardMaterial({ map: glassBlockTexture(), roughness: 0.55 }));
+  const windowSpots = [];
+  const pipesFront = [X0 + 15.5, -6, 9, -X0 - 9];
+  const pipesBack = [X0 + 24, 2, -X0 - 15];
+  const [bannerStart] = toWorld(4, 0);
+  const bannerSpans = [[bannerStart - 1.5, bannerStart + 8], [bannerStart + 21.5, bannerStart + 24.5], [bannerStart + 29, bannerStart + 39]];
+  const louvreX = X0 + 20;
   let windowSeed = 5;
   const windowRandom = () => { windowSeed = (windowSeed * 16807) % 2147483647; return windowSeed / 2147483647; };
   const windowsAlong = (x1, z1, x2, z2, y, outward, skip = () => false, blocks = false) => {
@@ -319,6 +325,14 @@ export function buildExterior() {
       }
       const w = [2.1, 2.4, 2.4, 1.7][Math.floor(windowRandom() * 4)];
       const h = 1.15;
+      const front = outward[1] === 1;
+      const back = outward[1] === -1;
+      const level = Math.round((y - 1.75) / FLOOR_HEIGHT);
+      const near = (list, gap) => list.some((px) => Math.abs(px - x) < w / 2 + gap);
+      if ((front && near(pipesFront, 0.35)) || (back && near(pipesBack, 0.35))) continue;
+      if (front && level <= 1 && Math.abs(x - louvreX) < w / 2 + 1.3) continue;
+      if (front && level === 0 && bannerSpans.some(([a, c]) => x + w / 2 > a && x - w / 2 < c)) continue;
+      windowSpots.push({ x, y, z, outward, w, along: [(x2 - x1) / length, (z2 - z1) / length] });
       const frame = add(new THREE.BoxGeometry(w + 0.16, h + 0.16, 0.1), solid("#ece9df"), x + outward[0] * 0.16, y + 0.2, z + outward[1] * 0.16);
       frame.rotation.y = turn;
       const pane = add(new THREE.PlaneGeometry(w, h), mat(`window${i % 4}`, () => new THREE.MeshStandardMaterial({ map: windowTexture(Math.floor(windowRandom() * 4)), roughness: 0.35, metalness: 0.1 })), x + outward[0] * 0.22, y + 0.2, z + outward[1] * 0.22);
@@ -382,9 +396,36 @@ export function buildExterior() {
 
   // The maroon arched canopy over the side entrance, on four posts.
   const [, entranceZ] = toWorld(0, 57);
-  const canopy = add(new THREE.CylinderGeometry(2.3, 2.3, 11, 28, 1, true, Math.PI / 2, Math.PI), mat("canopy", () => new THREE.MeshLambertMaterial({ color: COLORS.canopy, side: THREE.DoubleSide })), X0 - 2.3, 3.3, entranceZ);
+  const canopyGroup = new THREE.Group();
+  const canopy = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 11, 32, 1, true, Math.PI / 2, Math.PI), mat("canopy", () => new THREE.MeshStandardMaterial({ color: COLORS.canopy, roughness: 0.6, side: THREE.DoubleSide })));
   canopy.rotation.x = Math.PI / 2;
-  [-4.8, 0, 4.8].forEach((dz) => add(new THREE.CylinderGeometry(0.08, 0.08, 3.3, 8), solid("#3b3b3b"), X0 - 4.4, 1.65, entranceZ + dz));
+  canopyGroup.add(canopy);
+  for (let dz = -5.4; dz <= 5.41; dz += 1.35) {
+    const rib = new THREE.Mesh(new THREE.TorusGeometry(2.38, 0.035, 6, 24, Math.PI), solid("#2b2b2b"));
+    rib.position.z = dz;
+    canopyGroup.add(rib);
+  }
+  canopyGroup.scale.set(1, 0.42, 1);
+  canopyGroup.position.set(X0 - 2.4, 2.35, entranceZ);
+  canopyGroup.traverse((item) => { item.castShadow = true; });
+  group.add(canopyGroup);
+  [-5.2, 0, 5.2].forEach((dz) => add(new THREE.CylinderGeometry(0.07, 0.07, 2.35, 8), solid("#2b2b2b"), X0 - 4.75, 1.17, entranceZ + dz));
+  // The entrance: a dark opening with a yellow grille gate (bars, rails and the ring pattern).
+  const yellow = solid("#e8c53a");
+  add(new THREE.BoxGeometry(0.06, 2.7, 4.2), solid("#22302a"), X0 - 0.17, 1.35, entranceZ);
+  for (let dz = -2; dz <= 2.01; dz += 0.18) add(new THREE.BoxGeometry(0.05, 2.6, 0.05), yellow, X0 - 0.24, 1.3, entranceZ + dz);
+  [0.15, 1.4, 2.6].forEach((yy) => add(new THREE.BoxGeometry(0.06, 0.07, 4.2), yellow, X0 - 0.25, yy, entranceZ));
+  for (let dz = -1.8; dz <= 1.81; dz += 0.6) {
+    const ring = add(new THREE.TorusGeometry(0.2, 0.03, 6, 16), yellow, X0 - 0.26, 1.85, entranceZ + dz);
+    ring.rotation.y = Math.PI / 2;
+  }
+  // Yellow grille doors next to it, under small arches.
+  [entranceZ + 4, entranceZ - 4].forEach((dz) => {
+    add(new THREE.BoxGeometry(0.06, 2.2, 1.3), solid("#22302a"), X0 - 0.17, 1.1, dz);
+    for (let k = -0.55; k <= 0.56; k += 0.16) add(new THREE.BoxGeometry(0.04, 2.15, 0.04), yellow, X0 - 0.23, 1.08, dz + k);
+    const arch = add(new THREE.TorusGeometry(0.68, 0.08, 6, 16, Math.PI), solid("#4f9a3c"), X0 - 0.2, 2.2, dz);
+    arch.rotation.y = Math.PI / 2;
+  });
 
   // Green outdoor fire stairs at the back, zig-zagging up to the 4th floor.
   const [fx1] = toWorld(6, 0);
@@ -449,33 +490,20 @@ export function buildExterior() {
       grille.rotation.y = turn;
     }
   };
-  // Scattered over a wall like a real building: an uneven number per floor, at uneven spots and
-  // heights, a mix of window and split units, some stacked on brackets. Seeded: always the same.
+  // One aircon per window (as on the building), beside it: window-type units low, split units
+  // a little higher; the side and type are seeded, so the building always looks the same.
   let acSeed = 23;
   const acRandom = () => { acSeed = (acSeed * 16807) % 2147483647; return acSeed / 2147483647; };
-  const units = (x1, z1, x2, z2, outward, levels, density) => {
-    const length = Math.hypot(x2 - x1, z2 - z1);
-    for (const level of levels) {
-      const count = Math.round((length / 9) * density * (0.5 + acRandom()));
-      const taken = [];
-      for (let i = 0; i < count; i += 1) {
-        const t = 0.04 + acRandom() * 0.92;
-        if (taken.some((other) => Math.abs(other - t) * length < 1.6)) continue;
-        taken.push(t);
-        const x = x1 + (x2 - x1) * t;
-        const z = z1 + (z2 - z1) * t;
-        const low = acRandom() < 0.4;
-        const split = acRandom() < 0.6;
-        unit(x, level * FLOOR_HEIGHT + (low ? 0.75 + acRandom() * 0.3 : 2.2 + acRandom() * 0.5), z, outward, split);
-        if (split && acRandom() < 0.2) unit(x, level * FLOOR_HEIGHT + 0.8, z, outward, true); // a second unit below
-      }
-    }
-  };
-  units(X0, D / 2, -X0, D / 2, [0, 1], [0, 1, 2], 1);
-  units(X0, D / 2, deckX, D / 2, [0, 1], [3], 0.7);
-  units(-X0, Z0, X0, Z0, [0, -1], [0, 1, 2, 3], 1.2);
-  units(-X0, Z0, -X0, D / 2, [1, 0], [0, 1, 2], 0.8);
-  units(X0, Z0, X0, D / 2, [-1, 0], [1, 2], 0.4);
+  windowSpots.forEach(({ x, y, z, outward, w, along }) => {
+    const side = acRandom() < 0.5 ? -1 : 1;
+    const split = acRandom() < 0.55;
+    const offset = w / 2 + (split ? 0.75 : 0.62);
+    const ax = x + along[0] * side * offset;
+    const az = z + along[1] * side * offset;
+    const pipes = outward[1] === 1 ? pipesFront : outward[1] === -1 ? pipesBack : [];
+    if (pipes.some((px) => Math.abs(px - ax) < 0.7)) return;
+    unit(ax, y + (split ? 0.45 : -0.05), az, outward, split);
+  });
 
   // Tarpaulin banners on the ground floor at the front.
   const banners = [
@@ -490,7 +518,7 @@ export function buildExterior() {
     const wide = i === 3;
     const w = wide ? 9 : 2.6;
     const x = wide ? b0 + 34 : b0 + i * 3.2 + (i === 4 ? 10 : 0);
-    const tarp = add(new THREE.PlaneGeometry(w, 1.6), mat(`banner${i}`, () => new THREE.MeshLambertMaterial({ map: bannerTexture(title, colors, subtitle) })), x, wide ? FLOOR_HEIGHT * 0.62 + 1.6 : 2.2, D / 2 + 0.2);
+    const tarp = add(new THREE.PlaneGeometry(w, 1.6), mat(`banner${i}`, () => new THREE.MeshLambertMaterial({ map: bannerTexture(title, colors, subtitle) })), x, 2.1, D / 2 + 0.34);
     tarp.castShadow = false;
   });
 

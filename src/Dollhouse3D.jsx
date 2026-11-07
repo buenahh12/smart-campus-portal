@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { BUILDING_NAME, FLOORS, METERS_PER_UNIT as M, PLAN_HEIGHT, PLAN_WIDTH } from "./floorPlans";
 import { STAIR, buildExterior, buildRoute, stairFrame } from "./building3d";
-import { furnishFloor, scaleUv, tileTexture, woodTexture } from "./interior3d";
+import { concreteTexture, courtRailing, courtyard, furnishFloor, hexTexture, scaleUv, tileTexture, woodTexture } from "./interior3d";
 
 // 3D dollhouse of the Main Academic Building, built from the same rectangles as the 2D
 // floor plan. The building method (floor slabs, 2.5 m walls with door gaps, stacked floors)
@@ -19,9 +19,13 @@ const DOOR_WIDTH = 1.0;
 // Like an architect's model: white walls, wood floors in rooms, light tiles in hallways and C.R.s.
 const COLORS = {
   hall: "#ebe4d3",
-  wall: "#f7f5ef",
-  edge: "#b9b3a6",
-  stairs: "#e8c9a0",
+  wall: "#9bd35c", // lime green walls inside, as in the photos
+  base: "#3f8f3a", // darker green strip along the bottom of the walls
+  door: "#f3f2ec",
+  bars: "#24372c",
+  column: "#4fae3e",
+  edge: "#5f8a4a",
+  stairs: "#a9a8a2", // grey concrete stairs
   exit: "#e9a99f",
   deck: "#d7e0d1",
   room: { classroom: "#fbf8f1", office: "#e2ebdb", lab: "#dfe8ef", facility: "#f3e6d4", cr: "#e7e4ee" },
@@ -32,41 +36,21 @@ const roomColor = (item) => COLORS[item.type] || COLORS.room[item.type] || COLOR
 // Plan (x right, y down) to world (x right, z toward the viewer), centred on the building.
 const toWorld = (x, y) => [(x - PLAN_WIDTH / 2) * M, (y - PLAN_HEIGHT / 2) * M];
 
-// One edge of a room, split around the door if the door sits on it.
-function wallSegments(rect, door) {
-  const [x, y, w, h] = rect;
-  const edges = [
-    { a: [x, y], b: [x + w, y] },
-    { a: [x, y + h], b: [x + w, y + h] },
-    { a: [x, y], b: [x, y + h] },
-    { a: [x + w, y], b: [x + w, y + h] },
-  ];
-  const gap = DOOR_WIDTH / M / 2;
-  return edges.flatMap(({ a, b }) => {
-    const horizontal = a[1] === b[1];
-    const onEdge = door && (horizontal ? Math.abs(door[1] - a[1]) < 0.6 && door[0] >= a[0] && door[0] <= b[0]
-      : Math.abs(door[0] - a[0]) < 0.6 && door[1] >= a[1] && door[1] <= b[1]);
-    if (!onEdge) return [{ a, b }];
-    const at = horizontal ? door[0] : door[1];
-    const start = horizontal ? a[0] : a[1];
-    const end = horizontal ? b[0] : b[1];
-    const point = (value) => (horizontal ? [value, a[1]] : [a[0], value]);
-    return [
-      at - gap > start ? { a, b: point(at - gap) } : null,
-      at + gap < end ? { a: point(at + gap), b } : null,
-    ].filter(Boolean);
-  });
-}
-
 function buildFloor(plan, materialFor) {
   const group = new THREE.Group();
   const box = (width, height, depth, color, x, y, z) => {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), materialFor(color));
     mesh.position.set(x, y, z);
     group.add(mesh);
-    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry), materialFor(COLORS.edge, true));
-    edges.position.copy(mesh.position);
-    group.add(edges);
+    return mesh;
+  };
+  // A thin bar from a to b (handrails).
+  const bar = (a, b, color, thickness = 0.05) => {
+    const length = a.distanceTo(b);
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(thickness, thickness, length, 8), materialFor(color));
+    mesh.position.copy(a).lerp(b, 0.5);
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+    group.add(mesh);
   };
   const slab = ([x, y, w, h], color, lift = 0, texture = "") => {
     const [cx, cz] = toWorld(x + w / 2, y + h / 2);
@@ -80,9 +64,26 @@ function buildFloor(plan, materialFor) {
   };
   const floorTexture = (item) => (item.type === "cr" ? "crtile" : ["classroom", "office", "lab", "facility"].includes(item.type) ? "wood" : "");
 
-  plan.halls.forEach((hall) => slab(hall.rect, COLORS.hall, 0, "tile"));
+  plan.halls.forEach((hall) => slab(hall.rect, COLORS.hall, 0, "concrete"));
+  // Every wall line on this floor, merged, so a wall two rooms share is drawn once.
+  const lines = new Map(); // "h|y" or "v|x" -> { spans: [[from, to]], gaps: [[from, to]] }
+  const lineOf = (horizontal, at) => {
+    const key = `${horizontal ? "h" : "v"}|${at.toFixed(2)}`;
+    if (!lines.has(key)) lines.set(key, { horizontal, at, spans: [], gaps: [] });
+    return lines.get(key);
+  };
+  const doorGap = DOOR_WIDTH / M / 2;
   plan.rooms.forEach((item) => {
-    if (item.type === "void") return; // open court: nothing to stand on
+    if (item.type === "void") {
+      if (plan.level === 1) {
+        // The courtyard: hexagon pavers, plants, umbrellas and the fountain.
+        slab(item.rect, "#ffffff", 0, "hex");
+        group.add(courtyard(item.rect, toWorld, M, materialFor, SLAB));
+      } else {
+        group.add(courtRailing(item.rect, toWorld, M, materialFor, SLAB, COLORS));
+      }
+      return;
+    }
     const fromBelow = item.type === "stairs" && FLOORS.find((other) => other.building === plan.building && other.level === plan.level - 1)?.rooms.some((room) => room.stair && room.stair === item.stair);
     if (!fromBelow) slab(item.rect, roomColor(item), 0.01, floorTexture(item));
     if (item.type === "deck") return;
@@ -107,29 +108,71 @@ function buildFloor(plan, materialFor) {
             step(STAIR.LANDING - (span * (i + 1)) / STEPS, STAIR.LANDING - (span * i) / STEPS, 0.51, 0.96, half + (half * (i + 1)) / STEPS - SLAB);
           }
           step(STAIR.LANDING, 0.98, 0.04, 0.96, half);
-          // The low wall between the two flights.
+          // The wall between the two flights, and a dark metal handrail on each flight.
           const [ax, az] = toWorld(...frame.at(STAIR.FIRST, 0.5));
           const [bx, bz] = toWorld(...frame.at(STAIR.LANDING, 0.5));
           box(frame.vertical ? 0.12 : Math.abs(bx - ax), FLOOR_HEIGHT - 0.4, frame.vertical ? Math.abs(bz - az) : 0.12, COLORS.wall, (ax + bx) / 2, SLAB + (FLOOR_HEIGHT - 0.4) / 2, (az + bz) / 2);
+          const railAt = (t, u, height) => {
+            const [px, pz] = toWorld(...frame.at(t, u));
+            return new THREE.Vector3(px, SLAB + height + 0.9, pz);
+          };
+          bar(railAt(STAIR.FIRST, 0.44, 0.15), railAt(STAIR.LANDING, 0.44, half), COLORS.bars);
+          bar(railAt(STAIR.LANDING, 0.56, half), railAt(STAIR.FIRST, 0.56, FLOOR_HEIGHT - 0.2), COLORS.bars);
         } else {
           for (let i = 0; i < STEPS * 2; i += 1) step(STAIR.FIRST + ((0.88 - STAIR.FIRST) * i) / (STEPS * 2), STAIR.FIRST + ((0.88 - STAIR.FIRST) * (i + 1)) / (STEPS * 2), 0.08, 0.92, (FLOOR_HEIGHT * (i + 1)) / (STEPS * 2) - SLAB / 2);
         }
       }
     }
-    // Stairs are open to the hallway on the side you walk in (as on the 2D plan).
-    const stairsOpen = item.type === "stairs" && item.door;
-    wallSegments(item.rect, item.door).forEach(({ a, b }) => {
-      if (stairsOpen) {
-        const onDoorEdge = a[1] === b[1] ? Math.abs(item.door[1] - a[1]) < 0.6 : Math.abs(item.door[0] - a[0]) < 0.6;
-        if (onDoorEdge) return;
-      }
-      const [ax, az] = toWorld(...a);
-      const [bx, bz] = toWorld(...b);
+    // This room's four edges; its door (or, for stairs, the whole entrance side) is an opening.
+    const [x, y, w, h] = item.rect;
+    const edges = [[true, y, x, x + w], [true, y + h, x, x + w], [false, x, y, y + h], [false, x + w, y, y + h]];
+    const doors = [item.door, ...(item.extraDoors || [])].filter(Boolean);
+    edges.forEach(([horizontal, at, from, to]) => {
+      const line = lineOf(horizontal, at);
+      line.spans.push([from, to]);
+      doors.forEach(([dx, dy]) => {
+        const on = horizontal ? Math.abs(dy - at) < 0.6 && dx >= from && dx <= to : Math.abs(dx - at) < 0.6 && dy >= from && dy <= to;
+        if (!on) return;
+        if (item.type === "stairs") line.gaps.push([from, to]);
+        else { const c = horizontal ? dx : dy; line.gaps.push([c - doorGap, c + doorGap]); }
+      });
+    });
+  });
+  // Draw each wall line once: merge its spans, cut out the doors, add a dark green base strip
+  // and a white door frame over each doorway.
+  lines.forEach(({ horizontal, at, spans, gaps }) => {
+    spans.sort((p, q) => p[0] - q[0]);
+    const merged = [];
+    spans.forEach(([from, to]) => {
+      const last = merged[merged.length - 1];
+      if (last && from <= last[1] + 0.01) last[1] = Math.max(last[1], to);
+      else merged.push([from, to]);
+    });
+    gaps.sort((p, q) => p[0] - q[0]);
+    const pieces = [];
+    merged.forEach(([from, to]) => {
+      let start = from;
+      gaps.forEach(([g0, g1]) => {
+        if (g1 <= start || g0 >= to) return;
+        if (g0 > start) pieces.push([start, g0]);
+        start = Math.max(start, g1);
+      });
+      if (start < to) pieces.push([start, to]);
+    });
+    const draw = (from, to, height, bottom, color, thickness) => {
+      const [ax, az] = horizontal ? toWorld(from, at) : toWorld(at, from);
+      const [bx, bz] = horizontal ? toWorld(to, at) : toWorld(at, to);
       const length = Math.hypot(bx - ax, bz - az);
       if (length < 0.05) return;
-      const horizontal = az === bz;
-      box(horizontal ? length : WALL_THICKNESS, WALL_HEIGHT, horizontal ? WALL_THICKNESS : length, COLORS.wall,
-        (ax + bx) / 2, SLAB + WALL_HEIGHT / 2, (az + bz) / 2);
+      box(horizontal ? length : thickness, height, horizontal ? thickness : length, color, (ax + bx) / 2, SLAB + bottom + height / 2, (az + bz) / 2);
+    };
+    pieces.forEach(([from, to]) => {
+      draw(from, to, WALL_HEIGHT, 0, COLORS.wall, WALL_THICKNESS);
+      draw(from, to, 0.22, 0, COLORS.base, WALL_THICKNESS + 0.04);
+    });
+    gaps.forEach(([g0, g1]) => {
+      if ((g1 - g0) * M > 1.6) return; // open stair entrances have no frame
+      draw(g0, g1, 0.3, WALL_HEIGHT - 0.3, COLORS.door, WALL_THICKNESS + 0.02);
     });
   });
   group.add(furnishFloor(plan, toWorld, M, materialFor, SLAB));
@@ -183,7 +226,7 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
     // Only the main building: floors added there stack on top; other buildings are not drawn.
     const floors = FLOORS.filter((plan) => plan.building === BUILDING_NAME).map((plan) => {
       const materials = new Map();
-      const TEXTURES = { wood: woodTexture, tile: () => tileTexture(), crtile: () => tileTexture("#dfe9ee") };
+      const TEXTURES = { wood: woodTexture, tile: () => tileTexture(), crtile: () => tileTexture("#dfe9ee"), concrete: concreteTexture, hex: hexTexture };
       const materialFor = (color, line = false, texture = "") => {
         const key = `${color}${line}${texture}`;
         if (!materials.has(key)) {
