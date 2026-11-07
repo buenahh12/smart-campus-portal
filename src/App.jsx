@@ -4,6 +4,7 @@ import {
   finishGoogleRedirect,
   inAppBrowserName,
   loginAsAdmin,
+  loginAsVisitor,
   loginWithEmail,
   loginWithGoogle,
   logoutUser,
@@ -329,6 +330,23 @@ function LoginModal({ onClose, onCreate, onSignedIn = () => {}, onAdminSignedIn 
     }
   };
 
+  const [visitorSigningIn, setVisitorSigningIn] = useState(false);
+  const handleVisitorSignIn = async () => {
+    setVisitorSigningIn(true);
+    setError("");
+    try {
+      const result = await loginAsVisitor();
+      onSignedIn(result.user);
+    } catch (signInError) {
+      setError(isOfflineError(signInError) ? NEEDS_INTERNET
+        : signInError.code === "auth/operation-not-allowed" || signInError.code === "auth/admin-restricted-operation"
+          ? "Visitor sign-in isn't switched on yet. Use Google or email, or find your way without signing in."
+          : signInError.message || "Visitor sign-in could not be completed.");
+    } finally {
+      setVisitorSigningIn(false);
+    }
+  };
+
   const handleGoogleSignIn = async () => {
     setSigningIn(true);
     setError("");
@@ -427,6 +445,11 @@ function LoginModal({ onClose, onCreate, onSignedIn = () => {}, onAdminSignedIn 
               <button className="visitor-button" type="submit" disabled={emailSigningIn}>{emailSigningIn ? "Signing in..." : "Sign in with email"}</button>
             </form>
             <button className="create-account-link" onClick={onCreate}>Create a new campus account</button>
+            <div className="divider"><span>OR</span></div>
+            <button type="button" className="visitor-guest-button" onClick={handleVisitorSignIn} disabled={visitorSigningIn}>
+              <Icon name="location" size={18} /> {visitorSigningIn ? "Starting your visit..." : "Continue as a visitor"}
+              <small>No account, no name or email. Your saved places stay on this device.</small>
+            </button>
             <p className="auth-security-note"><Icon name="shield" size={15} /> Sign-in is handled by Firebase. Your password is not shared with Google.</p>
             <p className="auth-security-note"><Icon name="info" size={15} /> When you sign in, the school can see your account email, how you signed in, and your device type and browser.</p>
             <p className="terms">By continuing, you agree to SSCAI NAVI&apos;s <a href="#terms">Terms</a> and <a href="#privacy">Privacy Policy</a>.</p>
@@ -1062,7 +1085,8 @@ export default function App() {
   // Keeps the signed-in user and their role (from the Firebase JWT claims) in sync,
   // including after a page reload.
   useEffect(() => watchSession(({ user, role: nextRole }) => {
-    setSignedInUser(user && !user.isAnonymous ? user : null);
+    // Visitors (no account) are signed in too, so My Campus can keep their saved places.
+    setSignedInUser(user || null);
     setRole(nextRole);
     recordVisit(user, nextRole);
     recordSignIn(user, nextRole);

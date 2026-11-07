@@ -140,9 +140,9 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
     };
   }, [onClose]);
 
-  const name = profile?.name || user.displayName || user.email?.split("@")[0] || "there";
+  const name = profile?.name || user.displayName || user.email?.split("@")[0] || (user.isAnonymous ? "Visitor" : "there");
   const firstName = name.split(" ")[0];
-  const role = profile?.role || "Student";
+  const role = profile?.role || (user.isAnonymous ? "Visitor" : "Student");
   const gradeLevel = profile?.gradeLevel || "";
   const section = profile?.section || "";
   const myClassroom = role === "Student" ? classroomOf(gradeLevel, section) : null;

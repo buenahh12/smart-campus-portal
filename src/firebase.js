@@ -10,6 +10,7 @@ import {
   sendPasswordResetEmail,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signInAnonymously,
   getIdTokenResult,
   updateProfile,
   sendEmailVerification,
@@ -74,6 +75,12 @@ export const loginWithGoogle = () => {
     if (error.code === 'auth/popup-blocked') return signInWithRedirect(auth, googleProvider);
     throw error;
   });
+};
+// A visitor with no account: a temporary Firebase identity on this device, so My Campus can save
+// places for them. No name or email is asked for or stored.
+export const loginAsVisitor = () => {
+  if (!auth) return Promise.reject(new Error('Firebase is not configured. Add the VITE_FIREBASE_* values to your .env file.'));
+  return signInAnonymously(auth);
 };
 export const finishGoogleRedirect = () => hasFirebaseConfig ? getRedirectResult(auth) : Promise.resolve(null);
 export const loginWithEmail = ({ email, password }) => {
