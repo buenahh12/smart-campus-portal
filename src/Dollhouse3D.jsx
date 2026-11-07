@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { BUILDING_NAME, FLOORS, METERS_PER_UNIT as M, PLAN_HEIGHT, PLAN_WIDTH } from "./floorPlans";
+import { buildExterior, buildRoute } from "./building3d";
 
 // 3D dollhouse of the Main Academic Building, built from the same rectangles as the 2D
 // floor plan. The building method (floor slabs, 2.5 m walls with door gaps, stacked floors)
@@ -99,7 +100,12 @@ function buildFloor(plan, materialFor) {
 }
 
 // highlight: a place key ("3:room-304") to light up with a glowing box and a bouncing pin.
-export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight = null }) {
+// view: "inside" (the floors, like lifting the roof off) or "outside" (the real building).
+// route: a findRoute() result; a glowing ball walks it, climbing the stairs, and the camera follows.
+const BALL_SPEED = 4.5; // metres a second
+const END_PAUSE = 1.6; // seconds at the destination before it starts again
+
+export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight = null, view = "inside", route = null, className = "", openLabel = "Open plan" }) {
   const holder = useRef(null);
   const scene = useRef(null);
   const [failed, setFailed] = useState(false);
@@ -114,6 +120,8 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
       return undefined;
     }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     element.appendChild(renderer.domElement);
 
     const world = new THREE.Scene();
@@ -123,7 +131,13 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
     world.add(new THREE.HemisphereLight("#ffffff", "#c9c2b0", 2.2));
     const sun = new THREE.DirectionalLight("#ffffff", 1.6);
     sun.position.set(-30, 60, 40);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 200 });
+    sun.shadow.radius = 6;
+    sun.shadow.bias = -0.0008;
     world.add(sun);
+    world.add(new THREE.AmbientLight("#fff1e2", 0.35));
 
     // Each floor gets its own materials so lower floors can be faded independently.
     // Only the main building: floors added there stack on top; other buildings are not drawn.
@@ -142,6 +156,10 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
       world.add(group);
       return { floor: plan.floor, group, materials: [...materials.values()] };
     });
+
+    const exterior = buildExterior();
+    exterior.visible = false;
+    world.add(exterior);
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -173,8 +191,37 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
     const loop = (time = 0) => {
       const marker = scene.current?.marker;
       if (marker && !reduceMotion) marker.userData.pin.position.y = marker.userData.pinY + Math.sin(time / 280) * 0.6;
+      const walk = scene.current?.walk;
+      if (walk && scene.current.view === "inside") stepWalk(walk, time);
       controls.update();
       renderer.render(world, camera);
+    };
+    // Moves the ball along the route, shows its floor clearly (the other route floors faintly),
+    // and lets the camera drift after it.
+    const stepWalk = (walk, time) => {
+      const { curve, length, ball, halo, floors: routeFloors, ballHeight } = walk.group.userData;
+      if (walk.started === undefined) walk.started = time;
+      const travelled = reduceMotion ? length : ((time - walk.started) / 1000 * BALL_SPEED) % (length + END_PAUSE * BALL_SPEED);
+      const point = curve.getPointAt(Math.min(1, travelled / length));
+      ball.position.copy(point);
+      if (!reduceMotion) halo.scale.setScalar(1 + Math.sin(time / 220) * 0.12);
+      const level = Math.min(Math.max(...routeFloors), Math.max(1, Math.round((point.y - ballHeight) / FLOOR_HEIGHT) + 1));
+      if (level !== walk.level) {
+        walk.level = level;
+        const top = Math.max(...routeFloors);
+        floors.forEach((item) => {
+          item.group.visible = item.floor <= top;
+          const opacity = item.floor === level ? 1 : routeFloors.includes(item.floor) ? 0.22 : 0.1;
+          item.materials.forEach((material) => {
+            material.opacity = material.isLineBasicMaterial ? opacity * 0.55 : opacity;
+            material.depthWrite = item.floor === level;
+          });
+        });
+      }
+      const aim = new THREE.Vector3(point.x * 0.6, point.y - ballHeight, point.z * 0.6);
+      const move = aim.sub(controls.target).multiplyScalar(reduceMotion ? 1 : 0.05);
+      controls.target.add(move);
+      camera.position.add(move);
     };
     const visibility = new IntersectionObserver(([entry]) => {
       running = entry.isIntersecting;
@@ -182,7 +229,7 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
     });
     visibility.observe(element);
 
-    scene.current = { floors, controls, camera, world, marker: null, render: () => !running && loop() };
+    scene.current = { floors, controls, camera, world, exterior, marker: null, walk: null, view: "inside", floor: null, render: () => !running && loop() };
     return () => {
       visibility.disconnect();
       sizeObserver.disconnect();
@@ -190,6 +237,7 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
       controls.dispose();
       world.traverse((item) => { item.geometry?.dispose(); if (item.userData.ownMaterial) item.material.dispose(); });
       floors.forEach(({ materials }) => materials.forEach((material) => material.dispose()));
+      exterior.userData.materials.forEach((material) => { material.map?.dispose(); material.dispose(); });
       renderer.dispose();
       renderer.domElement.remove();
       scene.current = null;
@@ -225,7 +273,7 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
     marker.userData = { pin, pinY: pin.position.y, floor: plan.floor };
     current.world.add(marker);
     current.marker = marker;
-    marker.visible = plan.floor === floor;
+    marker.visible = Boolean(route) || plan.floor === floor;
     current.render();
     return () => {
       current.world.remove(marker);
@@ -237,29 +285,79 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
     };
   }, [highlight]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The route: trail, start ring and the guide ball (animated in the render loop).
+  useEffect(() => {
+    const current = scene.current;
+    if (!current || !route) return undefined;
+    const group = buildRoute(route);
+    if (!group) return undefined;
+    current.world.add(group);
+    current.walk = { group, level: null };
+    current.controls.autoRotate = false;
+    current.render();
+    return () => {
+      current.world.remove(group);
+      group.traverse((item) => item.geometry?.dispose());
+      group.userData.materials.forEach((material) => material.dispose());
+      if (current.walk?.group === group) current.walk = null;
+      current.render();
+    };
+  }, [route]);
+
+  // Inside (floors) or outside (the real building).
   useEffect(() => {
     const current = scene.current;
     if (!current) return;
-    if (current.marker) current.marker.visible = current.marker.userData.floor === floor;
-    current.floors.forEach((item) => {
-      item.group.visible = item.floor <= floor;
-      const opacity = item.floor === floor ? 1 : 0.18;
-      item.materials.forEach((material) => {
-        material.opacity = material.isLineBasicMaterial ? opacity * 0.55 : opacity;
-        material.depthWrite = item.floor === floor;
-      });
-    });
-    // Keep the viewing angle; just move up or down to the chosen floor.
-    const offset = current.camera.position.clone().sub(current.controls.target);
-    current.controls.target.set(0, (floor - 1) * FLOOR_HEIGHT, 0);
-    current.camera.position.copy(current.controls.target).add(offset);
+    current.view = view;
+    const outside = view === "outside";
+    current.exterior.visible = outside;
+    if (current.walk) {
+      current.walk.group.visible = !outside;
+      current.walk.level = null;
+    }
+    if (current.marker) current.marker.visible = !outside && (Boolean(current.walk) || current.marker.userData.floor === floor);
+    if (outside) {
+      current.floors.forEach((item) => { item.group.visible = false; });
+      // A low front-corner view, like a toy model on a table: the whole building fits.
+      current.controls.target.set(0, 4, 0);
+      current.camera.position.set(-58, 34, 92);
+    } else if (!current.walk) {
+      current.floor = null; // let the floor effect set the floors again
+      showFloor(current, floor);
+    }
     current.render();
+  }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const current = scene.current;
+    if (!current || current.walk || current.view === "outside") return;
+    showFloor(current, floor);
   }, [floor]);
 
   if (failed) return fallback;
-  return <div className="ss-dollhouse">
+  return <div className={`ss-dollhouse ${className}`}>
     <div ref={holder} className="ss-dollhouse-canvas" role="img" aria-label={label} />
-    <button type="button" className="ss-dollhouse-open" onClick={onOpen}>Open plan</button>
+    {onOpen && <button type="button" className="ss-dollhouse-open" onClick={onOpen}>{openLabel}</button>}
     <span className="ss-dollhouse-hint" aria-hidden="true">Drag to turn · two fingers on phones</span>
   </div>;
+}
+
+// The chosen floor clearly, the floors below faintly, the floors above hidden.
+function showFloor(current, floor) {
+  if (current.floor === floor) return;
+  current.floor = floor;
+  if (current.marker) current.marker.visible = current.marker.userData.floor === floor;
+  current.floors.forEach((item) => {
+    item.group.visible = item.floor <= floor;
+    const opacity = item.floor === floor ? 1 : 0.18;
+    item.materials.forEach((material) => {
+      material.opacity = material.isLineBasicMaterial ? opacity * 0.55 : opacity;
+      material.depthWrite = item.floor === floor;
+    });
+  });
+  // Keep the viewing angle; just move up or down to the chosen floor.
+  const offset = current.camera.position.clone().sub(current.controls.target);
+  current.controls.target.set(0, (floor - 1) * FLOOR_HEIGHT, 0);
+  current.camera.position.copy(current.controls.target).add(offset);
+  current.render();
 }

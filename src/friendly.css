@@ -308,3 +308,43 @@ body .student-portal-shell .mc-welcome-skip { justify-self: center; min-height: 
 .notice-item[data-spotlight] { border-radius: 14px; box-shadow: 0 0 0 4px var(--peach, #f1c39a); background: rgba(241, 195, 154, .18); transition: box-shadow .3s ease, background .3s ease; }
 @media (max-width: 640px) { .announce-pop { top: 76px; } .announce-pop-art { width: 68px; height: 68px; } .announce-pop-text b { font-size: 16px; } }
 @media (prefers-reduced-motion: reduce) { .announce-pop { animation: none; } }
+
+/* 3D directions: the building on the left (top on phones), the route and steps beside it. */
+.route3d { position: fixed; z-index: 240; inset: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); color: var(--cream, #f6efe1); background-color: var(--forest, #1c3a2a); background-image: var(--grain-light), radial-gradient(70% 60% at 92% 4%, rgba(111, 150, 100, .42), transparent 62%), linear-gradient(160deg, #234634 0%, #1c3a2a 55%, #162f22 100%); }
+.route3d-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; border-bottom: 1px solid rgba(246, 239, 225, .12); }
+.route3d-head .kicker { margin: 0; color: var(--peach, #f1c39a); font-family: var(--mono, monospace); }
+.route3d-head h2 { margin: 2px 0 0; color: var(--cream, #f6efe1); font-family: var(--display, inherit); font-size: clamp(22px, 3vw, 30px); font-weight: 900; font-stretch: 112%; text-transform: uppercase; }
+.route3d-close { display: grid; place-items: center; width: 48px; height: 48px; border: 1px solid rgba(246, 239, 225, .35); border-radius: 50%; color: var(--cream, #f6efe1); background: transparent; }
+.route3d-body { display: grid; grid-template-columns: minmax(0, 1fr) 360px; min-height: 0; }
+.route3d-stage { position: relative; min-height: 0; padding: 14px; }
+.ss-dollhouse.route3d-canvas { height: 100%; min-height: 300px; border: 0; border-radius: 20px; background: radial-gradient(80% 80% at 50% 30%, #fbf7ee 0%, #e8dfcb 100%); }
+.route3d-views { position: absolute; left: 28px; bottom: 28px; }
+.route3d-panel { display: grid; align-content: start; gap: 12px; min-height: 0; overflow-y: auto; padding: 16px 20px 24px; border-left: 1px solid rgba(246, 239, 225, .12); }
+.route3d-panel label { display: grid; gap: 6px; color: var(--cream, #f6efe1); font-size: 14px; font-weight: 700; }
+.route3d-panel select { min-height: 48px; padding: 0 12px; border: 0; border-radius: 12px; color: var(--ink, #1b2a21); background: var(--surface, #fffcf5); font: inherit; font-size: 16px; font-weight: 600; }
+.route3d-swap { justify-self: start; min-height: 36px; padding: 0 14px; border: 1px solid rgba(246, 239, 225, .35); border-radius: 999px; color: var(--cream, #f6efe1); background: transparent; font-weight: 700; }
+.route3d-summary { margin: 4px 0 0; color: #d3ddcf; font-size: 16px; }
+.route3d-summary b { color: var(--peach, #f1c39a); font-size: 22px; }
+.route3d-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.route3d-actions button { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px; border: 0; border-radius: 999px; color: var(--ink, #1b2a21); background: var(--peach, #f1c39a); font-weight: 800; }
+.route3d-actions button + button { color: var(--cream, #f6efe1); background: transparent; border: 1px solid rgba(246, 239, 225, .35); }
+.route3d-steps { display: grid; gap: 6px; margin: 4px 0 0; padding: 0; list-style: none; counter-reset: step; }
+.route3d-steps li { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: baseline; gap: 8px; padding: 10px 12px; border-radius: 12px; color: var(--ink, #1b2a21); background: var(--surface, #fffcf5); font-size: 15px; line-height: 1.4; counter-increment: step; }
+.route3d-steps li::before { content: counter(step); display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; color: var(--ink, #1b2a21); background: var(--peach, #f1c39a); font-size: 12px; font-weight: 800; }
+.route3d-steps li small { color: var(--muted, #5d6a5e); white-space: nowrap; }
+.route3d-steps li.kind-up, .route3d-steps li.kind-down { background: #fdf3e2; }
+.route3d-note { margin: 0; color: #d3ddcf; }
+.route3d-fallback { display: grid; place-items: center; height: 100%; margin: 0; padding: 20px; border-radius: 20px; color: var(--ink, #1b2a21); background: var(--surface, #fffcf5); text-align: center; }
+.map-3d-button { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; margin-left: auto; padding: 0 14px; border: 0; border-radius: 999px; color: var(--ink, #1b2a21); background: var(--peach, #f1c39a); font-weight: 800; }
+.dollhouse-actions .dollhouse-route { color: var(--ink, #1b2a21); background: var(--peach, #f1c39a); border-color: var(--peach, #f1c39a); }
+@media (max-width: 900px) {
+  .route3d-body { grid-template-columns: 1fr; grid-template-rows: minmax(260px, 48dvh) minmax(0, 1fr); }
+  .route3d-stage { padding: 10px; }
+  .route3d-views { left: 20px; bottom: 20px; }
+  .route3d-panel { border-left: 0; border-top: 1px solid rgba(246, 239, 225, .12); }
+}
+.route3d-panel, .route3d-panel > * { min-width: 0; }
+.route3d-panel select { width: 100%; }
+.route3d-canvas .ss-dollhouse-hint { left: auto; right: 16px; bottom: 16px; }
+.route3d-views { background: var(--surface, #fffcf5); }
+.ss-dollhouse.route3d-canvas { background: radial-gradient(80% 80% at 50% 30%, #fdf1e4 0%, #f2d9c4 100%); }

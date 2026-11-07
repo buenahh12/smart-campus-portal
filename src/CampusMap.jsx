@@ -4,6 +4,7 @@ import { usePublicCollection } from "./CampusUpdates";
 import { CMS_COLLECTIONS, isClosureActive } from "./cms";
 import { usePlanVersion } from "./usePlan";
 import {
+  BUILDING_NAME,
   FLOORS,
   PLACES,
   PLAN_HEIGHT,
@@ -676,6 +677,7 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
                   <div className="map-summary">
                     <b>{route.minutes} min</b>
                     <span>{route.meters} m{route.floors.length > 1 ? ` · ${route.floors.length} floors` : ""}</span>
+                    {route.path.every((id) => buildingOf(graphNode(id)?.floor) === BUILDING_NAME) && <button type="button" className="map-3d-button" onClick={() => window.dispatchEvent(new CustomEvent("sscai:route3d", { detail: { start: route.start.key, end: route.end.key } }))}><Icon name="cube" size={15} /> Show in 3D</button>}
                   </div>
                   {emergency && <p className="map-alert">In a real emergency, stay calm and follow your teacher and school staff.</p>}
                   <ol className="map-steps">

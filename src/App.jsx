@@ -151,6 +151,7 @@ const lazyScreen = (load) => lazy(() => load().catch(() => ({ default: ScreenUna
 const loadCampusMap = () => import("./CampusMap");
 const loadMyCampus = () => import("./MyCampus");
 const ArLiveView = lazyScreen(() => import("./ArLiveView"));
+const Route3DView = lazyScreen(() => import("./Route3D"));
 const CampusMap = lazyScreen(loadCampusMap);
 const MyCampus = lazyScreen(loadMyCampus);
 const AdminCms = lazyScreen(() => import("./AdminCms"));
@@ -935,6 +936,12 @@ export default function App() {
   usePrefetchScreens();
   const offlineApp = useOfflineApp();
   const [loginOpen, setLoginOpen] = useState(false);
+  const [route3d, setRoute3d] = useState(null); // { start, end } while the 3D directions are open
+  useEffect(() => {
+    const open = (event) => { setMapState(null); setRoute3d(event.detail || {}); };
+    window.addEventListener("sscai:route3d", open);
+    return () => window.removeEventListener("sscai:route3d", open);
+  }, []);
   const [noticeOpen, setNoticeOpen] = useState(() => !privacyNoticeSeen());
   const [menuOpen, setMenuOpen] = useState(false);
   const [floor, setFloor] = useState(2);
@@ -1179,6 +1186,7 @@ export default function App() {
                   </Suspense>
                 </div>
                 <div className="dollhouse-actions">
+                  <button type="button" className="dollhouse-route" onClick={() => setRoute3d({})}><Icon name="cube" size={16} /> Watch a route in 3D</button>
                   <button type="button" onClick={() => setMapState({ floor })}><Icon name="route" size={16} /> Open the 2D floor plan</button>
                 </div>
               </article>
@@ -1280,14 +1288,15 @@ export default function App() {
           <span className="ss-footer-links"><a href="#privacy">Privacy Policy</a> <a href="#terms">Terms of Use</a> <a href="#top">Back to top</a></span>
         </div>
       </footer>
-      {!accountOpen && !loginOpen && !mapState && !arOpen && <SiiBot onSignIn={openLogin} onSignOut={handleSignOut} onOpenAccount={() => setAccountOpen(true)} alreadySignedIn={Boolean(signedInUser)} onNavigate={navigateTo} onOpenMap={setMapState} />}
+      {!accountOpen && !loginOpen && !mapState && !arOpen && !route3d && <SiiBot onSignIn={openLogin} onSignOut={handleSignOut} onOpenAccount={() => setAccountOpen(true)} alreadySignedIn={Boolean(signedInUser)} onNavigate={navigateTo} onOpenMap={setMapState} />}
       <AppStatus online={offlineApp.online} updateReady={offlineApp.updateReady} onUpdate={offlineApp.applyUpdate} />
-      <InstallPrompt offlineApp={offlineApp} hidden={Boolean(noticeOpen || mapState || arOpen || loginOpen || accountOpen || createAccountOpen || adminLoginOpen || adminView || offlineApp.updateReady)} />
+      <InstallPrompt offlineApp={offlineApp} hidden={Boolean(noticeOpen || route3d || mapState || arOpen || loginOpen || accountOpen || createAccountOpen || adminLoginOpen || adminView || offlineApp.updateReady)} />
       {noticeOpen && !mapState && !arOpen && !adminView && <PrivacyNotice onDone={() => setNoticeOpen(false)} />}
-      <AnnouncementPopup hidden={Boolean(noticeOpen || mapState || arOpen || loginOpen || accountOpen || createAccountOpen || adminLoginOpen || adminView)} />
+      <AnnouncementPopup hidden={Boolean(noticeOpen || route3d || mapState || arOpen || loginOpen || accountOpen || createAccountOpen || adminLoginOpen || adminView)} />
       <PolicyDialog />
       <Suspense fallback={<ScreenLoading />}>
       {arOpen && <ArLiveView onClose={() => setArOpen(false)} />}
+      {route3d && <Route3DView start={route3d.start} end={route3d.end} onClose={() => setRoute3d(null)} onOpenMap={(key, mapFloor) => { setRoute3d(null); setMapState({ destination: key, floor: mapFloor }); }} />}
       {mapState && <CampusMap onClose={() => setMapState(null)} initialFloor={mapState.floor || 2} initialDestination={mapState.destination || null} initialEmergency={Boolean(mapState.emergency)} />}
       {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} onCreate={openCreateAccount} onSignedIn={(user) => { setSignedInUser(user); setLoginOpen(false); setAccountOpen(true); }} onAdminSignedIn={(user) => { setLoginOpen(false); setSignedInUser(user); setRole("admin"); setAdminView("content"); }} />}
       {accountOpen && signedInUser && <MyCampus
