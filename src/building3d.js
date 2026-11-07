@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { BUILDING_NAME, METERS_PER_UNIT as M, PLAN_HEIGHT, PLAN_WIDTH, buildingOf, graphNode } from "./floorPlans";
+import { BUILDING_NAME, FLOORS, METERS_PER_UNIT as M, PLAN_HEIGHT, PLAN_WIDTH, buildingOf, graphNode } from "./floorPlans";
 
 // The outside of the Main Academic Building and the guide-ball route, for the 3D dollhouse.
 // Sizes come from the 2D floor plans (1 plan unit = 0.4 m); the look comes from photos of the
@@ -88,31 +88,48 @@ function signTexture() {
   const g = canvas.getContext("2d");
   g.fillStyle = "#97d951";
   g.fillRect(0, 0, 2048, 160);
+  // Dark green border, like the painted band.
   g.strokeStyle = "#1d6b2c";
-  g.lineWidth = 10;
-  g.strokeRect(5, 5, 2038, 150);
-  // Logo: a white seal with a coloured cube.
-  g.fillStyle = "#ffffff";
-  g.beginPath();
-  g.arc(95, 80, 62, 0, Math.PI * 2);
-  g.fill();
-  g.strokeStyle = "#1d6b2c";
-  g.lineWidth = 6;
-  g.stroke();
-  [["#2f6fd1", 70, 62], ["#e2502f", 98, 52], ["#2fa04f", 88, 86]].forEach(([color, x, y]) => {
-    g.fillStyle = color;
-    g.fillRect(x, y, 26, 26);
-  });
-  g.font = "bold 104px Archivo, Arial Narrow, Arial, sans-serif";
+  g.lineWidth = 12;
+  g.strokeRect(6, 6, 2036, 148);
+  // Tall, condensed letters: dark green, outlined in yellow, as painted on the building.
+  g.font = "900 118px 'Archivo Narrow', 'Arial Narrow', Archivo, Arial, sans-serif";
   g.textBaseline = "middle";
   g.lineJoin = "round";
-  g.lineWidth = 10;
-  g.strokeStyle = "#f3d33b";
-  g.strokeText("SAINT SIMON OF CYRENE ACADEMY", 190, 86);
-  g.fillStyle = "#1d6b2c";
-  g.fillText("SAINT SIMON OF CYRENE ACADEMY", 190, 86);
+  const text = "SAINT SIMON OF CYRENE ACADEMY";
+  const width = g.measureText(text).width;
+  const room = 2048 - 220 - 40;
+  g.save();
+  g.translate(220, 84);
+  g.scale(Math.min(1, room / width), 1.08);
+  g.lineWidth = 12;
+  g.strokeStyle = "#f6d23a";
+  g.strokeText(text, 0, 0);
+  g.fillStyle = "#16612a";
+  g.fillText(text, 0, 0);
+  g.restore();
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
+  // The school's real logo (the round seal), painted in once it has loaded.
+  const seal = new Image();
+  seal.onload = () => {
+    g.save();
+    g.beginPath();
+    g.arc(110, 80, 70, 0, Math.PI * 2);
+    g.closePath();
+    g.fillStyle = "#ffffff";
+    g.fill();
+    g.clip();
+    g.drawImage(seal, 40, 10, 140, 140);
+    g.restore();
+    g.lineWidth = 5;
+    g.strokeStyle = "#1d6b2c";
+    g.beginPath();
+    g.arc(110, 80, 70, 0, Math.PI * 2);
+    g.stroke();
+    texture.needsUpdate = true;
+  };
+  seal.src = `${import.meta.env.BASE_URL}logologooo.jpg`;
   return texture;
 }
 
@@ -259,14 +276,44 @@ export function buildExterior() {
 }
 
 // ---------- The route: a green trail and a glowing ball that walks it ----------
+// Going between floors: up (or down) the first flight to the half landing at the far end of the
+// stairwell, across the landing, then the second flight back to the entrance side, one floor up.
+// Straight stairs (no U shape) are one ramp across the stairwell. Plan units, floors as numbers.
+function stairClimb(node, next) {
+  const room = FLOORS.find((plan) => plan.floor === node.floor)?.rooms.find((item) => item.id === node.room);
+  if (!room) return [];
+  const [x, y, w, h] = room.rect;
+  const vertical = h >= w;
+  const door = room.door || [x + w / 2, y + h / 2];
+  const nearStart = vertical ? door[1] - y < h / 2 : door[0] - x < w / 2;
+  const along = (t) => (nearStart ? t : 1 - t); // 0 at the entrance end, 1 at the far end
+  const at = (t, u) => (vertical ? [x + w * u, y + h * along(t)] : [x + w * along(t), y + h * u]);
+  const from = node.floor;
+  const to = next.floor;
+  const mid = (from + to) / 2;
+  if (room.shape !== "u") return [[...at(0.1, 0.5), from], [...at(0.9, 0.5), to]];
+  return [
+    [...at(0.12, 0.28), from],
+    [...at(0.8, 0.28), mid],
+    [...at(0.92, 0.5), mid],
+    [...at(0.8, 0.72), mid],
+    [...at(0.12, 0.72), to],
+  ];
+}
+
 export function buildRoute(route, ballHeight = 0.6) {
   const nodes = (route?.path || []).map((id) => graphNode(id)).filter(Boolean);
   const points = [];
-  for (const node of nodes) {
-    const [x, z] = toWorld(node.x, node.y);
-    const point = new THREE.Vector3(x, (node.floor - 1) * FLOOR_HEIGHT + ballHeight, z);
+  const push = (px, py, floorLevel) => {
+    const [x, z] = toWorld(px, py);
+    const point = new THREE.Vector3(x, (floorLevel - 1) * FLOOR_HEIGHT + ballHeight, z);
     if (!points.length || points[points.length - 1].distanceTo(point) > 0.05) points.push(point);
-  }
+  };
+  nodes.forEach((node, index) => {
+    push(node.x, node.y, node.floor);
+    const next = nodes[index + 1];
+    if (next && next.floor !== node.floor && node.kind === "room") stairClimb(node, next).forEach(([px, py, level]) => push(px, py, level));
+  });
   if (points.length < 2) return null;
   const curve = new THREE.CurvePath();
   for (let i = 0; i < points.length - 1; i += 1) curve.add(new THREE.LineCurve3(points[i], points[i + 1]));

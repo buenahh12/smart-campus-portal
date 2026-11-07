@@ -23,7 +23,7 @@ export default function Route3DView({ start, end, onClose, onOpenMap }) {
   const places = useMemo(choices, []);
   const [from, setFrom] = useState(start || firstKey("entrance"));
   const [to, setTo] = useState(end || firstKey("director"));
-  const [view, setView] = useState("inside");
+  const [view, setView] = useState("walk"); // walk (POV behind the pin), inside (overview) or outside
   const [replay, setReplay] = useState(0);
   const closures = usePublicCollection(CMS_COLLECTIONS.closures);
   const blockedKey = closures.items.filter((item) => isClosureActive(item)).map((item) => item.mapArea).sort().join("|");
@@ -55,11 +55,12 @@ export default function Route3DView({ start, end, onClose, onOpenMap }) {
     </header>
     <div className="route3d-body">
       <div className="route3d-stage">
-        <Dollhouse3D zoom className="route3d-canvas" floor={showing?.end.floor || 1} route={view === "inside" ? showing : null} highlight={showing?.end.key || null} view={view}
+        <Dollhouse3D zoom={view !== "walk"} pov={view === "walk" && Boolean(showing)} className="route3d-canvas" floor={showing?.end.floor || 1} route={view === "outside" ? null : showing} highlight={showing?.end.key || null} view={view === "outside" ? "outside" : "inside"}
           label={showing ? `3D route from ${placeTitle(showing.start)} to ${placeTitle(showing.end)}` : "3D model of the Main Academic Building"}
           fallback={<p className="route3d-fallback">3D isn&apos;t available on this device. Use the 2D floor plan instead.</p>} />
         <div className="va-segment route3d-views" role="group" aria-label="View">
-          <button type="button" className={view === "inside" ? "active" : ""} aria-pressed={view === "inside"} onClick={() => setView("inside")}>Inside</button>
+          <button type="button" className={view === "walk" ? "active" : ""} aria-pressed={view === "walk"} onClick={() => setView("walk")}>Walk</button>
+          <button type="button" className={view === "inside" ? "active" : ""} aria-pressed={view === "inside"} onClick={() => setView("inside")}>Above</button>
           <button type="button" className={view === "outside" ? "active" : ""} aria-pressed={view === "outside"} onClick={() => setView("outside")}>Outside</button>
         </div>
       </div>
@@ -72,14 +73,14 @@ export default function Route3DView({ start, end, onClose, onOpenMap }) {
         {showing && <>
           <p className="route3d-summary"><b>{showing.minutes} min</b> · {showing.meters} m{showing.floors.length > 1 ? ` · ${showing.floors.length} floors` : ""}</p>
           <div className="route3d-actions">
-            <button type="button" onClick={() => { setView("inside"); setReplay((count) => count + 1); }}><Icon name="arrow" size={15} /> Play again</button>
+            <button type="button" onClick={() => { if (view === "outside") setView("walk"); setReplay((count) => count + 1); }}><Icon name="arrow" size={15} /> Play again</button>
             {onOpenMap && <button type="button" onClick={() => onOpenMap(showing.end.key, showing.end.floor)}><Icon name="route" size={15} /> 2D map</button>}
           </div>
           <ol className="route3d-steps">
             {showing.steps.map((step, index) => <li key={index} className={`kind-${step.kind}`}><span>{step.text}</span>{step.meters ? <small>{step.meters} m</small> : null}</li>)}
           </ol>
         </>}
-        {view === "outside" && <p className="route3d-note">The outside of the Main Academic Building. Tap <b>Inside</b> to watch the route.</p>}
+        {view === "outside" && <p className="route3d-note">The outside of the Main Academic Building. Tap <b>Walk</b> to follow the pin, or <b>Above</b> to see the whole route.</p>}
       </aside>
     </div>
   </div>;

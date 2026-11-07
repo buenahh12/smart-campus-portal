@@ -106,7 +106,8 @@ const BALL_SPEED = 4.5; // metres a second
 const END_PAUSE = 1.6; // seconds at the destination before it starts again
 
 // zoom: allow zooming (pinch, mouse wheel, and + / - buttons).
-export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight = null, view = "inside", route = null, className = "", openLabel = "Open plan", zoom = false }) {
+// pov: while a route shows, the camera walks behind the pin at eye level (first-person view).
+export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight = null, view = "inside", route = null, className = "", openLabel = "Open plan", zoom = false, pov = false }) {
   const holder = useRef(null);
   const scene = useRef(null);
   const [failed, setFailed] = useState(false);
@@ -196,6 +197,10 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
       if (marker && !reduceMotion) marker.userData.pin.position.y = marker.userData.pinY + Math.sin(time / 280) * 0.6;
       const walk = scene.current?.walk;
       if (walk && scene.current.view === "inside") stepWalk(walk, time);
+      if (walk && scene.current.pov && scene.current.view === "inside") {
+        renderer.render(world, camera);
+        return;
+      }
       controls.update();
       renderer.render(world, camera);
     };
@@ -213,18 +218,40 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
         halo.scale.setScalar(1 + Math.sin(time / 220) * 0.12);
         ball.position.y += Math.abs(Math.sin(time / 180)) * 0.45;
       }
-      const level = Math.min(Math.max(...routeFloors), Math.max(1, Math.round((point.y - ballHeight) / FLOOR_HEIGHT) + 1));
-      if (level !== walk.level) {
+      const pov = scene.current.pov;
+      const level = Math.min(Math.max(...routeFloors), Math.max(1, Math.floor((point.y - ballHeight) / FLOOR_HEIGHT + 0.5) + 1));
+      if (level !== walk.level || pov !== walk.pov) {
         walk.level = level;
+        walk.pov = pov;
         const top = Math.max(...routeFloors);
         floors.forEach((item) => {
-          item.group.visible = item.floor <= top;
-          const opacity = item.floor === level ? 1 : routeFloors.includes(item.floor) ? 0.22 : 0.1;
+          // POV: only the floor you are on (and the one below, seen down the stairs); overview: the route's floors.
+          item.group.visible = pov ? item.floor <= level && item.floor >= level - 1 : item.floor <= top;
+          const opacity = item.floor === level ? 1 : pov ? 0.35 : routeFloors.includes(item.floor) ? 0.22 : 0.1;
           item.materials.forEach((material) => {
             material.opacity = material.isLineBasicMaterial ? opacity * 0.55 : opacity;
             material.depthWrite = item.floor === level;
           });
         });
+      }
+      ball.scale.setScalar(pov ? 0.55 : 1);
+      if (pov) {
+        // Eye level, a few steps behind the pin, looking where it is going. Up and down the stairs
+        // the camera climbs with it.
+        const ahead = curve.getPointAt(Math.min(1, (travelled + 5) / length));
+        const behind = curve.getPointAt(Math.max(0, (travelled - 5) / length));
+        const heading = ahead.clone().sub(behind).setY(0);
+        if (heading.lengthSq() < 0.01) heading.copy(walk.heading || new THREE.Vector3(0, 0, -1));
+        heading.normalize();
+        walk.heading = walk.heading ? walk.heading.lerp(heading, reduceMotion ? 1 : 0.08).normalize() : heading;
+        const eye = point.clone().addScaledVector(walk.heading, -8.5);
+        eye.y = point.y - ballHeight + 3.8;
+        camera.position.lerp(eye, reduceMotion ? 1 : 0.15);
+        const look = point.clone().addScaledVector(walk.heading, 6);
+        look.y = ahead.y - ballHeight + 0.6;
+        walk.look = walk.look ? walk.look.lerp(look, reduceMotion ? 1 : 0.15) : look;
+        camera.lookAt(walk.look);
+        return;
       }
       const aim = new THREE.Vector3(point.x * 0.6, point.y - ballHeight, point.z * 0.6);
       const move = aim.sub(controls.target).multiplyScalar(reduceMotion ? 0 : 0.05);
@@ -237,7 +264,7 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
     });
     visibility.observe(element);
 
-    scene.current = { floors, controls, camera, world, exterior, marker: null, walk: null, view: "inside", floor: null, render: () => !running && loop() };
+    scene.current = { floors, controls, camera, world, exterior, marker: null, walk: null, view: "inside", pov: false, floor: null, render: () => !running && loop() };
     return () => {
       visibility.disconnect();
       sizeObserver.disconnect();
@@ -314,6 +341,23 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
       current.render();
     };
   }, [route]);
+
+  // POV on or off; going back to the overview puts the camera above the building again.
+  useEffect(() => {
+    const current = scene.current;
+    if (!current) return;
+    current.pov = pov;
+    current.camera.fov = pov ? 60 : 32;
+    current.camera.near = pov ? 0.1 : 1;
+    current.camera.updateProjectionMatrix();
+    current.controls.enabled = !pov;
+    if (!pov) {
+      current.controls.target.set(0, 0, 0);
+      current.camera.position.set(0, 66, 82);
+      if (current.walk) current.walk.pov = null;
+    }
+    current.render();
+  }, [pov]);
 
   // Inside (floors) or outside (the real building).
   useEffect(() => {
