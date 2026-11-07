@@ -201,7 +201,9 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
     const stepWalk = (walk, time) => {
       const { curve, length, ball, halo, floors: routeFloors, ballHeight } = walk.group.userData;
       if (walk.started === undefined) walk.started = time;
-      const travelled = reduceMotion ? length : ((time - walk.started) / 1000 * BALL_SPEED) % (length + END_PAUSE * BALL_SPEED);
+      // The ball always walks the route (it is the directions, not decoration); with reduced motion
+      // only the camera stays still and the glow does not pulse.
+      const travelled = ((time - walk.started) / 1000 * BALL_SPEED) % (length + END_PAUSE * BALL_SPEED);
       const point = curve.getPointAt(Math.min(1, travelled / length));
       ball.position.copy(point);
       if (!reduceMotion) halo.scale.setScalar(1 + Math.sin(time / 220) * 0.12);
@@ -219,7 +221,7 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
         });
       }
       const aim = new THREE.Vector3(point.x * 0.6, point.y - ballHeight, point.z * 0.6);
-      const move = aim.sub(controls.target).multiplyScalar(reduceMotion ? 1 : 0.05);
+      const move = aim.sub(controls.target).multiplyScalar(reduceMotion ? 0 : 0.05);
       controls.target.add(move);
       camera.position.add(move);
     };
