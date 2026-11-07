@@ -18,7 +18,7 @@ const toWorld = (x, y) => [(x - PLAN_WIDTH / 2) * M, (y - PLAN_HEIGHT / 2) * M];
 
 const COLORS = {
   lime: "#85c845",
-  limeLight: "#a6e263",
+  limeLight: "#76b23b",
   base: "#2f7a36",
   teal: "#86cdb5",
   roof: "#c9d1c0",
@@ -78,6 +78,85 @@ function glassBlockTexture() {
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
+}
+
+// A window like the ones on the building: white frame, dark glass with a soft reflection, white
+// grille bars, sometimes a curtain behind. Variant 0-3.
+const windowCache = new Map();
+function windowTexture(variant) {
+  if (windowCache.has(variant)) return windowCache.get(variant);
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 128;
+  const g = canvas.getContext("2d");
+  const glass = g.createLinearGradient(0, 0, 256, 128);
+  glass.addColorStop(0, "#5f7380");
+  glass.addColorStop(0.45, "#3e4f5a");
+  glass.addColorStop(1, "#2d3a43");
+  g.fillStyle = glass;
+  g.fillRect(0, 0, 256, 128);
+  // Curtains in some windows.
+  if (variant === 1) { g.fillStyle = "rgba(236, 229, 214, .85)"; g.fillRect(14, 10, 100, 108); }
+  if (variant === 2) { g.fillStyle = "rgba(214, 226, 236, .7)"; g.fillRect(14, 10, 228, 50); }
+  // Sky reflection.
+  g.fillStyle = "rgba(255,255,255,.16)";
+  g.beginPath(); g.moveTo(30, 0); g.lineTo(90, 0); g.lineTo(40, 128); g.lineTo(-20, 128); g.fill();
+  // Frame and grille.
+  g.strokeStyle = "#f3f1ea";
+  g.lineWidth = 12;
+  g.strokeRect(6, 6, 244, 116);
+  g.lineWidth = 5;
+  const bars = variant === 3 ? 10 : 8;
+  for (let i = 1; i < bars; i += 1) { g.beginPath(); g.moveTo((256 / bars) * i, 8); g.lineTo((256 / bars) * i, 120); g.stroke(); }
+  g.beginPath(); g.moveTo(8, 64); g.lineTo(248, 64); g.stroke();
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  windowCache.set(variant, texture);
+  return texture;
+}
+
+// Paint that has been in the sun and rain: faint stains, streaks under the ledges, darker at the
+// bottom. Light grey on white, so it only shades the wall colour a little.
+let grime = null;
+function grimeTexture() {
+  if (grime) return grime;
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 256;
+  const g = canvas.getContext("2d");
+  g.fillStyle = "#ffffff";
+  g.fillRect(0, 0, 512, 256);
+  let seed = 11;
+  const random = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  for (let i = 0; i < 26; i += 1) {
+    const x = random() * 512;
+    const w = 8 + random() * 22;
+    const h = 14 + random() * 46;
+    const streak = g.createLinearGradient(0, 0, 0, h);
+    streak.addColorStop(0, `rgba(70, 80, 60, ${0.025 + random() * 0.035})`);
+    streak.addColorStop(1, "rgba(70, 80, 60, 0)");
+    g.fillStyle = streak;
+    g.fillRect(x, 0, w, h);
+  }
+  for (let i = 0; i < 60; i += 1) {
+    const x = random() * 512;
+    const y = random() * 256;
+    const r = 6 + random() * 30;
+    const spot = g.createRadialGradient(x, y, 0, x, y, r);
+    spot.addColorStop(0, `rgba(80, 90, 70, ${0.02 + random() * 0.03})`);
+    spot.addColorStop(1, "rgba(80, 90, 70, 0)");
+    g.fillStyle = spot;
+    g.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  const base = g.createLinearGradient(0, 190, 0, 256);
+  base.addColorStop(0, "rgba(60, 60, 45, 0)");
+  base.addColorStop(1, "rgba(60, 60, 45, .14)");
+  g.fillStyle = base;
+  g.fillRect(0, 190, 512, 66);
+  grime = new THREE.CanvasTexture(canvas);
+  grime.colorSpace = THREE.SRGBColorSpace;
+  grime.wrapS = THREE.RepeatWrapping;
+  return grime;
 }
 
 // The painted name band across the front.
@@ -191,6 +270,16 @@ export function buildExterior() {
   };
   // Matte clay: rough, no shine, a gentle bumpy surface.
   const solid = (color) => mat(color, () => new THREE.MeshStandardMaterial({ color, roughness: 0.92, metalness: 0, bumpMap: clayTexture(), bumpScale: 0.6 }));
+  // Wall paint: the colour, slightly weathered (stains and streaks), one stain pattern per ~8 m.
+  const paint = (color, length) => {
+    const repeats = Math.max(1, Math.round(length / 8));
+    return mat(`paint${color}${repeats}`, () => {
+      const map = grimeTexture().clone();
+      map.repeat.set(repeats, 1);
+      map.needsUpdate = true;
+      return new THREE.MeshStandardMaterial({ color, map, roughness: 0.95, metalness: 0, bumpMap: clayTexture(), bumpScale: 0.35 });
+    });
+  };
   const add = (geometry, material, x, y, z) => {
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(x, y, z);
@@ -204,25 +293,37 @@ export function buildExterior() {
   // A wall from (x1, z1) to (x2, z2), from height y0, h tall, t thick.
   const wall = (x1, z1, x2, z2, y0, h, color, t = 0.3) => {
     const length = Math.hypot(x2 - x1, z2 - z1);
-    const mesh = add(soft(length + t, h, t, 0.25), solid(color), (x1 + x2) / 2, y0 + h / 2, (z1 + z2) / 2);
+    const tall = h > 1.5; // walls get weathered paint; ledges and bands stay plain
+    const mesh = add(soft(length + t, h, t, tall ? 0.1 : 0.12), tall ? paint(color, length) : solid(color), (x1 + x2) / 2, y0 + h / 2, (z1 + z2) / 2);
     mesh.rotation.y = -Math.atan2(z2 - z1, x2 - x1);
     return mesh;
   };
   const glass = mat("glass", () => new THREE.MeshStandardMaterial({ map: glassBlockTexture(), roughness: 0.55 }));
-  const windowsAlong = (x1, z1, x2, z2, y, outward, skip = () => false) => {
+  let windowSeed = 5;
+  const windowRandom = () => { windowSeed = (windowSeed * 16807) % 2147483647; return windowSeed / 2147483647; };
+  const windowsAlong = (x1, z1, x2, z2, y, outward, skip = () => false, blocks = false) => {
     const length = Math.hypot(x2 - x1, z2 - z1);
     const count = Math.max(1, Math.floor((length - 4) / 5.5));
+    const turn = Math.atan2(outward[0], outward[1]);
     for (let i = 0; i < count; i += 1) {
-      const t = (i + 0.5) / count;
+      const t = (i + 0.5 + (windowRandom() - 0.5) * 0.18) / count;
       const x = x1 + (x2 - x1) * t;
       const z = z1 + (z2 - z1) * t;
       if (skip(x, z, y)) continue;
-      const turn = Math.atan2(outward[0], outward[1]);
-      const frame = add(soft(1.9, 1.8, 0.2, 0.08), solid("#f4f1e6"), x + outward[0] * 0.18, y, z + outward[1] * 0.18);
+      if (blocks) {
+        const frame = add(soft(1.9, 1.8, 0.16, 0.04), solid("#ece9df"), x + outward[0] * 0.17, y, z + outward[1] * 0.17);
+        frame.rotation.y = turn;
+        const pane = add(new THREE.PlaneGeometry(1.5, 1.4), glass, x + outward[0] * 0.26, y, z + outward[1] * 0.26);
+        pane.rotation.y = turn;
+        continue;
+      }
+      const w = [2.1, 2.4, 2.4, 1.7][Math.floor(windowRandom() * 4)];
+      const h = 1.15;
+      const frame = add(new THREE.BoxGeometry(w + 0.16, h + 0.16, 0.1), solid("#ece9df"), x + outward[0] * 0.16, y + 0.2, z + outward[1] * 0.16);
       frame.rotation.y = turn;
-      const pane = add(new THREE.PlaneGeometry(1.5, 1.4), glass, x + outward[0] * 0.29, y, z + outward[1] * 0.29);
+      const pane = add(new THREE.PlaneGeometry(w, h), mat(`window${i % 4}`, () => new THREE.MeshStandardMaterial({ map: windowTexture(Math.floor(windowRandom() * 4)), roughness: 0.35, metalness: 0.1 })), x + outward[0] * 0.22, y + 0.2, z + outward[1] * 0.22);
       pane.rotation.y = turn;
-      const sill = add(soft(2.2, 0.18, 0.45, 0.08), solid("#f4f1e6"), x + outward[0] * 0.32, y - 0.95, z + outward[1] * 0.32);
+      const sill = add(new THREE.BoxGeometry(w + 0.3, 0.1, 0.32), solid("#dcd8cc"), x + outward[0] * 0.26, y - 0.43, z + outward[1] * 0.26);
       sill.rotation.y = turn;
     }
   };
@@ -270,7 +371,7 @@ export function buildExterior() {
     const y = level * FLOOR_HEIGHT + 1.75;
     const front = level < 3 ? [X0, -X0] : [X0, deckX];
     windowsAlong(front[0], D / 2, front[1], D / 2, y, [0, 1], (x) => level === 2 && x > signLeft && x < signRight);
-    windowsAlong(X0, D / 2, X0, Z0, y, [-1, 0], (x, z) => level === 0 && z > -3 && z < 9);
+    windowsAlong(X0, D / 2, X0, Z0, y, [-1, 0], (x, z) => level === 0 && z > -3 && z < 9, true);
     windowsAlong(-X0, Z0, -X0, level < 3 ? D / 2 : deckZ, y, [1, 0]);
     windowsAlong(-X0, Z0, X0, Z0, y, [0, -1], (x) => x > X0 + 2 && x < X0 + 11);
   }
@@ -348,24 +449,33 @@ export function buildExterior() {
       grille.rotation.y = turn;
     }
   };
-  // Spread along a wall, between the windows, on chosen floors, in a fixed pattern.
-  const units = (x1, z1, x2, z2, outward, levels, every) => {
+  // Scattered over a wall like a real building: an uneven number per floor, at uneven spots and
+  // heights, a mix of window and split units, some stacked on brackets. Seeded: always the same.
+  let acSeed = 23;
+  const acRandom = () => { acSeed = (acSeed * 16807) % 2147483647; return acSeed / 2147483647; };
+  const units = (x1, z1, x2, z2, outward, levels, density) => {
     const length = Math.hypot(x2 - x1, z2 - z1);
-    const count = Math.max(1, Math.floor((length - 4) / 5.5));
-    for (let i = 0; i < count; i += 1) {
-      for (const level of levels) {
-        if ((i + level) % every) continue;
-        const t = (i + 1) / count - 0.5 / count + 0.32 / count;
-        const x = x1 + (x2 - x1) * Math.min(0.97, t);
-        const z = z1 + (z2 - z1) * Math.min(0.97, t);
-        unit(x, level * FLOOR_HEIGHT + (i % 3 === 0 ? 0.9 : 2.4), z, outward, (i + level) % 3 !== 0);
+    for (const level of levels) {
+      const count = Math.round((length / 9) * density * (0.5 + acRandom()));
+      const taken = [];
+      for (let i = 0; i < count; i += 1) {
+        const t = 0.04 + acRandom() * 0.92;
+        if (taken.some((other) => Math.abs(other - t) * length < 1.6)) continue;
+        taken.push(t);
+        const x = x1 + (x2 - x1) * t;
+        const z = z1 + (z2 - z1) * t;
+        const low = acRandom() < 0.4;
+        const split = acRandom() < 0.6;
+        unit(x, level * FLOOR_HEIGHT + (low ? 0.75 + acRandom() * 0.3 : 2.2 + acRandom() * 0.5), z, outward, split);
+        if (split && acRandom() < 0.2) unit(x, level * FLOOR_HEIGHT + 0.8, z, outward, true); // a second unit below
       }
     }
   };
-  units(X0, D / 2, -X0, D / 2, [0, 1], [0, 1, 2], 2);
-  units(X0, D / 2, deckX, D / 2, [0, 1], [3], 3);
-  units(-X0, Z0, X0, Z0, [0, -1], [0, 1, 2, 3], 2);
-  units(-X0, Z0, -X0, D / 2, [1, 0], [0, 1, 2], 3);
+  units(X0, D / 2, -X0, D / 2, [0, 1], [0, 1, 2], 1);
+  units(X0, D / 2, deckX, D / 2, [0, 1], [3], 0.7);
+  units(-X0, Z0, X0, Z0, [0, -1], [0, 1, 2, 3], 1.2);
+  units(-X0, Z0, -X0, D / 2, [1, 0], [0, 1, 2], 0.8);
+  units(X0, Z0, X0, D / 2, [-1, 0], [1, 2], 0.4);
 
   // Tarpaulin banners on the ground floor at the front.
   const banners = [
@@ -382,6 +492,64 @@ export function buildExterior() {
     const x = wide ? b0 + 34 : b0 + i * 3.2 + (i === 4 ? 10 : 0);
     const tarp = add(new THREE.PlaneGeometry(w, 1.6), mat(`banner${i}`, () => new THREE.MeshLambertMaterial({ map: bannerTexture(title, colors, subtitle) })), x, wide ? FLOOR_HEIGHT * 0.62 + 1.6 : 2.2, D / 2 + 0.2);
     tarp.castShadow = false;
+  });
+
+  // Cables fixed along the walls: under each ledge they run from hook to hook with a little sag,
+  // and some drop down the wall to a unit or the ground (as in the photos).
+  const cableMaterial = mat("cable", () => new THREE.MeshBasicMaterial({ color: "#222222" }));
+  const cable = (points) => {
+    const curve = new THREE.CatmullRomCurve3(points);
+    group.add(new THREE.Mesh(new THREE.TubeGeometry(curve, points.length * 8, 0.03, 5, false), cableMaterial));
+  };
+  let cableSeed = 41;
+  const cableRandom = () => { cableSeed = (cableSeed * 16807) % 2147483647; return cableSeed / 2147483647; };
+  const alongWall = (x1, z1, x2, z2, outward, y, gap = 0.12) => {
+    const length = Math.hypot(x2 - x1, z2 - z1);
+    const hooks = Math.max(2, Math.round(length / 6));
+    const points = [];
+    for (let i = 0; i <= hooks * 2; i += 1) {
+      const t = i / (hooks * 2);
+      const sag = i % 2 ? 0.25 + cableRandom() * 0.25 : 0;
+      points.push(new THREE.Vector3(x1 + (x2 - x1) * t + outward[0] * gap, y - sag, z1 + (z2 - z1) * t + outward[1] * gap));
+    }
+    cable(points);
+  };
+  for (let level = 1; level <= 3; level += 1) {
+    const y = level * FLOOR_HEIGHT - 0.35;
+    alongWall(X0 + 1, D / 2 + 0.2, -X0 - 1, D / 2 + 0.2, [0, 1], y - (level === 3 ? 0 : 0), 0.1);
+    if (level < 3) alongWall(X0 + 1, D / 2 + 0.2, -X0 - 1, D / 2 + 0.2, [0, 1], y - 0.18, 0.16);
+    alongWall(-X0 - 1, Z0 - 0.2, X0 + 1, Z0 - 0.2, [0, -1], y, 0.1);
+  }
+  // Drops down the front and back.
+  for (let i = 0; i < 9; i += 1) {
+    const x = X0 + 4 + cableRandom() * (W - 8);
+    const top = FLOOR_HEIGHT * (2 + Math.floor(cableRandom() * 2)) - 0.4;
+    const bottom = 0.8 + cableRandom() * 2;
+    const z = i % 2 ? D / 2 + 0.22 : Z0 - 0.22;
+    cable([new THREE.Vector3(x, top, z), new THREE.Vector3(x + 0.25, (top + bottom) / 2, z), new THREE.Vector3(x + 0.1, bottom, z)]);
+  }
+
+  // Vertical drain pipes from the roof down to the ground.
+  const pipe = solid("#7fbd45");
+  [X0 + 15.5, -6, 9, -X0 - 9].forEach((x) => add(new THREE.CylinderGeometry(0.12, 0.12, H3 - 0.3, 10), pipe, x, (H3 - 0.3) / 2, D / 2 + 0.28));
+  [X0 + 24, 2, -X0 - 15].forEach((x) => add(new THREE.CylinderGeometry(0.12, 0.12, H3 - 0.3, 10), pipe, x, (H3 - 0.3) / 2, Z0 - 0.28));
+
+  // Louvre (jalousie) windows on the left part of the front: a white frame with tilted slats.
+  const louvre = (x, y) => {
+    add(new THREE.BoxGeometry(2.1, 1.5, 0.1), solid("#ece9df"), x, y, D / 2 + 0.17);
+    add(new THREE.PlaneGeometry(1.9, 1.3), solid("#3a4650"), x, y, D / 2 + 0.2);
+    for (let k = 0; k < 6; k += 1) {
+      const slat = add(new THREE.BoxGeometry(1.9, 0.04, 0.2), solid("#f2f0ea"), x, y - 0.55 + k * 0.22, D / 2 + 0.3);
+      slat.rotation.x = -0.6;
+    }
+  };
+  louvre(X0 + 20, FLOOR_HEIGHT + 1.95);
+  louvre(X0 + 20, 1.95);
+
+  // Wall lamps on arms above the ground floor.
+  [X0 + 10, -2, 14].forEach((x) => {
+    add(new THREE.BoxGeometry(0.08, 0.08, 0.6), solid("#3b3b3b"), x, FLOOR_HEIGHT - 0.2, D / 2 + 0.45);
+    add(new THREE.BoxGeometry(0.5, 0.12, 0.35), solid("#2f2f2f"), x, FLOOR_HEIGHT - 0.28, D / 2 + 0.75);
   });
 
   // Electric wires: concrete poles in front and behind, with black wires sagging between them
