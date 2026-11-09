@@ -10,6 +10,7 @@ import {
   requestPasswordReset,
 } from "./firebase";
 import Icon from "./Icon";
+import ArPreview from "./ArPreview";
 import CampusUpdates, { usePublicCollection, visibleAnnouncements } from "./CampusUpdates";
 import { AnnouncementArt } from "./EventArt";
 import { CMS_COLLECTIONS, GRADE_LEVELS, MAX_SECTION_LENGTH, USER_ROLES, isClosureActive, recordSignIn, recordVisit, todayKey, watchSession } from "./cms";
@@ -1215,18 +1216,7 @@ export default function App() {
                 <span className="ss-way-icon" aria-hidden="true"><Icon name="scan" size={26} /></span>
                 <h3>AR live view</h3>
                 <p>Hold up your phone and follow the arrows on the floor all the way to your room.</p>
-                <div className="ar-preview" aria-hidden="true">
-                  <img className="ar-cam" src={asset("campus/classroom.jpg")} alt="" loading="lazy" />
-                  <svg className="ar-floor" viewBox="0 0 1200 900" preserveAspectRatio="xMidYMid slice">
-                    <g fill="none" stroke="#fff" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M880 870 L1010 790 L1140 870" strokeWidth="34" opacity=".95" />
-                      <path d="M915 765 L1003 712 L1091 765" strokeWidth="25" opacity=".8" />
-                      <path d="M940 690 L998 656 L1056 690" strokeWidth="17" opacity=".62" />
-                    </g>
-                  </svg>
-                  <div className="ar-card"><b>Go straight · 38 m</b><span>Room 204 is on your left</span></div>
-                  <span className="ar-eta">about 1 min</span>
-                </div>
+                <ArPreview />
                 <div className="dollhouse-actions">
                   <button type="button" onClick={() => setArOpen(true)}><Icon name="scan" size={16} /> Start AR live view</button>
                 </div>
