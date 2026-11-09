@@ -84,8 +84,18 @@ function buildFloor(plan, materialFor) {
       }
       return;
     }
-    const fromBelow = item.type === "stairs" && FLOORS.find((other) => other.building === plan.building && other.level === plan.level - 1)?.rooms.some((room) => room.stair && room.stair === item.stair);
+    const below = item.type === "stairs" ? FLOORS.find((other) => other.building === plan.building && other.level === plan.level - 1)?.rooms.find((room) => room.stair && room.stair === item.stair) : null;
+    const fromBelow = Boolean(below);
     if (!fromBelow) slab(item.rect, roomColor(item), 0.01, floorTexture(item));
+    else {
+      // The stairs from below come up through this stairwell, so it has no full floor, only the
+      // landing you step off onto: the entrance end for U-shaped stairs, the far end for straight.
+      const lower = stairFrame(below);
+      const [t0, t1] = below.shape === "u" ? [0, STAIR.FIRST] : [0.88, 1];
+      const [ax, ay] = lower.at(t0, 0);
+      const [bx, by] = lower.at(t1, 1);
+      slab([Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay)], COLORS.stairs, 0.01);
+    }
     if (item.type === "deck") return;
     if (item.type === "stairs") {
       // A real staircase up to the floor above (if the same stairs continue there): for U-shaped
@@ -96,16 +106,21 @@ function buildFloor(plan, materialFor) {
         const frame = stairFrame(item);
         const STEPS = 10;
         const half = FLOOR_HEIGHT / 2;
-        const step = (t0, t1, u0, u1, top) => {
+        // thick: how deep the block is under the tread. Solid to the floor when left out; the
+        // upper flight is a sloped concrete flight with open space under it, because the flight
+        // from the floor below comes up underneath it and people step off there.
+        const step = (t0, t1, u0, u1, top, thick = top) => {
           const [ax, az] = toWorld(...frame.at(t0, u0));
           const [bx, bz] = toWorld(...frame.at(t1, u1));
-          box(Math.abs(bx - ax), top, Math.abs(bz - az), COLORS.stairs, (ax + bx) / 2, SLAB + top / 2, (az + bz) / 2);
+          const height = Math.min(top, thick);
+          box(Math.abs(bx - ax), height, Math.abs(bz - az), COLORS.stairs, (ax + bx) / 2, SLAB + top - height / 2, (az + bz) / 2);
         };
         const span = STAIR.LANDING - STAIR.FIRST;
         if (item.shape === "u") {
+          const flight = half / STEPS + 0.35;
           for (let i = 0; i < STEPS; i += 1) {
             step(STAIR.FIRST + (span * i) / STEPS, STAIR.FIRST + (span * (i + 1)) / STEPS, 0.04, 0.49, (half * (i + 1)) / STEPS);
-            step(STAIR.LANDING - (span * (i + 1)) / STEPS, STAIR.LANDING - (span * i) / STEPS, 0.51, 0.96, half + (half * (i + 1)) / STEPS - SLAB);
+            step(STAIR.LANDING - (span * (i + 1)) / STEPS, STAIR.LANDING - (span * i) / STEPS, 0.51, 0.96, half + (half * (i + 1)) / STEPS - SLAB, flight);
           }
           step(STAIR.LANDING, 0.98, 0.04, 0.96, half);
           // The wall between the two flights, and a dark metal handrail on each flight.
@@ -188,7 +203,10 @@ const END_PAUSE = 1.6; // seconds at the destination before it starts again
 
 // zoom: allow zooming (pinch, mouse wheel, and + / - buttons).
 // pov: while a route shows, the camera walks behind the pin at eye level (first-person view).
-export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight = null, view = "inside", route = null, className = "", openLabel = "Open plan", zoom = false, pov = false }) {
+// onProgress(fraction, restarted): how far along the route the pin is, every frame it walks.
+export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight = null, view = "inside", route = null, className = "", openLabel = "Open plan", zoom = false, pov = false, onProgress = null }) {
+  const progress = useRef(onProgress);
+  progress.current = onProgress;
   const holder = useRef(null);
   const scene = useRef(null);
   const [failed, setFailed] = useState(false);
@@ -300,6 +318,7 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
       const travelled = ((time - walk.started) / 1000 * BALL_SPEED) % (length + END_PAUSE * BALL_SPEED);
       const restarted = walk.travelled !== undefined && travelled < walk.travelled - 1;
       walk.travelled = travelled;
+      progress.current?.(Math.min(1, travelled / length), restarted);
       const point = curve.getPointAt(Math.min(1, travelled / length));
       ball.position.copy(point);
       if (!reduceMotion) {

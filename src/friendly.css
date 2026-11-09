@@ -406,3 +406,11 @@ body .student-portal-shell .mc-welcome-skip { justify-self: center; min-height: 
 .home-3d-views { margin: 0 0 10px; }
 .home-3d-views button { min-height: 38px; padding: 0 16px; }
 .ss-way .ss-dollhouse { height: 260px; background: radial-gradient(80% 80% at 50% 30%, #fdf1e4 0%, #f2d9c4 100%); }
+
+/* Voice guide switch (Off / English / Tagalog) and the step being read out. */
+.route3d-voice { display: grid; gap: 6px; }
+.route3d-voice > span { display: inline-flex; align-items: center; gap: 6px; color: var(--cream, #f6efe1); font-size: 14px; font-weight: 700; }
+.route3d-voice .va-segment { justify-self: start; }
+.route3d-voice .va-segment button { min-height: 38px; padding: 0 14px; }
+.route3d-steps li.current { outline: 3px solid #2ddf87; outline-offset: -1px; box-shadow: 0 0 0 5px rgba(45, 223, 135, .18); }
+@media (prefers-reduced-motion: no-preference) { .route3d-steps li { transition: box-shadow .25s, outline-color .25s; } }

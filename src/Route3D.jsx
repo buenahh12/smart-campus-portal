@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Icon from "./Icon";
 import "./analytics.css";
 import Dollhouse3D from "./Dollhouse3D";
 import { isMainBuildingRoute } from "./building3d";
 import { usePublicCollection } from "./CampusUpdates";
 import { CMS_COLLECTIONS, isClosureActive } from "./cms";
+import { VOICE_LANGS, saveVoiceLang, savedVoiceLang, speak, stepStarts, stepText, stopSpeaking, unlockVoice, voiceSupported } from "./voiceGuide";
 import { BUILDING_NAME, PLACES, blockedAreas, buildingOf, findRoute, floorLabel, placeByKey, placeTitle } from "./floorPlans";
 
 // Full-screen 3D directions: pick where you are and where you're going, and a glowing ball walks
@@ -34,6 +35,37 @@ export default function Route3DView({ start, end, onClose, onOpenMap }) {
   }, [from, to, replay, blockedKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const showing = route && !route.blocked ? route : null;
 
+  // Voice guide: as the pin reaches each step it is read out (once per play) in English or Tagalog.
+  const [voice, setVoice] = useState(() => (voiceSupported() ? savedVoiceLang() : "off"));
+  const [current, setCurrent] = useState(-1);
+  const spoken = useRef(-1);
+  const starts = useMemo(() => (showing ? stepStarts(showing.steps) : []), [showing]);
+  useEffect(() => { spoken.current = -1; setCurrent(-1); stopSpeaking(); }, [showing, view]);
+  useEffect(() => () => stopSpeaking(), []);
+  const onProgress = useCallback((fraction, restarted) => {
+    if (!showing) return;
+    if (restarted) { spoken.current = -1; setCurrent(-1); return; }
+    let index = -1;
+    starts.forEach((at, i) => { if (fraction >= at) index = i; });
+    if (index > spoken.current) {
+      spoken.current = index;
+      setCurrent(index);
+      speak(stepText(showing.steps[index].text, voice), voice);
+    }
+  }, [showing, starts, voice]);
+  const chooseVoice = (value) => {
+    setVoice(value);
+    saveVoiceLang(value);
+    stopSpeaking();
+    if (value !== "off") {
+      // Phones only let a page talk after a tap: a silent word now unlocks the voice for the steps.
+      unlockVoice();
+      // Start the walk again so every step is read from the beginning.
+      if (view === "outside") setView("walk");
+      setReplay((count) => count + 1);
+    }
+  };
+
   useEffect(() => {
     const key = (event) => event.key === "Escape" && onClose();
     window.addEventListener("keydown", key);
@@ -55,7 +87,7 @@ export default function Route3DView({ start, end, onClose, onOpenMap }) {
     </header>
     <div className="route3d-body">
       <div className="route3d-stage">
-        <Dollhouse3D zoom={view !== "walk"} pov={view === "walk" && Boolean(showing)} className="route3d-canvas" floor={showing?.end.floor || 1} route={view === "outside" ? null : showing} highlight={showing?.end.key || null} view={view === "outside" ? "outside" : "inside"}
+        <Dollhouse3D zoom={view !== "walk"} pov={view === "walk" && Boolean(showing)} className="route3d-canvas" onProgress={view === "outside" ? null : onProgress} floor={showing?.end.floor || 1} route={view === "outside" ? null : showing} highlight={showing?.end.key || null} view={view === "outside" ? "outside" : "inside"}
           label={showing ? `3D route from ${placeTitle(showing.start)} to ${placeTitle(showing.end)}` : "3D model of the Main Academic Building"}
           fallback={<p className="route3d-fallback">3D isn&apos;t available on this device. Use the 2D floor plan instead.</p>} />
         <div className="va-segment route3d-views" role="group" aria-label="View">
@@ -76,8 +108,14 @@ export default function Route3DView({ start, end, onClose, onOpenMap }) {
             <button type="button" onClick={() => { if (view === "outside") setView("walk"); setReplay((count) => count + 1); }}><Icon name="arrow" size={15} /> Play again</button>
             {onOpenMap && <button type="button" onClick={() => onOpenMap(showing.end.key, showing.end.floor)}><Icon name="route" size={15} /> 2D map</button>}
           </div>
+          {voiceSupported() && <div className="route3d-voice" role="group" aria-label="Voice guide">
+            <span><Icon name="bot" size={15} /> Voice guide</span>
+            <div className="va-segment">
+              {Object.entries(VOICE_LANGS).map(([value, name]) => <button key={value} type="button" className={voice === value ? "active" : ""} aria-pressed={voice === value} onClick={() => chooseVoice(value)}>{name}</button>)}
+            </div>
+          </div>}
           <ol className="route3d-steps">
-            {showing.steps.map((step, index) => <li key={index} className={`kind-${step.kind}`}><span>{step.text}</span>{step.meters ? <small>{step.meters} m</small> : null}</li>)}
+            {showing.steps.map((step, index) => <li key={index} className={`kind-${step.kind}${index === current ? " current" : ""}`} aria-current={index === current ? "step" : undefined}><span>{stepText(step.text, voice)}</span>{step.meters ? <small>{step.meters} m</small> : null}</li>)}
           </ol>
         </>}
         {view === "outside" && <p className="route3d-note">The outside of the Main Academic Building. Tap <b>Walk</b> to follow the pin, or <b>Above</b> to see the whole route.</p>}

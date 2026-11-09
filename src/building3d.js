@@ -670,6 +670,16 @@ function stairClimb(node, next) {
 
 export function buildRoute(route, ballHeight = 0.6) {
   const nodes = (route?.path || []).map((id) => graphNode(id)).filter(Boolean);
+  // The route starts and stops at the doorway, never inside a classroom or office: the room's
+  // own point (its middle) is dropped, and the last stop is just outside the door.
+  const isRoomMiddle = (node) => node?.kind === "room" && !String(node.room).startsWith("stair");
+  if (nodes.length > 2 && isRoomMiddle(nodes[0]) && nodes[1].kind === "door") nodes.shift();
+  if (nodes.length > 2 && isRoomMiddle(nodes[nodes.length - 1]) && nodes[nodes.length - 2].kind === "door") {
+    nodes.pop();
+    const door = nodes[nodes.length - 1];
+    const before = nodes[nodes.length - 2];
+    if (before && before.floor === door.floor) nodes[nodes.length - 1] = { ...door, x: before.x + (door.x - before.x) * 0.7, y: before.y + (door.y - before.y) * 0.7 };
+  }
   const points = [];
   const push = (px, py, floorLevel) => {
     const [x, z] = toWorld(px, py);
@@ -688,8 +698,23 @@ export function buildRoute(route, ballHeight = 0.6) {
     if (next && next.floor !== node.floor && node.kind === "room") stairClimb(node, next).forEach(([px, py, level]) => push(px, py, level));
   });
   if (points.length < 2) return null;
+  // Straight runs joined by rounded corners, so the trail and the pin swing smoothly round
+  // every turn and stair landing instead of snapping. Each corner is cut back up to 1.2 m
+  // (never more than a third of either side, so short flights keep their shape).
   const curve = new THREE.CurvePath();
-  for (let i = 0; i < points.length - 1; i += 1) curve.add(new THREE.LineCurve3(points[i], points[i + 1]));
+  let from = points[0];
+  for (let i = 1; i < points.length - 1; i += 1) {
+    const corner = points[i];
+    const inLength = corner.distanceTo(points[i - 1]);
+    const outLength = corner.distanceTo(points[i + 1]);
+    const cut = Math.min(1.2, inLength / 3, outLength / 3);
+    const enter = corner.clone().lerp(points[i - 1], cut / inLength);
+    const leave = corner.clone().lerp(points[i + 1], cut / outLength);
+    if (from.distanceTo(enter) > 0.01) curve.add(new THREE.LineCurve3(from, enter));
+    curve.add(new THREE.QuadraticBezierCurve3(enter, corner, leave));
+    from = leave;
+  }
+  curve.add(new THREE.LineCurve3(from, points[points.length - 1]));
   const group = new THREE.Group();
   const trailMaterial = new THREE.MeshBasicMaterial({ color: "#2ddf87", transparent: true, opacity: 0.7, depthTest: false });
   const trail = new THREE.Mesh(new THREE.TubeGeometry(curve, Math.max(40, points.length * 10), 0.16, 8, false), trailMaterial);
