@@ -19,37 +19,70 @@ export function saveVoiceLang(value) {
   try { localStorage.setItem(VOICE_KEY, value); } catch { /* private window: just not remembered */ }
 }
 
-const unthe = (text) => text.replace(/\bthe two /g, "dalawang ").replace(/\bthe /g, "");
-const names = (text) => unthe(text).replace(/ and /g, " at ");
-const turnWord = { "turn left": "kumaliwa", "turn right": "kumanan", "turn around and walk": "bumalik" };
-
-// One English step -> Tagalog (everyday Taglish, as people give directions in school).
-export function toTagalog(text) {
-  let m;
-  if ((m = /^Start at the (.+) on the (.+)$/.exec(text))) return `Magsimula sa ${m[1]}, ${m[2]}`;
-  if ((m = /^Leave (.+) \((.+)\)$/.exec(text))) return `Lumabas sa ${m[1]}, ${m[2]}`;
-  if ((m = /^Take the (.+) up to the (.+)$/.exec(text))) return `Umakyat sa ${m[1]} hanggang ${m[2]}`;
-  if ((m = /^Take the (.+) down to the (.+)$/.exec(text))) return `Bumaba sa ${m[1]} hanggang ${m[2]}`;
-  if ((m = /^Go out through the (.+)$/.exec(text))) return `Lumabas sa ${m[1]}`;
-  if ((m = /^Arrive at (.+)$/.exec(text))) return `Nandito ka na sa ${unthe(m[1])}`;
-  if ((m = /^Walk to (.+?)(?: in the (.+))?$/.exec(text))) return `Maglakad papunta sa ${unthe(m[1])}${m[2] ? ` sa ${m[2]}` : ""}`;
-
-  const past = (rest) => (rest ? `, dadaan sa ${names(rest)}` : "");
-  if ((m = /^Step off the stairs(?: and (turn left|turn right|turn around and walk))?(?:, then walk past (.+))?$/.exec(text))) {
-    return `Umalis sa hagdan${m[1] ? ` at ${turnWord[m[1]]}` : ""}${m[2] ? `, tapos maglakad${past(m[2])}` : ""}`;
+// Simple, everyday Taglish, the way students and guards give directions: "Liko sa kaliwa",
+// "Diretso lang", "Akyat sa hagdan". Hallway, stairs and room names stay in English like the signs.
+const name = (text) => text.replace(/\bthe two /gi, "dalawang ").replace(/\bthe /gi, "").replace(/ and /g, " at ");
+const TURN = { "turn left": "liko sa kaliwa", "turn right": "liko sa kanan", "turn around and walk": "balik ka" };
+const T = "(turn left|turn right|turn around and walk)";
+const RULES = [
+  [/^start at the (.+) on the (.+)$/i, (m) => `simula sa ${name(m[1])}, ${m[2]}`],
+  [/^leave (.+) \((.+)\)$/i, (m) => `labas sa ${name(m[1])} (${m[2]})`],
+  [/^take the (.+) up to the (.+)$/i, (m) => `akyat sa ${name(m[1])} papuntang ${m[2]}`],
+  [/^take the (.+) down to the (.+)$/i, (m) => `baba sa ${name(m[1])} papuntang ${m[2]}`],
+  [/^go out through the (.+)$/i, (m) => `labas sa ${name(m[1])}`],
+  [/^(?:arrive at|you have arrived at) (.+)$/i, (m) => `nandito ka na sa ${name(m[1])}`],
+  [/^you will arrive at (.+)$/i, (m) => `doon na ang ${name(m[1])}`],
+  [/^walk to (.+?)(?: in the (.+))?$/i, (m) => `lakad papunta sa ${name(m[1])}`],
+  [/^follow the arrows to (.+)$/i, (m) => `sundan ang arrow papunta sa ${name(m[1])}`],
+  [/^you are off the route$/i, () => "wala ka na sa daan"],
+  [/^walk back to the arrows.*$/i, () => "bumalik sa mga arrow, o tumayo kung nasaan ang arrow at pindutin ang Re-center"],
+  [/^tap next at the turn$/i, () => "pindutin ang Next pagdating sa liko"],
+  [/^tap next on the (.+)$/i, (m) => `pindutin ang Next pagdating sa ${m[1]}`],
+  [new RegExp(`^step off the stairs(?: and ${T})?$`, "i"), (m) => `paglabas sa hagdan${m[1] ? `, ${TURN[m[1].toLowerCase()]}` : ""}`],
+  [/^walk down the hallway$/i, () => "lakad lang sa hallway"],
+  // The AR live view screen.
+  [/^(\d+) m left$/i, (m) => `${m[1]} metro pa`],
+  [/^following the arrows on the steps$/i, () => "sundan ang arrow sa hagdan"],
+  [/^stand in the doorway of (.+) with your back to the room$/i, (m) => `tumayo sa pinto ng ${name(m[1])}, nakatalikod sa room`],
+  [/^facing the hallway$/i, () => "nakaharap sa hallway"],
+  [/^then tap start$/i, () => "tapos pindutin ang Start"],
+  [/^choose where you are \(from\) and where you want to go \(to\)$/i, () => "piliin kung nasaan ka (From) at saan ka pupunta (To)"],
+  [/^you are already there$/i, () => "nandito ka na"],
+  [/^keep going straight$/i, () => "diretso lang"],
+  [/^keep going past (.+)$/i, (m) => `diretso lang, lampas sa ${name(m[1])}`],
+  [/^walk past (.+)$/i, (m) => `lakad lampas sa ${name(m[1])}`],
+  [/^walk through (.+)$/i, (m) => `dumaan sa ${name(m[1])}`],
+  [new RegExp(`^${T} and walk through (.+)$`, "i"), (m) => `${TURN[m[1].toLowerCase()]}, dumaan sa ${name(m[2])}`],
+  [/^(turn left|turn right) at (.+)$/i, (m) => `${TURN[m[1].toLowerCase()]} pagdating sa ${name(m[2])}`],
+  [new RegExp(`^${T} and walk past (.+)$`, "i"), (m) => `${TURN[m[1].toLowerCase()]}, lampas sa ${name(m[2])}`],
+  [new RegExp(`^${T} down the hallway$`, "i"), (m) => `${TURN[m[1].toLowerCase()]} sa hallway`],
+  [new RegExp(`^${T} and walk about (\\d+) m$`, "i"), (m) => `${TURN[m[1].toLowerCase()]}, lakad ng ${m[2]} metro`],
+  [new RegExp(`^${T}$`, "i"), (m) => TURN[m[1].toLowerCase()]],
+  [/^walk about (\d+) m$/i, (m) => `lakad ng ${m[1]} metro`],
+  [/^keep going about (\d+) m$/i, (m) => `diretso lang ng ${m[1]} metro`],
+  [/^go ahead a few steps$/i, () => "konting lakad pa"],
+  [/^step out into the hallway$/i, () => "labas sa hallway"],
+  [/^step out of the stairway$/i, () => "labas sa hagdan"],
+];
+const part = (text) => {
+  for (const [pattern, make] of RULES) {
+    const m = pattern.exec(text.trim());
+    if (m) return make(m);
   }
-  if (text === "Walk down the hallway") return "Maglakad sa pasilyo";
-  if (text === "Keep going straight") return "Dumiretso lang";
-  if ((m = /^Keep going past (.+)$/.exec(text))) return `Dumiretso lang${past(m[1])}`;
-  if ((m = /^Walk past (.+)$/.exec(text))) return `Maglakad${past(m[1])}`;
-  if ((m = /^Walk through (.+)$/.exec(text))) return `Dumaan sa loob ng ${unthe(m[1])}`;
-  if ((m = /^(Turn left|Turn right|Turn around and walk) and walk through (.+)$/.exec(text))) return `${cap(turnWord[m[1].toLowerCase()])} at dumaan sa loob ng ${unthe(m[2])}`;
-  if ((m = /^(Turn left|Turn right) at (.+?)(?:, then walk past (.+))?$/.exec(text))) return `${cap(turnWord[m[1].toLowerCase()])} sa ${unthe(m[2])}${m[3] ? `, tapos maglakad${past(m[3])}` : ""}`;
-  if ((m = /^(Turn left|Turn right|Turn around and walk) and walk past (.+)$/.exec(text))) return `${cap(turnWord[m[1].toLowerCase()])}, tapos maglakad${past(m[2])}`;
-  if ((m = /^(Turn left|Turn right|Turn around and walk) down the hallway$/.exec(text))) return `${cap(turnWord[m[1].toLowerCase()])} sa pasilyo`;
-  return text;
-}
+  return text.trim();
+};
 const cap = (word) => word.charAt(0).toUpperCase() + word.slice(1);
+
+// One English direction (one or more sentences, parts joined by ", then ") -> simple Tagalog.
+export function toTagalog(text) {
+  // A sentence ends at a full stop after a small letter or a number ("6 m.", "floor."), never
+  // inside a name like "C.R." or "C.R. Girls".
+  return text.split(/(?<=[a-z0-9)]\.)\s+/).map((sentence) => {
+    const end = /[a-z0-9)]\.$/.test(sentence) ? "." : "";
+    const body = end ? sentence.slice(0, -1) : sentence;
+    return cap(body.split(/, then /i).flatMap((piece) => piece.split(/, (?=following|facing)/i)).map(part).join(", tapos ").replace(/, tapos (sundan ang arrow sa hagdan|nakaharap)/g, ", $1")) + end;
+  }).join(" ").trim();
+}
 
 export const stepText = (text, lang) => (lang === "tl" ? toTagalog(text) : text);
 

@@ -69,3 +69,6 @@
 .ar-live-pick small { color: #1f7a4d; }
 .ar-live-status { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 18px; color: #1a1a1a; background: #fff; box-shadow: 0 6px 20px rgba(0,0,0,.3); font: 600 clamp(16px, 4.4vw, 19px)/1.35 var(--sans); }
 .ar-live-status::before { content: ""; flex: none; width: 34px; height: 34px; border-radius: 50%; background: #1f7a4d url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 19V5M6 11l6-6 6 6'/%3E%3C/svg%3E") center / 18px no-repeat; }
+.ar-live-title-actions { display: flex; flex: none; gap: 6px; }
+.ar-live-voice { gap: 4px; text-transform: none; }
+.ar-live-voice.on { border-color: #2ddf87; color: #fff; background: rgba(31,122,77,.85); }

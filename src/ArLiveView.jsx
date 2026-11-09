@@ -6,6 +6,7 @@ import { CMS_COLLECTIONS, isClosureActive } from "./cms";
 import { inAppBrowserName } from "./firebase";
 import { usePlanVersion } from "./usePlan";
 import { FLOORS, METERS_PER_UNIT as M, blockedAreas, buildingOf, findRoute, floorLabel, graphNode, placeByKey, placeTitle } from "./floorPlans";
+import { VOICE_LANGS, saveVoiceLang, savedVoiceLang, speak, stepText, stopSpeaking, unlockVoice, voiceSupported } from "./voiceGuide";
 import "./ar.css";
 
 // AR Live View in the browser. Like the SSCA NAVI AR app, nothing knows where you are by GPS:
@@ -260,6 +261,7 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
   const [tracking, setTracking] = useState({ left: null, off: false, atEnd: false, section: null });
   const [problem, setProblem] = useState("");
   const [welcome, setWelcome] = useState(true);
+  const [voice, setVoice] = useState(() => (voiceSupported() ? savedVoiceLang() : "off"));
   const [xrSupported, setXrSupported] = useState(false);
   const overlay = useRef(null);
   const video = useRef(null);
@@ -612,6 +614,28 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
     }
   }
 
+  // Voice guide: says each new direction once (not every metre of "12 m left"), in English or
+  // Tagalog. Nothing is said while choosing rooms.
+  const { section: xrSection } = tracking;
+  const voiceLine = mode === "setup" || problem ? ""
+    : mode === "xr" ? (tracking.atEnd ? `You have arrived at ${placeTitle(destination)}.`
+      : tracking.off ? "You are off the route. Walk back to the arrows."
+        : xrSection?.kind === "stairs" ? `${xrSection.text}, following the arrows on the steps.`
+          : `Follow the arrows to ${destinationText}.`)
+      : message || "";
+  useEffect(() => {
+    if (voiceLine) speak(stepText(voiceLine, voice), voice);
+  }, [voiceLine, voice]);
+  useEffect(() => () => stopSpeaking(), []);
+  const cycleVoice = () => {
+    const order = Object.keys(VOICE_LANGS);
+    const next = order[(order.indexOf(voice) + 1) % order.length];
+    setVoice(next);
+    saveVoiceLang(next);
+    stopSpeaking();
+    if (next !== "off") unlockVoice();
+  };
+
   const floorNow = mode === "xr" ? tracking.section : step;
   const floorText = floorNow ? (floorNow.toFloor ? `${floorLabel(floorNow.floor)} → ${floorLabel(floorNow.toFloor)}` : floorLabel(floorNow.floor)) : "";
   const ready = Boolean(path) && !crossesBuildings && mode === "setup";
@@ -644,7 +668,10 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
           <span className="ar-live-overline">{"// AR live view"}</span>
           <b>SSCAI NAVI</b>
         </div>
-        <button type="button" className="ar-live-button ar-live-small" onClick={close}>Close</button>
+        <span className="ar-live-title-actions">
+          {voiceSupported() && <button type="button" className={`ar-live-button ar-live-small ar-live-voice${voice !== "off" ? " on" : ""}`} onClick={cycleVoice} aria-label={`Voice guide: ${VOICE_LANGS[voice]}. Tap to change.`}>🔊 {VOICE_LANGS[voice]}</button>}
+          <button type="button" className="ar-live-button ar-live-small" onClick={close}>Close</button>
+        </span>
       </div>
       <div className="ar-live-grid">
         {select(fromKey, setFromKey, "From")}
@@ -662,6 +689,6 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
       </div>}
       {mode !== "setup" && <p className="ar-live-mode">{mode === "xr" ? "AR on · point the camera at the floor ahead" : "Compass guide · tap Next at each turn"}{floorText ? ` · ${floorText}` : ""}</p>}
     </div>
-    {!welcome && <p className="ar-live-status" aria-live="polite">{message}</p>}
+    {!welcome && <p className="ar-live-status" aria-live="polite">{stepText(message || "", voice)}</p>}
   </div>;
 }
