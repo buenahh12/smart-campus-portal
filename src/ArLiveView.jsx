@@ -616,7 +616,7 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
   const floorText = floorNow ? (floorNow.toFloor ? `${floorLabel(floorNow.floor)} → ${floorLabel(floorNow.toFloor)}` : floorLabel(floorNow.floor)) : "";
   const ready = Boolean(path) && !crossesBuildings && mode === "setup";
   const close = () => { stop(); onClose(); };
-  return <div ref={overlay} className={`ar-live ar-live-${mode}`} role="dialog" aria-modal="true" aria-label="AR live view">
+  return <div ref={overlay} className={`ar-live ar-live-${mode}`} style={{ backgroundImage: `linear-gradient(rgba(8,16,11,.25), rgba(8,16,11,.45)), url(${import.meta.env.BASE_URL}campus/hallway.jpg)` }} role="dialog" aria-modal="true" aria-label="AR live view">
     <video ref={video} className="ar-live-video" autoPlay playsInline muted />
     <div ref={canvasHolder} className="ar-live-canvas" aria-hidden="true" />
     {welcome && <div className="ar-live-welcome">
