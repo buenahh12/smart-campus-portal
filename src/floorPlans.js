@@ -374,8 +374,8 @@ function rebuild() {
     .filter((item) => item.door)
     .map((item) => ({ ...item, floor, key: `${floor}:${item.id}` }))));
   MAP_AREAS.splice(0, MAP_AREAS.length, ...FLOORS.flatMap(({ floor, halls, rooms }) => [
-    ...halls.map((hall) => ({ value: `${floor}:${hall.id}`, label: `${floorLabel(floor)} · ${hall.name}`, floor })),
-    ...rooms.filter((item) => item.type === "stairs").map((item) => ({ value: `${floor}:${item.id}`, label: `${floorLabel(floor)} · ${item.name}`, floor })),
+    ...halls.map((hall) => ({ value: `${floor}:${hall.id}`, label: `${floorLabel(floor)} · ${hall.name}`, name: hall.name, floor })),
+    ...rooms.filter((item) => item.type === "stairs").map((item) => ({ value: `${floor}:${item.id}`, label: `${floorLabel(floor)} · ${item.name}`, name: item.name, floor })),
   ]));
   Object.assign(GRAPH, buildGraph(FLOORS));
 }
@@ -703,4 +703,16 @@ export function findNearestExit(startKey, blocked = new Set()) {
 }
 
 // Closure records from the Content Manager -> the set of blocked map areas.
-export const blockedAreas = (closures) => new Set(closures.map((item) => item.mapArea).filter(Boolean));
+// Closure records from the Content Manager -> the set of blocked map areas. Older records that only
+// have a typed hallway name still block it when the name matches a hallway or stairs on that floor.
+export const closureArea = (item) => {
+  if (item?.mapArea) return item.mapArea;
+  const text = String(item?.pathway || "").toLowerCase();
+  if (!text) return "";
+  const match = MAP_AREAS
+    .filter((area) => (item.floor == null || item.floor === "" || Number(item.floor) === area.floor) && area.name && text.includes(area.name.toLowerCase()))
+    .sort((a, b) => b.name.length - a.name.length)[0];
+  return match?.value || "";
+};
+export const blockedAreas = (closures) => new Set(closures.map(closureArea).filter(Boolean));
+export const blockedKeyOf = (closures) => [...blockedAreas(closures)].sort().join("|");

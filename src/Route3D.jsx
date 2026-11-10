@@ -6,7 +6,7 @@ import { isMainBuildingRoute } from "./building3d";
 import { usePublicCollection } from "./CampusUpdates";
 import { CMS_COLLECTIONS, isClosureActive } from "./cms";
 import { VOICE_LANGS, saveVoiceLang, savedVoiceLang, speak, stepStarts, stepText, stopSpeaking, unlockVoice, voiceSupported } from "./voiceGuide";
-import { BUILDING_NAME, PLACES, blockedAreas, buildingOf, findRoute, floorLabel, placeByKey, placeTitle } from "./floorPlans";
+import { BUILDING_NAME, PLACES, blockedAreas, blockedKeyOf, buildingOf, closureArea, mapAreaLabel, findRoute, floorLabel, placeByKey, placeTitle } from "./floorPlans";
 
 // Full-screen 3D directions: pick where you are and where you're going, and a glowing ball walks
 // the route through the 3D building, climbing the stairs, with the steps listed beside it.
@@ -27,10 +27,12 @@ export default function Route3DView({ start, end, onClose, onOpenMap }) {
   const [view, setView] = useState("walk"); // walk (POV behind the pin), inside (overview) or outside
   const [replay, setReplay] = useState(0);
   const closures = usePublicCollection(CMS_COLLECTIONS.closures);
-  const blockedKey = closures.items.filter((item) => isClosureActive(item)).map((item) => item.mapArea).sort().join("|");
+  const activeClosures = closures.items.filter((item) => isClosureActive(item));
+  const blockedKey = blockedKeyOf(activeClosures);
+  const closedHere = activeClosures.filter((item) => closureArea(item));
   const route = useMemo(() => {
     if (!from || !to || from === to) return null;
-    const found = findRoute(from, to, blockedAreas(closures.items.filter((item) => isClosureActive(item))));
+    const found = findRoute(from, to, blockedAreas(activeClosures));
     return found && !found.blocked && isMainBuildingRoute(found) ? { ...found, replay } : found?.blocked ? { blocked: true } : null;
   }, [from, to, replay, blockedKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const showing = route && !route.blocked ? route : null;
@@ -87,7 +89,7 @@ export default function Route3DView({ start, end, onClose, onOpenMap }) {
     </header>
     <div className="route3d-body">
       <div className="route3d-stage">
-        <Dollhouse3D zoom={view !== "walk"} pov={view === "walk" && Boolean(showing)} className="route3d-canvas" onProgress={view === "outside" ? null : onProgress} floor={showing?.end.floor || 1} route={view === "outside" ? null : showing} highlight={showing?.end.key || null} view={view === "outside" ? "outside" : "inside"}
+        <Dollhouse3D blocked={blockedKey} zoom={view !== "walk"} pov={view === "walk" && Boolean(showing)} className="route3d-canvas" onProgress={view === "outside" ? null : onProgress} floor={showing?.end.floor || 1} route={view === "outside" ? null : showing} highlight={showing?.end.key || null} view={view === "outside" ? "outside" : "inside"}
           label={showing ? `3D route from ${placeTitle(showing.start)} to ${placeTitle(showing.end)}` : "3D model of the Main Academic Building"}
           fallback={<p className="route3d-fallback">3D isn&apos;t available on this device. Use the 2D floor plan instead.</p>} />
         <div className="va-segment route3d-views" role="group" aria-label="View">
@@ -101,6 +103,10 @@ export default function Route3DView({ start, end, onClose, onOpenMap }) {
         <button type="button" className="route3d-swap" onClick={() => { setFrom(to); setTo(from); }} aria-label="Swap from and to">⇅ Swap</button>
         <label>To (where you&apos;re going)<select value={to} onChange={(event) => setTo(event.target.value)}>{places.map(option)}</select></label>
         {route?.blocked && <p className="map-alert">No open route right now because a hallway or stairway is closed. Please ask school staff for help.</p>}
+        {closedHere.length > 0 && <div className="route3d-closed" role="status">
+          <b>Closed right now. The route goes around:</b>
+          {closedHere.map((item) => <small key={item.id}>{item.pathway || mapAreaLabel(closureArea(item))} · {floorLabel(Number(closureArea(item).split(":")[0]))}{item.detour ? ` · ${item.detour}` : ""}</small>)}
+        </div>}
         {from === to && <p className="route3d-note">You&apos;re already there.</p>}
         {showing && <>
           <p className="route3d-summary"><b>{showing.minutes} min</b> · {showing.meters} m{showing.floors.length > 1 ? ` · ${showing.floors.length} floors` : ""}</p>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import Icon from "./Icon";
 import { CMS_COLLECTIONS, deleteItem, isClosureActive, saveItem, todayKey, watchCollection } from "./cms";
-import { MAP_AREAS, mapAreaLabel } from "./floorPlans";
+import { MAP_AREAS, buildingOf, mapAreaLabel } from "./floorPlans";
 import { emailSubscribers } from "./notify";
 import AdminFloorPlan from "./AdminFloorPlan";
 import { auth } from "./firebase";
@@ -148,20 +148,27 @@ const SECTIONS = [
     label: "Pathway restrictions",
     singular: "restriction",
     fields: [
-      { name: "pathway", label: "Pathway or hallway", type: "text", required: true, max: 100, placeholder: "e.g. East hallway near Room 204" },
-      { name: "building", label: "Building", type: "text", required: true, max: 80, placeholder: "e.g. Main Academic Building" },
-      { name: "floor", label: "Floor", type: "number", required: true, min: 0, maxValue: 20 },
+      // The area picked here is what the 2D map, 3D directions and AR live view route around.
+      { name: "mapArea", label: "Pathway or hallway", type: "select", required: true, options: MAP_AREAS, hint: "The 2D floor plan, 3D directions and AR live view will route everyone around it and mark it CLOSED while the restriction is in effect." },
+      { name: "pathway", label: "Name people will see (optional)", type: "text", max: 100, placeholder: "Leave blank to use the hallway's name" },
+      { name: "building", type: "hidden" },
+      { name: "floor", type: "hidden" },
       { name: "reason", label: "Reason", type: "select", required: true, options: ["Maintenance", "Cleaning", "Construction", "Safety hazard", "School event", "Other"] },
-      { name: "mapArea", label: "Block on the 2D floor plan (optional)", type: "select", options: MAP_AREAS, hint: "Routes on the floor plan will avoid this hallway or staircase while the restriction is in effect." },
       { name: "detour", label: "Detour / alternate route (optional)", type: "text", max: 160, placeholder: "e.g. Use the west stairwell" },
       { name: "details", label: "Details (optional)", type: "textarea", max: 500 },
       { name: "startDate", label: "Closed from", type: "date", required: true, initial: () => todayKey() },
       { name: "endDate", label: "Reopens after (optional)", type: "date" },
       { name: "active", label: "Restriction is in effect", type: "checkbox", initial: true },
     ],
-    preview: (values) => <div className="cms-preview"><span className="cms-preview-label">Picture people will see</span><ClosureArt closure={values} /></div>,
+    // Floor, building and (when left blank) the name come from the picked area.
+    beforeSave: (record) => {
+      const area = MAP_AREAS.find((item) => item.value === record.mapArea);
+      if (!area) return { ...record, floor: Number.parseInt(record.floor, 10) || null };
+      return { ...record, floor: area.floor, building: buildingOf(area.floor), pathway: record.pathway || area.name };
+    },
+    preview: (values) => <div className="cms-preview"><span className="cms-preview-label">Picture people will see</span><ClosureArt closure={{ ...values, pathway: values.pathway || MAP_AREAS.find((item) => item.value === values.mapArea)?.name || "" }} /></div>,
     title: (item) => item.pathway,
-    meta: (item) => `${item.building} · Floor ${item.floor} · ${item.reason}${item.endDate ? ` · until ${item.endDate}` : ""}${item.mapArea ? ` · map: ${mapAreaLabel(item.mapArea)}` : ""}`,
+    meta: (item) => `${item.building} · Floor ${item.floor} · ${item.reason}${item.endDate ? ` · until ${item.endDate}` : ""}${item.mapArea ? ` · blocked in 2D, 3D and AR: ${mapAreaLabel(item.mapArea)}` : " · not on the map yet: edit it and pick the hallway"}`,
     badge: (item) => isClosureActive(item) ? ["Closed now", "bad"] : item.active && item.startDate > todayKey() ? ["Scheduled", "warn"] : ["Open", "good"],
     // Email subscribers when a restriction is switched on.
     emailLabel: "Email subscribers about this closure",

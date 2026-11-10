@@ -11,6 +11,8 @@ import {
   PLAN_HEIGHT,
   PLAN_WIDTH,
   blockedAreas,
+  blockedKeyOf,
+  closureArea,
   findNearestExit,
   findRoute,
   buildingOf,
@@ -551,7 +553,7 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
   const [selectedKey, setSelectedKey] = useState(initialDestination);
   const [floor, setFloor] = useState(() => (initialEmergency || initialDestination ? placeByKey(readStart())?.floor : null) || initialFloor);
   const activeClosures = closures.items.filter((item) => isClosureActive(item));
-  const blockedKey = activeClosures.map((item) => item.mapArea).filter(Boolean).sort().join("|");
+  const blockedKey = blockedKeyOf(activeClosures);
   const blocked = useMemo(() => blockedAreas(activeClosures), [blockedKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const route = useMemo(() => (emergency ? findNearestExit(startKey, blocked) : findRoute(startKey, destKey, blocked)), [emergency, startKey, destKey, blocked, planVersion]); // eslint-disable-line react-hooks/exhaustive-deps
   const plan = FLOORS.find((item) => item.floor === floor);
@@ -696,7 +698,7 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
 
           {activeClosures.length > 0 && <div className="map-closures">
             <b>Closed today</b>
-            {activeClosures.map((item) => <small key={item.id}>{item.pathway} · {floorLabel(item.floor)}{item.mapArea ? " · avoided" : ""}{item.detour ? ` · ${item.detour}` : ""}</small>)}
+            {activeClosures.map((item) => <small key={item.id}>{item.pathway} · {floorLabel(item.floor)}{closureArea(item) ? " · route goes around it" : ""}{item.detour ? ` · ${item.detour}` : ""}</small>)}
           </div>}
         </aside>
       </div>

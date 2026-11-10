@@ -204,7 +204,7 @@ const END_PAUSE = 1.6; // seconds at the destination before it starts again
 // zoom: allow zooming (pinch, mouse wheel, and + / - buttons).
 // pov: while a route shows, the camera walks behind the pin at eye level (first-person view).
 // onProgress(fraction, restarted): how far along the route the pin is, every frame it walks.
-export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight = null, view = "inside", route = null, className = "", openLabel = "Open plan", zoom = false, pov = false, onProgress = null }) {
+export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight = null, view = "inside", route = null, className = "", openLabel = "Open plan", zoom = false, pov = false, onProgress = null, blocked = "" }) {
   const progress = useRef(onProgress);
   progress.current = onProgress;
   const holder = useRef(null);
@@ -447,6 +447,63 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
       current.render();
     };
   }, [highlight]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Closed hallways and stairs (pathway restrictions): a red see-through block with a CLOSED sign,
+  // on that floor's group so it shows and fades with the floor. blocked is "2:east-hall|3:stairs-a".
+  useEffect(() => {
+    const current = scene.current;
+    if (!current || !blocked) return undefined;
+    const added = [];
+    const redMaterial = new THREE.MeshBasicMaterial({ color: "#e0342b", transparent: true, opacity: 0.42, depthWrite: false });
+    const barMaterial = new THREE.MeshLambertMaterial({ color: "#d62d24" });
+    const canvas = document.createElement("canvas");
+    canvas.width = 256;
+    canvas.height = 96;
+    const paint = canvas.getContext("2d");
+    paint.fillStyle = "#d62d24";
+    paint.beginPath();
+    paint.roundRect(4, 4, 248, 88, 18);
+    paint.fill();
+    paint.fillStyle = "#ffffff";
+    paint.font = "bold 52px system-ui, sans-serif";
+    paint.textAlign = "center";
+    paint.textBaseline = "middle";
+    paint.fillText("CLOSED", 128, 52);
+    const signTexture = new THREE.CanvasTexture(canvas);
+    const signMaterial = new THREE.SpriteMaterial({ map: signTexture, depthTest: false });
+    blocked.split("|").forEach((key) => {
+      const [floorText, id] = key.split(":");
+      const plan = FLOORS.find((item) => item.floor === Number(floorText) && item.building === BUILDING_NAME);
+      const area = plan?.halls.find((item) => item.id === id) || plan?.rooms.find((item) => item.id === id);
+      const target = current.floors.find((item) => item.floor === plan?.floor);
+      if (!area || !target) return;
+      const [x, y, w, h] = area.rect;
+      const [cx, cz] = toWorld(x + w / 2, y + h / 2);
+      const mark = new THREE.Group();
+      const block = new THREE.Mesh(new THREE.BoxGeometry(w * M, 1.2, h * M), redMaterial);
+      block.position.set(cx, SLAB + 0.6, cz);
+      // A barrier across the middle, along the short side.
+      const across = w > h;
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(across ? 0.12 : w * M, 0.18, across ? h * M : 0.12), barMaterial);
+      bar.position.set(cx, SLAB + 1.0, cz);
+      const sign = new THREE.Sprite(signMaterial);
+      sign.scale.set(4, 1.5, 1);
+      sign.position.set(cx, SLAB + 2.4, cz);
+      sign.renderOrder = 10;
+      mark.add(block, bar, sign);
+      target.group.add(mark);
+      added.push([target.group, mark]);
+    });
+    current.render();
+    return () => {
+      added.forEach(([group, mark]) => {
+        group.remove(mark);
+        mark.traverse((item) => item.geometry?.dispose());
+      });
+      [redMaterial, barMaterial, signMaterial, signTexture].forEach((item) => item.dispose());
+      current.render();
+    };
+  }, [blocked]);
 
   // The route: trail, start ring and the guide ball (animated in the render loop).
   useEffect(() => {

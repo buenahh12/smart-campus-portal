@@ -414,3 +414,8 @@ body .student-portal-shell .mc-welcome-skip { justify-self: center; min-height: 
 .route3d-voice .va-segment button { min-height: 38px; padding: 0 14px; }
 .route3d-steps li.current { outline: 3px solid #2ddf87; outline-offset: -1px; box-shadow: 0 0 0 5px rgba(45, 223, 135, .18); }
 @media (prefers-reduced-motion: no-preference) { .route3d-steps li { transition: box-shadow .25s, outline-color .25s; } }
+
+/* Pathway restrictions shown in the 3D directions and the AR live view. */
+.route3d-closed { display: grid; gap: 4px; margin: 10px 0; padding: 10px 12px; border: 1px solid #f0b4ae; border-left: 4px solid #d62d24; border-radius: 10px; background: #fff3f1; color: #7a1d17; font-size: 13px; }
+.route3d-closed b { font-size: 13px; }
+.route3d-closed small { font-size: 12.5px; color: #8a2a22; }

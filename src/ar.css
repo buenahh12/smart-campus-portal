@@ -72,3 +72,6 @@
 .ar-live-title-actions { display: flex; flex: none; gap: 6px; }
 .ar-live-voice { gap: 4px; text-transform: none; }
 .ar-live-voice.on { border-color: #2ddf87; color: #fff; background: rgba(31,122,77,.85); }
+
+.ar-live-closed { margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; border-left: 4px solid #ff5a4f; background: rgba(214, 45, 36, .22); color: #fff; font-size: 12.5px; line-height: 1.35; }
+.ar-live-closed b { color: #ffd2cd; }

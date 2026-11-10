@@ -16,7 +16,7 @@ import { AnnouncementArt } from "./EventArt";
 import { CMS_COLLECTIONS, GRADE_LEVELS, MAX_SECTION_LENGTH, USER_ROLES, isClosureActive, recordSignIn, recordVisit, todayKey, watchSession } from "./cms";
 import { usePlanVersion } from "./usePlan";
 import { useOfflineApp } from "./offline";
-import { BUILDING_NAME, FLOORS, PLACES, findPlaceKey, floorShort, placeByKey, placeTitle, sectionsOf, floorLabel as planFloorLabel } from "./floorPlans";
+import { BUILDING_NAME, FLOORS, PLACES, blockedKeyOf, findPlaceKey, floorShort, placeByKey, placeTitle, sectionsOf, floorLabel as planFloorLabel } from "./floorPlans";
 import { searchPlace } from "./placeSearch";
 import { PolicyDialog, PrivacyNotice, privacyNoticeSeen } from "./Policies";
 import { FeedbackDialog, openFeedback } from "./Feedback";
@@ -984,6 +984,8 @@ export default function App() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
   const planVersion = usePlanVersion(); // re-render when staff rename rooms or add floors
+  const homeClosures = usePublicCollection(CMS_COLLECTIONS.closures).items;
+  const homeBlocked = blockedKeyOf(homeClosures.filter((item) => isClosureActive(item)));
   const [signedInUser, setSignedInUser] = useState(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [createAccountOpen, setCreateAccountOpen] = useState(false);
@@ -1216,7 +1218,7 @@ export default function App() {
                     <button type="button" className={view3d === "inside" ? "active" : ""} aria-pressed={view3d === "inside"} onClick={() => setView3d("inside")}>Inside</button>
                   </div>
                   <Suspense fallback={<MiniPlan floor={floor} onOpen={() => setMapState({ floor })} />}>
-                    <Dollhouse3D key={planVersion} floor={floor} highlight={highlight3d} view={view3d} zoom onOpen={() => setMapState({ floor })} label={`3D model of the ${planFloorLabel(floor).toLowerCase()}`}
+                    <Dollhouse3D key={planVersion} blocked={homeBlocked} floor={floor} highlight={highlight3d} view={view3d} zoom onOpen={() => setMapState({ floor })} label={`3D model of the ${planFloorLabel(floor).toLowerCase()}`}
                       fallback={<MiniPlan floor={floor} onOpen={() => setMapState({ floor })} />} />
                     {highlight3d && placeByKey(highlight3d) && <p className="ss-3d-showing"><Icon name="location" size={16} /> Showing <b>{placeTitle(placeByKey(highlight3d))}</b> · {planFloorLabel(placeByKey(highlight3d).floor)}<button type="button" onClick={() => setHighlight3d(null)} aria-label="Stop showing this room">Clear</button></p>}
                   </Suspense>

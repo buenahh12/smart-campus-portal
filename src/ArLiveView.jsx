@@ -5,7 +5,7 @@ import { placeOptions } from "./CampusMap";
 import { CMS_COLLECTIONS, isClosureActive } from "./cms";
 import { inAppBrowserName } from "./firebase";
 import { usePlanVersion } from "./usePlan";
-import { FLOORS, METERS_PER_UNIT as M, blockedAreas, buildingOf, findRoute, floorLabel, graphNode, placeByKey, placeTitle } from "./floorPlans";
+import { FLOORS, METERS_PER_UNIT as M, blockedAreas, blockedKeyOf, buildingOf, closureArea, mapAreaLabel, findRoute, floorLabel, graphNode, placeByKey, placeTitle } from "./floorPlans";
 import { VOICE_LANGS, saveVoiceLang, savedVoiceLang, speak, stepText, stopSpeaking, unlockVoice, voiceSupported } from "./voiceGuide";
 import "./ar.css";
 
@@ -269,7 +269,8 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
   const engine = useRef(null);
 
   const activeClosures = closures.items.filter((item) => isClosureActive(item));
-  const blockedKey = activeClosures.map((item) => item.mapArea).filter(Boolean).sort().join("|");
+  const blockedKey = blockedKeyOf(activeClosures);
+  const closedHere = activeClosures.filter((item) => closureArea(item));
   const route = useMemo(() => findRoute(fromKey, toKey, blockedAreas(activeClosures)), [fromKey, toKey, blockedKey, planVersion]); // eslint-disable-line react-hooks/exhaustive-deps
   // Routes through a walkway into another building cannot be one AR trail (see the message below).
   const crossesBuildings = Boolean(route?.via?.some((edge) => edge.link));
@@ -687,6 +688,9 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
         <span>{inApp} can&apos;t do full AR. Open this in Chrome so the arrows stay on the floor as you walk.</span>
         <a className="ar-live-button ar-live-small" href={chromeLink(fromKey, toKey)}>Open in Chrome</a>
       </div>}
+      {closedHere.length > 0 && <p className="ar-live-closed" role="status">
+        <b>{voice === "tl" ? "Sarado ngayon, iniiwasan ng arrow:" : "Closed now, the arrows go around:"}</b> {closedHere.map((item) => `${item.pathway || mapAreaLabel(closureArea(item))} (${floorLabel(Number(closureArea(item).split(":")[0]))})`).join(", ")}
+      </p>}
       {mode !== "setup" && <p className="ar-live-mode">{mode === "xr" ? "AR on · point the camera at the floor ahead" : "Compass guide · tap Next at each turn"}{floorText ? ` · ${floorText}` : ""}</p>}
     </div>
     {!welcome && <p className="ar-live-status" aria-live="polite">{stepText(message || "", voice)}</p>}
