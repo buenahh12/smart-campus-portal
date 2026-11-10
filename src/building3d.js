@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { BUILDING_NAME, FLOORS, METERS_PER_UNIT as M, PLAN_HEIGHT, PLAN_WIDTH, buildingOf, graphNode } from "./floorPlans";
+import { courtyard } from "./interior3d";
 
 // The outside of the Main Academic Building and the guide-ball route, for the 3D dollhouse.
 // Sizes come from the 2D floor plans (1 plan unit = 0.4 m); the look comes from photos of the
@@ -363,8 +364,55 @@ export function buildExterior() {
   wall(X0, D / 2, deckX, D / 2, H3, FLOOR_HEIGHT, COLORS.lime);
   wall(X0, Z0, X0, D / 2, H3, FLOOR_HEIGHT, COLORS.lime);
 
-  // Roofs: the 4th floor's roof, and the roof deck with a low wall around it.
-  add(soft(W + 0.6, 0.6, deckZ - Z0 + 0.6, 0.28), solid(COLORS.roof), 0, H4 + 0.3, (Z0 + deckZ) / 2);
+  // The open court in the middle ("OPEN DOWN BELOW" on the plans): a hole through the roof, the
+  // court's inner walls with windows on every floor, and the ground-floor courtyard at the bottom.
+  const courtOf = (level) => FLOORS.find((plan) => plan.building === BUILDING_NAME && plan.level === level)?.rooms.find((item) => item.type === "void")?.rect;
+  const corners = (rect) => {
+    const [x, y, w, h] = rect;
+    const [ax, az] = toWorld(x, y);
+    const [bx, bz] = toWorld(x + w, y + h);
+    return [ax, az, bx, bz];
+  };
+  const lowCourt = courtOf(1) || courtOf(2);
+  const topCourt = courtOf(4) || lowCourt;
+
+  // Roofs: the 4th floor's roof (around the court opening), and the roof deck with a low wall.
+  const roofX0 = X0 - 0.3, roofX1 = -X0 + 0.3, roofZ0 = Z0 - 0.3, roofZ1 = deckZ + 0.3;
+  const roofPiece = (x1, z1, x2, z2) => x2 - x1 > 0.2 && z2 - z1 > 0.2 && add(soft(x2 - x1, 0.6, z2 - z1, 0.28), solid(COLORS.roof), (x1 + x2) / 2, H4 + 0.3, (z1 + z2) / 2);
+  if (topCourt) {
+    const [hx0, hz0, hx1, hz1] = corners(topCourt);
+    roofPiece(roofX0, roofZ0, roofX1, hz0);
+    roofPiece(roofX0, Math.min(hz1, roofZ1), roofX1, roofZ1);
+    roofPiece(roofX0, hz0, hx0, Math.min(hz1, roofZ1));
+    roofPiece(hx1, hz0, roofX1, Math.min(hz1, roofZ1));
+  } else roofPiece(roofX0, roofZ0, roofX1, roofZ1);
+  if (lowCourt) {
+    const courtWalls = (rect, y0, h, withWindows, levels) => {
+      const [ax, az, bx, bz] = corners(rect);
+      // Inner faces, each looking into the court.
+      const sides = [[ax, az, bx, az, [0, 1]], [bx, az, bx, bz, [-1, 0]], [bx, bz, ax, bz, [0, -1]], [ax, bz, ax, az, [1, 0]]];
+      sides.forEach(([x1, z1, x2, z2, inward]) => {
+        wall(x1, z1, x2, z2, y0, h, COLORS.lime, 0.3);
+        if (withWindows) levels.forEach((level) => windowsAlong(x1, z1, x2, z2, level * FLOOR_HEIGHT + 1.75, inward, () => false, true));
+        // A ledge at each floor and the dark base, like the outside walls.
+        levels.forEach((level) => level > 0 && wall(x1 + inward[0] * 0.3, z1 + inward[1] * 0.3, x2 + inward[0] * 0.3, z2 + inward[1] * 0.3, level * FLOOR_HEIGHT, 0.28, COLORS.limeLight, 0.5));
+      });
+      return [ax, az, bx, bz];
+    };
+    courtWalls(lowCourt, 0, H3, true, [0, 1, 2]);
+    courtWalls(topCourt, H3, FLOOR_HEIGHT + 0.6, true, [3]);
+    // Where the 4th-floor opening and the lower one differ, a strip of floor fills the gap.
+    const [lx0, lz0, lx1, lz1] = corners(lowCourt);
+    const [tx0, tz0, tx1, tz1] = corners(topCourt);
+    const strip = (x1, z1, x2, z2) => x2 - x1 > 0.1 && z2 - z1 > 0.1 && add(new THREE.BoxGeometry(x2 - x1, 0.3, z2 - z1), solid(COLORS.limeLight), (x1 + x2) / 2, H3 + 0.15, (z1 + z2) / 2);
+    strip(lx0, lz0, lx1, tz0);
+    strip(lx0, tz1, lx1, lz1);
+    strip(lx0, Math.max(lz0, tz0), tx0, Math.min(lz1, tz1));
+    strip(tx1, Math.max(lz0, tz0), lx1, Math.min(lz1, tz1));
+    // The courtyard floor (light pavers) with its planters, umbrellas and fountain.
+    add(new THREE.BoxGeometry(lx1 - lx0, 0.12, lz1 - lz0), solid("#d9d4c4"), (lx0 + lx1) / 2, 0.06, (lz0 + lz1) / 2);
+    group.add(courtyard(lowCourt, toWorld, M, (color) => solid(color), 0.12));
+  }
   add(soft(deckX - X0 + 0.6, 0.6, D / 2 - deckZ + 0.3, 0.28), solid(COLORS.roof), (X0 + deckX) / 2, H4 + 0.3, (deckZ + D / 2) / 2);
   add(soft(-X0 - deckX, 0.4, D / 2 - deckZ, 0.2), solid(COLORS.deck), (deckX - X0) / 2, H3 + 0.2, (deckZ + D / 2) / 2);
   wall(deckX, D / 2, -X0, D / 2, H3, 1, COLORS.lime, 0.25);
