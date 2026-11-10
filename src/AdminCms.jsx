@@ -248,7 +248,7 @@ const friendlyError = (error) => error?.code === "permission-denied"
   ? "Permission denied. Only accounts with the administrator role can change campus content."
   : error?.message || "Something went wrong. Please try again.";
 
-export default function AdminCms({ onClose, onOpenAnalytics, onOpenSignIns, onOpenFeedback, onOpenLog }) {
+export default function AdminCms({ onClose, onSignOut, onOpenAnalytics, onOpenSignIns, onOpenFeedback, onOpenLog }) {
   const [activeKey, setActiveKey] = useState(SECTIONS[0].key);
   const [data, setData] = useState({});
   const [loadError, setLoadError] = useState("");
@@ -359,7 +359,8 @@ export default function AdminCms({ onClose, onOpenAnalytics, onOpenSignIns, onOp
             {onOpenSignIns && <button onClick={onOpenSignIns}>Sign-ins</button>}
             {onOpenFeedback && <button onClick={onOpenFeedback}>Feedback</button>}
             {onOpenLog && <button onClick={onOpenLog}>Change log</button>}
-            <button className="admin-close" onClick={onClose} aria-label="Close content manager"><Icon name="close" /></button>
+            {onSignOut && <button onClick={onSignOut}>Sign out</button>}
+            <button className="admin-close" onClick={onClose} aria-label="View the site" title="View the site"><Icon name="close" /></button>
           </div>
         </header>
         <div className="cms-tabs" role="tablist" aria-label="Content type">

@@ -991,9 +991,17 @@ export default function App() {
   const [adminView, setAdminView] = useState(null);
   const [adminLoginOpen, setAdminLoginOpen] = useState(false);
   const isAdmin = role === "admin";
+  const roleRef = useRef(role);
+  roleRef.current = role;
   const openLogin = () => {
     setMenuOpen(false);
     setLoginOpen(true);
+  };
+  // The admin never gets the student "My Campus" screen: their account button opens the admin side.
+  const openAccount = () => {
+    setMenuOpen(false);
+    if (roleRef.current === "admin") setAdminView("content");
+    else setAccountOpen(true);
   };
   const openCreateAccount = () => {
     setLoginOpen(false);
@@ -1003,8 +1011,6 @@ export default function App() {
   // followed by #admin. Nothing on the site shows or links to the admin side (no Admin button);
   // the admin account and the database rules guard everything behind it. Already signed in as the
   // admin, #admin goes straight to the Content manager.
-  const roleRef = useRef(role);
-  roleRef.current = role;
   useEffect(() => {
     const check = () => {
       if (location.hash !== "#admin") return;
@@ -1067,7 +1073,14 @@ export default function App() {
     setRole(nextRole);
     recordVisit(user, nextRole);
     recordSignIn(user, nextRole);
-    if (nextRole !== "admin") setAdminView(null);
+    roleRef.current = nextRole;
+    if (nextRole === "admin") {
+      // However the admin signed in (username, email, Google, or a page reload), they land on the
+      // admin side, never in the student portal.
+      setAccountOpen(false);
+      setCreateAccountOpen(false);
+      setAdminView((current) => current || "content");
+    } else setAdminView(null);
   }), []);
 
   useEffect(() => {
@@ -1094,8 +1107,9 @@ export default function App() {
             <a className="ss-nav-link" href="#visit" onClick={() => setMenuOpen(false)}>Visit</a>
             <div className="ss-nav-actions">
               {offlineApp.canInstall && <button type="button" className="ss-btn ss-btn-quiet" onClick={() => { setMenuOpen(false); offlineApp.install(); }}>Install app</button>}
-              {signedInUser
-                ? <button type="button" className="ss-btn ss-btn-primary" onClick={() => { setMenuOpen(false); setAccountOpen(true); }}>My Campus</button>
+              {isAdmin && <button type="button" className="ss-btn ss-btn-quiet" onClick={() => { setMenuOpen(false); handleSignOut(); }}>Sign out</button>}
+              {signedInUser || isAdmin
+                ? <button type="button" className="ss-btn ss-btn-primary" onClick={openAccount}>{isAdmin ? "Admin panel" : "My Campus"}</button>
                 : <button type="button" className="ss-btn ss-btn-primary" onClick={openLogin}>Sign in</button>}
             </div>
           </nav>
@@ -1305,7 +1319,7 @@ export default function App() {
           <span className="ss-footer-links"><button type="button" className="ss-footer-feedback" onClick={() => openFeedback()}>Send feedback</button> <a href="#privacy">Privacy Policy</a> <a href="#terms">Terms of Use</a> <a href="#top">Back to top</a></span>
         </div>
       </footer>
-      {!accountOpen && !loginOpen && !mapState && !arOpen && !route3d && <SiiBot onSignIn={openLogin} onSignOut={handleSignOut} onOpenAccount={() => setAccountOpen(true)} alreadySignedIn={Boolean(signedInUser)} onNavigate={navigateTo} onOpenMap={setMapState} />}
+      {!accountOpen && !loginOpen && !mapState && !arOpen && !route3d && <SiiBot onSignIn={openLogin} onSignOut={handleSignOut} onOpenAccount={openAccount} alreadySignedIn={Boolean(signedInUser)} onNavigate={navigateTo} onOpenMap={setMapState} />}
       <AppStatus online={offlineApp.online} updateReady={offlineApp.updateReady} onUpdate={offlineApp.applyUpdate} />
       <InstallPrompt offlineApp={offlineApp} hidden={Boolean(noticeOpen || route3d || mapState || arOpen || loginOpen || accountOpen || createAccountOpen || adminLoginOpen || adminView || offlineApp.updateReady)} />
       {noticeOpen && !mapState && !arOpen && !adminView && <PrivacyNotice onDone={() => setNoticeOpen(false)} />}
@@ -1316,8 +1330,8 @@ export default function App() {
       {arOpen && <ArLiveView onClose={() => setArOpen(false)} />}
       {route3d && <Route3DView start={route3d.start} end={route3d.end} onClose={() => setRoute3d(null)} onOpenMap={(key, mapFloor) => { setRoute3d(null); setMapState({ destination: key, floor: mapFloor }); }} />}
       {mapState && <CampusMap onClose={() => setMapState(null)} initialFloor={mapState.floor || 2} initialDestination={mapState.destination || null} initialEmergency={Boolean(mapState.emergency)} />}
-      {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} onCreate={openCreateAccount} onSignedIn={(user) => { setSignedInUser(user); setLoginOpen(false); setAccountOpen(true); }} onAdminSignedIn={(user) => { setLoginOpen(false); setSignedInUser(user); setRole("admin"); setAdminView("content"); }} />}
-      {accountOpen && signedInUser && <MyCampus
+      {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} onCreate={openCreateAccount} onSignedIn={(user) => { setSignedInUser(user); setLoginOpen(false); if (ADMIN_EMAIL && String(user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase()) { setRole("admin"); roleRef.current = "admin"; } openAccount(); }} onAdminSignedIn={(user) => { setLoginOpen(false); setSignedInUser(user); setRole("admin"); setAdminView("content"); }} />}
+      {accountOpen && signedInUser && !isAdmin && <MyCampus
         user={signedInUser}
         onClose={() => setAccountOpen(false)}
         onSignOut={handleSignOut}
@@ -1337,7 +1351,7 @@ export default function App() {
       {isAdmin && adminView === "feedback" && <AdminFeedback onClose={() => setAdminView(null)} onOpenContent={() => setAdminView("content")} onOpenVisits={() => setAdminView("analytics")} onOpenSignIns={() => setAdminView("signins")} onOpenLog={() => setAdminView("log")} />}
       {isAdmin && adminView === "log" && <AdminChangeLog onClose={() => setAdminView(null)} onOpenContent={() => setAdminView("content")} onOpenVisits={() => setAdminView("analytics")} onOpenSignIns={() => setAdminView("signins")} onOpenFeedback={() => setAdminView("feedback")} />}
       {isAdmin && adminView === "signins" && <AdminSignIns onClose={() => setAdminView(null)} onOpenContent={() => setAdminView("content")} onOpenVisits={() => setAdminView("analytics")} />}
-      {isAdmin && adminView === "content" && <AdminCms onClose={() => setAdminView(null)} onOpenAnalytics={() => setAdminView("analytics")} onOpenSignIns={() => setAdminView("signins")} onOpenFeedback={() => setAdminView("feedback")} onOpenLog={() => setAdminView("log")} />}
+      {isAdmin && adminView === "content" && <AdminCms onClose={() => setAdminView(null)} onSignOut={handleSignOut} onOpenAnalytics={() => setAdminView("analytics")} onOpenSignIns={() => setAdminView("signins")} onOpenFeedback={() => setAdminView("feedback")} onOpenLog={() => setAdminView("log")} />}
       </Suspense>
     </div>
   );
