@@ -424,3 +424,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .arp-photo.on { transform: none; }
   .arp-pill, .arp-sign, .arp-step, .arp-chevrons i { animation: none; opacity: 1; }
 }
+
+/* Admin header buttons: one line each, a tidy row that wraps as a whole instead of squashing. */
+.admin-dashboard .admin-dashboard-header { gap: 16px 24px; flex-wrap: wrap; }
+.admin-dashboard .admin-dashboard-header > div:first-child { flex: 1 1 340px; min-width: 0; }
+.admin-dashboard .admin-dashboard-header .admin-header-actions { flex: 0 1 auto; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; max-width: 100%; }
+.admin-dashboard .admin-dashboard-header .admin-header-actions button:not(.admin-close) { flex: none; height: 38px; padding: 0 16px; white-space: nowrap; font-size: 13px; line-height: 1; border-radius: 8px; }
+.admin-dashboard .admin-dashboard-header .admin-header-actions button.admin-signout { border-color: transparent; color: var(--ink-2); background: transparent; text-decoration: underline; text-underline-offset: 3px; }
+.admin-dashboard .admin-dashboard-header .admin-header-actions .admin-close { flex: none; }
+@media (max-width: 600px) {
+  .admin-dashboard .admin-dashboard-header .admin-header-actions { justify-content: flex-start; }
+  .admin-dashboard .admin-dashboard-header .admin-header-actions button:not(.admin-close) { flex: 1 1 auto; padding: 0 12px; }
+  .admin-dashboard .admin-dashboard-header .admin-header-actions button.admin-signout { flex: none; }
+}

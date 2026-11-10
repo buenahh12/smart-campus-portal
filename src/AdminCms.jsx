@@ -359,7 +359,7 @@ export default function AdminCms({ onClose, onSignOut, onOpenAnalytics, onOpenSi
             {onOpenSignIns && <button onClick={onOpenSignIns}>Sign-ins</button>}
             {onOpenFeedback && <button onClick={onOpenFeedback}>Feedback</button>}
             {onOpenLog && <button onClick={onOpenLog}>Change log</button>}
-            {onSignOut && <button onClick={onSignOut}>Sign out</button>}
+            {onSignOut && <button className="admin-signout" onClick={onSignOut}>Sign out</button>}
             <button className="admin-close" onClick={onClose} aria-label="View the site" title="View the site"><Icon name="close" /></button>
           </div>
         </header>
