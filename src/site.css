@@ -180,7 +180,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .screen-loading-actions button { min-height: 44px; padding: 0 18px; border: 1px solid var(--line-strong, var(--line)); border-radius: 999px; color: var(--ink); background: var(--surface); font-weight: 700; }
 .screen-loading-actions button:first-child { border-color: var(--green); color: #fff; background: var(--green); }
 @media (prefers-reduced-motion: reduce) { .screen-loading i { animation: none; } }
-.ar-app-note a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .ss-dollhouse { position: relative; height: 200px; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
 .ss-dollhouse-canvas, .ss-dollhouse-canvas canvas { display: block; width: 100%; height: 100%; }
 .ss-dollhouse-canvas canvas { cursor: grab; }

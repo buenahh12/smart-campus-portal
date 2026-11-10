@@ -202,8 +202,6 @@ const SCHOOL_MAP_QUERY = "Saint Simon of Cyrene Academy, Carsadang Bago II, Imus
 const MAP_EMBED_URL = `https://www.google.com/maps?q=${encodeURIComponent(SCHOOL_MAP_QUERY)}&output=embed`;
 const MAP_OPEN_URL = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(SCHOOL_MAP_QUERY)}`;
 const MAP_DIRECTIONS_URL = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(SCHOOL_MAP_QUERY)}`;
-// The AR app is a separate Android build, published as a GitHub release by the AR developer.
-const AR_APP_URL = "https://github.com/janlawrencecambayaflorido/SSCA-NAVI-AR-V1/releases/tag/V1.0";
 const SIBOT_PROMPTS = ["Where is the clinic?", "Take me to Room 403", "Show the nearest exit", "What are the school hours?"];
 
 // Small, real outline of the chosen floor; opens the full floor plan.
@@ -1236,7 +1234,7 @@ export default function App() {
                 <div className="dollhouse-actions">
                   <button type="button" onClick={() => setArOpen(true)}><Icon name="scan" size={16} /> Start AR live view</button>
                 </div>
-                <p className="ar-app-note">Uses your phone&apos;s camera. Works best in Chrome on Android. Prefer an app? <a href={AR_APP_URL} target="_blank" rel="noopener noreferrer">Get the Android AR app</a>.</p>
+                <p className="ar-app-note">Uses your phone&apos;s camera. Works best in Chrome on Android. No app to download: it runs right here in the browser.</p>
               </article>
               <article className="ss-way">
                 <span className="ss-way-icon" aria-hidden="true"><Icon name="bot" size={26} /></span>
