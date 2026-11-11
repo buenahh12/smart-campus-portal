@@ -95,6 +95,7 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
   const [profileError, setProfileError] = useState("");
   const [search, setSearch] = useState("");
   const [emailUpdates, setEmailUpdatesState] = useState(false);
+  const [emailSaving, setEmailSaving] = useState(false);
   const [online, setOnline] = useState(navigator.onLine);
   const rooms = usePublicCollection(CMS_COLLECTIONS.rooms);
   const offices = usePublicCollection(CMS_COLLECTIONS.offices);
@@ -188,14 +189,18 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
   })();
   const notices = visibleAnnouncements(announcements.items).slice(0, 3);
 
+  const [saving, setSaving] = useState(false);
   const update = async (changes) => {
     setProfileError("");
+    setSaving(true);
     try {
       await saveProfile(user.uid, changes);
     } catch (error) {
       setProfileError(error?.code === "permission-denied"
         ? "Your account could not save this change. The Firestore rules may not be deployed yet."
         : "That change could not be saved. Check your connection and try again.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -209,9 +214,10 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
     const route = start && end ? findRoute(from, to, blockedNow) : null;
     return { id, from, to, start, end, route };
   });
-  const removeRoute = (id) => update({ savedRoutes: savedRouteIds.filter((item) => item !== id) });
+  const removeRoute = (id) => !saving && update({ savedRoutes: savedRouteIds.filter((item) => item !== id) });
 
   const toggleSaved = (place) => {
+    if (saving) return;
     const key = place.saveKey;
     if (savedKeys.includes(key)) {
       update({ savedPlaces: savedKeys.filter((item) => item !== key) });
@@ -320,13 +326,14 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
               <span><b>Confirm your email to get updates</b><small>We sent a link to {user.email}. Open it, then tap &ldquo;I&apos;ve confirmed&rdquo;.{confirmNote && ` ${confirmNote}`}</small>
                 <span className="mc-confirm-actions"><button type="button" onClick={checkConfirmed}>I&apos;ve confirmed</button><button type="button" onClick={resendConfirmation}>Send the link again</button></span></span>
             </div>}
-            {user.email && confirmed && <label className="mc-toggle"><input type="checkbox" checked={emailUpdates} onChange={(event) => {
+            {user.email && confirmed && <label className="mc-toggle"><input type="checkbox" checked={emailUpdates} disabled={emailSaving} onChange={(event) => {
               const enabled = event.target.checked;
               setEmailUpdatesState(enabled);
+              setEmailSaving(true);
               setEmailUpdates(user, name, enabled).catch(() => {
                 setEmailUpdatesState(!enabled);
                 setProfileError("Your email setting could not be saved. Check your connection and try again.");
-              });
+              }).finally(() => setEmailSaving(false));
             }} /><span><b>Email me announcements and closed hallways</b><small>Sent to {user.email} when the school posts an update.</small></span></label>}
             <button type="button" className="mc-feedback-button" onClick={() => openFeedback()}>Send feedback to the school</button>
           </section>

@@ -28,7 +28,9 @@ export async function isAdmin(idToken) {
     });
     if (!response.ok) return false;
     const { users = [] } = await response.json();
-    return String(users[0]?.email || "").toLowerCase() === adminEmail;
+    const user = users[0] || {};
+    const byPassword = (user.providerUserInfo || []).some((item) => item.providerId === "password");
+    return byPassword && !user.disabled && String(user.email || "").toLowerCase() === adminEmail;
   } catch {
     return false;
   }

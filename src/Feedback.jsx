@@ -148,9 +148,12 @@ export default function AdminFeedback({ onClose, onOpenContent, onOpenVisits, on
   const easeAverage = eased.length ? (eased.reduce((sum, row) => sum + row.survey.ease, 0) / eased.length).toFixed(1) : "–";
   const sibotUsers = answeredOf("sibot").filter((row) => row.survey.sibot !== "unused");
   const yesShare = (key) => percent(answeredOf(key).filter((row) => row.survey[key] === "yes").length, answeredOf(key).length);
-  const act = async (task) => {
+  const [busyId, setBusyId] = useState("");
+  const act = async (id, task) => {
+    if (busyId) return;
     setError("");
-    try { await task(); } catch { setError("That change couldn't be saved. Try again."); }
+    setBusyId(id);
+    try { await task(); } catch { setError("That change couldn't be saved. Try again."); } finally { setBusyId(""); }
   };
   return <div className="admin-shell" role="dialog" aria-modal="true" aria-labelledby="fb-title">
     <div className="admin-dashboard va-dashboard">
@@ -209,10 +212,10 @@ export default function AdminFeedback({ onClose, onOpenContent, onOpenVisits, on
             <small className="fb-meta">{whenText(row)} · {row.role || "Guest"}{row.page ? ` · About: ${row.page}` : ""}</small>
             {row.email && <small className="fb-meta">Reply to: <a href={`mailto:${row.email}`}>{row.email}</a></small>}
             <div className="fb-actions">
-              {status !== "seen" && <button type="button" onClick={() => act(() => setFeedbackStatus(row.id, "seen"))}>Mark seen</button>}
-              {status !== "done" && <button type="button" onClick={() => act(() => setFeedbackStatus(row.id, "done"))}>Done</button>}
-              {status !== "new" && <button type="button" onClick={() => act(() => setFeedbackStatus(row.id, "new"))}>Mark new</button>}
-              <button type="button" className="fb-delete" onClick={() => window.confirm("Delete this feedback? This can't be undone.") && act(() => deleteFeedback(row.id))}>Delete</button>
+              {status !== "seen" && <button type="button" onClick={() => act(row.id, () => setFeedbackStatus(row.id, "seen"))} disabled={Boolean(busyId)}>Mark seen</button>}
+              {status !== "done" && <button type="button" onClick={() => act(row.id, () => setFeedbackStatus(row.id, "done"))} disabled={Boolean(busyId)}>Done</button>}
+              {status !== "new" && <button type="button" onClick={() => act(row.id, () => setFeedbackStatus(row.id, "new"))} disabled={Boolean(busyId)}>Mark new</button>}
+              <button type="button" className="fb-delete" onClick={() => window.confirm("Delete this feedback? This can't be undone.") && act(row.id, () => deleteFeedback(row.id))} disabled={Boolean(busyId)}>Delete</button>
             </div>
           </article>;
         })}

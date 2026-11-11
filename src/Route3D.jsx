@@ -7,7 +7,7 @@ import { isMainBuildingRoute } from "./building3d";
 import { usePublicCollection } from "./CampusUpdates";
 import { CMS_COLLECTIONS, isClosureActive } from "./cms";
 import { VOICE_LANGS, saveVoiceLang, savedVoiceLang, speak, stepStarts, stepText, stopSpeaking, unlockVoice, voiceSupported } from "./voiceGuide";
-import { BUILDING_NAME, PLACES, blockedAreas, blockedKeyOf, routeWalkText, buildingOf, closureArea, mapAreaLabel, findRoute, floorLabel, placeByKey, placeTitle } from "./floorPlans";
+import { BUILDING_NAME, PLACES, blockedAreas, blockedKeyOf, routeWalkText, buildingOf, closureArea, mapAreaLabel, findRoute, floorLabel, placeTitle } from "./floorPlans";
 
 // Full-screen 3D directions: pick where you are and where you're going, and a glowing ball walks
 // the route through the 3D building, climbing the stairs, with the steps listed beside it.

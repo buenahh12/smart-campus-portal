@@ -270,6 +270,7 @@ export default function ArLiveView({ onClose, initialDestination = "", initialSt
   const canvasHolder = useRef(null);
   const engine = useRef(null);
   const stopping = useRef(false); // true while the person is ending AR themselves
+  const starting = useRef(false); // true while Start is opening the camera or AR
 
   const activeClosures = closures.items.filter((item) => isClosureActive(item));
   const blockedKey = blockedKeyOf(activeClosures);
@@ -530,6 +531,15 @@ export default function ArLiveView({ onClose, initialDestination = "", initialSt
   }, [mode, path, step, lastStep]);
 
   const start = async () => {
+    if (starting.current || mode !== "setup" || !path) return;
+    starting.current = true;
+    try {
+      await startRoute();
+    } finally {
+      starting.current = false;
+    }
+  };
+  const startRoute = async () => {
     setProblem("");
     stopping.current = false;
     setStepIndex(0);

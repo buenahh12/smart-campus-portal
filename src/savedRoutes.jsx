@@ -58,18 +58,25 @@ const NOTES = {
 export function SaveRouteButton({ from, to, className = "", noteClassName = "" }) {
   const { signedIn, isSaved, toggle } = useSavedRoutes();
   const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
   useEffect(() => setNote(""), [from, to]);
   if (!from || !to || from === to) return null;
   const saved = signedIn && isSaved(from, to);
   const click = async () => {
+    if (busy) return;
     if (!signedIn) {
       setNote("signin");
       return;
     }
-    setNote(await toggle(from, to));
+    setBusy(true);
+    try {
+      setNote(await toggle(from, to));
+    } finally {
+      setBusy(false);
+    }
   };
   return <>
-    <button type="button" className={`save-route ${saved ? "saved" : ""} ${className}`} onClick={click} aria-pressed={saved}>
+    <button type="button" className={`save-route ${saved ? "saved" : ""} ${className}`} onClick={click} aria-pressed={saved} disabled={busy}>
       <span aria-hidden="true">{saved ? "★" : "☆"}</span> {saved ? "Saved" : "Save route"}
     </button>
     {note && <p className={`save-route-note ${noteClassName}`} role="status">

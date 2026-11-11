@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Icon from "./Icon";
 import { CMS_COLLECTIONS, deleteItem, isClosureActive, saveItem, todayKey, watchCollection } from "./cms";
 import { MAP_AREAS, buildingOf, mapAreaLabel } from "./floorPlans";
@@ -342,8 +342,11 @@ export default function AdminCms({ onClose, onSignOut, onOpenAnalytics, onOpenSi
     }
   };
 
+  const removing = useRef(new Set());
   const remove = async (item) => {
+    if (removing.current.has(item.id)) return;
     if (!window.confirm(`Delete "${section.title(item)}"? This cannot be undone.`)) return;
+    removing.current.add(item.id);
     try {
       await deleteItem(section.collection, item.id);
       if (editingId === item.id) resetForm();
@@ -351,6 +354,8 @@ export default function AdminCms({ onClose, onSignOut, onOpenAnalytics, onOpenSi
     } catch (error) {
       setNotice("");
       setFormError(friendlyError(error));
+    } finally {
+      removing.current.delete(item.id);
     }
   };
 
