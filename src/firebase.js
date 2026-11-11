@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getToken, initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
+import { getToken, initializeAppCheck, ReCaptchaEnterpriseProvider, ReCaptchaV3Provider } from 'firebase/app-check';
 import { doc, getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, serverTimestamp, setDoc } from 'firebase/firestore';
 import { 
   getAuth, 
@@ -30,11 +30,15 @@ const hasFirebaseConfig = Object.values(firebaseConfig).every(Boolean);
 
 const app = hasFirebaseConfig ? initializeApp(firebaseConfig) : null;
 // App Check: only this website may use the database, so scripts cannot flood the visit
-// counters or sign-in records. Turned on by VITE_APPCHECK_SITE_KEY (a reCAPTCHA v3 site key);
+// counters or sign-in records. Turned on by VITE_APPCHECK_SITE_KEY (the reCAPTCHA / Fraud Defense site key);
 // then enforce App Check for Cloud Firestore in the Firebase console.
 const APP_CHECK_SITE_KEY = import.meta.env.VITE_APPCHECK_SITE_KEY;
 const appCheck = app && APP_CHECK_SITE_KEY
-  ? initializeAppCheck(app, { provider: new ReCaptchaV3Provider(APP_CHECK_SITE_KEY), isTokenAutoRefreshEnabled: true })
+  ? initializeAppCheck(app, {
+    // Fraud Defense (reCAPTCHA Enterprise) by default; VITE_APPCHECK_PROVIDER=classic for the old v3.
+    provider: import.meta.env.VITE_APPCHECK_PROVIDER === 'classic' ? new ReCaptchaV3Provider(APP_CHECK_SITE_KEY) : new ReCaptchaEnterpriseProvider(APP_CHECK_SITE_KEY),
+    isTokenAutoRefreshEnabled: true,
+  })
   : null;
 // This site's App Check proof, for our own server functions to pass on to Firestore ('' if off).
 export const appCheckToken = async () => {
