@@ -13,6 +13,7 @@ import {
   getIdTokenResult,
   updateProfile,
   sendEmailVerification,
+  signInAnonymously,
   signOut
 } from 'firebase/auth';
 
@@ -81,6 +82,14 @@ export const loginWithEmail = ({ email, password }) => {
     return Promise.reject(new Error('Firebase is not configured. Add the VITE_FIREBASE_* values to your .env file.'));
   }
   return signInWithEmailAndPassword(auth, email.trim(), password);
+};
+// Visitors (no account): a Firebase anonymous sign-in, so the visit shows in the admin's
+// Sign-ins list. Needs "Anonymous" turned on in Firebase Console > Authentication > Sign-in method.
+export const loginAsVisitor = () => {
+  if (!auth) {
+    return Promise.reject(new Error('Firebase is not configured. Add the VITE_FIREBASE_* values to your .env file.'));
+  }
+  return signInAnonymously(auth);
 };
 export const requestPasswordReset = (email) => {
   if (!auth) {

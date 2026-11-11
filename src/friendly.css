@@ -450,3 +450,16 @@ body .student-portal-shell .mc-welcome-skip { justify-self: center; min-height: 
 .ar-live-save .save-route-note { margin: 0; color: #fff; }
 .mc-route b span { color: var(--muted, #5d6a5e); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Visitor (no account) in the sign-in window. */
+.visitor-continue { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 48px; border: 1.5px solid var(--green, #1f4a35); border-radius: 999px; background: transparent; color: var(--green, #1f4a35); font-weight: 700; font-size: 15px; cursor: pointer; }
+.visitor-continue:hover { background: rgba(31, 74, 53, .06); }
+.visitor-types { display: grid; gap: 10px; margin: 6px 0 4px; }
+.visitor-types button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 10px 14px; border: 1.5px solid var(--line-strong, #cbbc9f); border-radius: 14px; background: #fffdf8; color: inherit; text-align: left; cursor: pointer; }
+.visitor-types button:hover, .visitor-types button:focus-visible { border-color: var(--green, #1f4a35); background: #f3f8f4; }
+.visitor-types button:disabled { opacity: .6; cursor: progress; }
+.visitor-types b { display: block; font-size: 15px; }
+.visitor-types small { display: block; color: var(--muted, #5d6a5e); font-size: 13px; }
+.visitor-type-icon { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; background: #f1c39a; color: #1f4a35; }
+.visitor-now { display: grid; gap: 8px; padding: 10px 12px; border-radius: 12px; background: #eef6f0; font-size: 14px; line-height: 1.4; }
+.visitor-now button { justify-self: start; padding: 4px 12px; min-height: 34px; border: 1px solid #1f4a35; border-radius: 999px; background: transparent; color: #1f4a35; font-weight: 700; }

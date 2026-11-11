@@ -221,7 +221,7 @@ service cloud.firestore {
         && data().uid == request.auth.uid
         && data().email == request.auth.token.get('email', '')
         && text('name', false, 80)
-        && data().role in ['', 'Student', 'Faculty / Staff', 'Parent / Guardian', 'Visitor']
+        && data().role in ['', 'Student', 'Faculty / Staff', 'Parent / Guardian', 'Visitor', 'Enrollee / Applicant', 'School personnel', 'Other visitor']
         && data().method in ['google.com', 'password', 'anonymous']
         && data().device in ['Phone', 'Tablet', 'Computer']
         && text('os', true, 30) && text('browser', true, 30) && text('screen', false, 20)

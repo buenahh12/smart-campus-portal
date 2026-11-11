@@ -171,6 +171,28 @@ export function watchSession(onChange) {
 // Personal profile for signed-in users, stored at users/{uid}. Only the owner can
 // read or change it (see firestore.rules), so it follows them to any device.
 export const USER_ROLES = ['Student', 'Faculty / Staff', 'Parent / Guardian', 'Visitor'];
+// Who a visitor (no account) is. Same list as the signIns role check in firestore.rules.
+export const VISITOR_TYPES = [
+  { role: 'Parent / Guardian', short: 'Parent', icon: 'heart', hint: 'Family of a learner' },
+  { role: 'Enrollee / Applicant', short: 'Enrollee', icon: 'book', hint: 'Asking about enrollment' },
+  { role: 'School personnel', short: 'Personnel', icon: 'building', hint: 'Staff, guard, maintenance, supplier' },
+  { role: 'Other visitor', short: 'Visitor', icon: 'location', hint: 'Guest, alumni, anyone else' },
+];
+const VISITOR_KEY = 'sscai-visitor-type';
+export const readVisitorType = () => {
+  try {
+    const value = localStorage.getItem(VISITOR_KEY) || '';
+    return VISITOR_TYPES.some((item) => item.role === value) ? value : '';
+  } catch {
+    return '';
+  }
+};
+export const saveVisitorType = (value) => {
+  try {
+    if (value) localStorage.setItem(VISITOR_KEY, value);
+    else localStorage.removeItem(VISITOR_KEY);
+  } catch { /* private window: just not remembered */ }
+};
 export const MAX_SAVED_PLACES = 30;
 // Students also give their grade level and section (same lists as validProfile in firestore.rules).
 export const GRADE_LEVELS = ['Nursery', 'Kindergarten', ...Array.from({ length: 12 }, (_, i) => `Grade ${i + 1}`)];
@@ -304,7 +326,7 @@ export async function recordSignIn(user, role) {
       uid: user.uid,
       email: user.email || '',
       name: (profile.name || user.displayName || '').slice(0, 80),
-      role: user.isAnonymous ? 'Visitor' : profile.role || '',
+      role: user.isAnonymous ? readVisitorType() || 'Visitor' : profile.role || '',
       method: user.isAnonymous ? 'anonymous' : user.providerData[0]?.providerId || 'password',
       ...describeDevice(),
       at: serverTimestamp(),

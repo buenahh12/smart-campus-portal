@@ -4,6 +4,7 @@ import {
   finishGoogleRedirect,
   inAppBrowserName,
   loginAsAdmin,
+  loginAsVisitor,
   loginWithEmail,
   loginWithGoogle,
   logoutUser,
@@ -13,7 +14,7 @@ import Icon from "./Icon";
 import ArPreview from "./ArPreview";
 import CampusUpdates, { usePublicCollection, visibleAnnouncements } from "./CampusUpdates";
 import { AnnouncementArt } from "./EventArt";
-import { CMS_COLLECTIONS, GRADE_LEVELS, MAX_SECTION_LENGTH, USER_ROLES, isClosureActive, recordSignIn, recordVisit, todayKey, watchSession } from "./cms";
+import { CMS_COLLECTIONS, GRADE_LEVELS, MAX_SECTION_LENGTH, USER_ROLES, VISITOR_TYPES, isClosureActive, readVisitorType, saveVisitorType, recordSignIn, recordVisit, todayKey, watchSession } from "./cms";
 import { usePlanVersion } from "./usePlan";
 import { useOfflineApp } from "./offline";
 import { BUILDING_NAME, FLOORS, PLACES, blockedKeyOf, findPlaceKey, floorShort, placeByKey, placeTitle, sectionsOf, floorLabel as planFloorLabel } from "./floorPlans";
@@ -276,7 +277,19 @@ function useReveal() {
 const ADMIN_USERNAME = (import.meta.env.VITE_ADMIN_USERNAME || "admin1").toLowerCase();
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || "";
 
-function LoginModal({ onClose, onCreate, onSignedIn = () => {}, onAdminSignedIn = () => {} }) {
+function LoginModal({ onClose, onCreate, onSignedIn = () => {}, onAdminSignedIn = () => {}, onVisitor = () => {}, visitorType = "", onLeaveVisitor = () => {} }) {
+  const [visitorStep, setVisitorStep] = useState(false);
+  const [visitorBusy, setVisitorBusy] = useState(false);
+  // A visitor says who they are, then continues without an account. The type is saved first so the
+  // sign-in record (written as soon as Firebase signs them in) carries it. If visitor sign-in is
+  // switched off in Firebase or there's no internet, they still continue; it just isn't recorded.
+  const continueAsVisitor = async (type) => {
+    setVisitorBusy(true);
+    saveVisitorType(type);
+    try { await loginAsVisitor(); } catch { /* not recorded, but they can still use everything */ }
+    setVisitorBusy(false);
+    onVisitor(type);
+  };
   const [signingIn, setSigningIn] = useState(false);
   const [emailSigningIn, setEmailSigningIn] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
@@ -397,8 +410,21 @@ function LoginModal({ onClose, onCreate, onSignedIn = () => {}, onAdminSignedIn 
           <Icon name="building" size={26} />
         </div>
         <p className="kicker">SECURE ACCESS</p>
-        <h2 id="login-title">{resetMode ? "Reset your password" : "Sign in to SSCAI NAVI"}</h2>
-        {resetMode ? (
+        <h2 id="login-title">{visitorStep ? "Who are you?" : resetMode ? "Reset your password" : "Sign in to SSCAI NAVI"}</h2>
+        {visitorStep ? (
+          <>
+            <p className="modal-copy">No account needed. Tell us who you are so the school knows who uses SSCAI NAVI. You can still find any room, use 2D, 3D and AR, and ask SiBot.</p>
+            <div className="visitor-types" role="group" aria-label="I am a">
+              {VISITOR_TYPES.map((item) => <button key={item.role} type="button" onClick={() => continueAsVisitor(item.role)} disabled={visitorBusy}>
+                <span className="visitor-type-icon" aria-hidden="true"><Icon name={item.icon} size={20} /></span>
+                <span><b>{item.role}</b><small>{item.hint}</small></span>
+              </button>)}
+            </div>
+            {visitorBusy && <p className="auth-success" role="status">Getting things ready…</p>}
+            <p className="auth-security-note"><Icon name="info" size={15} /> As a visitor, the school sees only which kind of visitor you picked and your device type and browser. No name or email.</p>
+            <button className="create-account-link" type="button" onClick={() => setVisitorStep(false)}>Back to sign in</button>
+          </>
+        ) : resetMode ? (
           <>
             <p className="modal-copy">Enter the email address on your campus account. Firebase will email you a secure link to reset your password.</p>
             <form className="password-reset-form" onSubmit={handlePasswordReset}>
@@ -411,6 +437,7 @@ function LoginModal({ onClose, onCreate, onSignedIn = () => {}, onAdminSignedIn 
           </>
         ) : (
           <>
+            {visitorType && <div className="visitor-now" role="status"><span>You&apos;re using SSCAI NAVI as a visitor: <b>{visitorType}</b>. Sign in or create an account to save places and routes.</span><button type="button" onClick={onLeaveVisitor}>Stop visitor mode</button></div>}
             <p className="modal-copy">Sign in to access personalized routes, saved locations, and campus services.</p>
             {inAppBrowserName()
               ? <OpenInBrowser app={inAppBrowserName()} />
@@ -426,6 +453,10 @@ function LoginModal({ onClose, onCreate, onSignedIn = () => {}, onAdminSignedIn 
               <button className="visitor-button" type="submit" disabled={emailSigningIn}>{emailSigningIn ? "Signing in..." : "Sign in with email"}</button>
             </form>
             <button className="create-account-link" onClick={onCreate}>Create a new campus account</button>
+            {!visitorType && <>
+              <div className="divider"><span>NO ACCOUNT?</span></div>
+              <button type="button" className="visitor-continue" onClick={() => { setVisitorStep(true); setError(""); }}><Icon name="location" size={17} /> Continue as visitor</button>
+            </>}
             <p className="auth-security-note"><Icon name="shield" size={15} /> Sign-in is handled by Firebase. Your password is not shared with Google.</p>
             <p className="auth-security-note"><Icon name="info" size={15} /> When you sign in, the school can see your account email, how you signed in, and your device type and browser.</p>
             <p className="terms">By continuing, you agree to SSCAI NAVI&apos;s <a href="#terms">Terms</a> and <a href="#privacy">Privacy Policy</a>.</p>
@@ -696,7 +727,7 @@ function AnnouncementPopup({ hidden }) {
 }
 
 // The role shown with a feedback message (no names or emails unless they choose to be replied to).
-const feedbackRole = (role) => ({ admin: "Administrator", visitor: "Visitor (no account)", user: "Signed in", guest: "Guest" }[role] || "Guest");
+const feedbackRole = (role, visitorType = "") => (visitorType && (role === "visitor" || role === "guest") ? `Visitor: ${visitorType}`.slice(0, 30) : { admin: "Administrator", visitor: "Visitor (no account)", user: "Signed in", guest: "Guest" }[role] || "Guest");
 
 function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alreadySignedIn = false, speakAnswers = false }) {
   const [open, setOpen] = useState(false);
@@ -994,6 +1025,7 @@ export default function App() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [createAccountOpen, setCreateAccountOpen] = useState(false);
   const [role, setRole] = useState("guest");
+  const [visitorType, setVisitorType] = useState(readVisitorType);
   const [adminView, setAdminView] = useState(null);
   const [adminLoginOpen, setAdminLoginOpen] = useState(false);
   const isAdmin = role === "admin";
@@ -1064,7 +1096,15 @@ export default function App() {
     searchProblem(`We couldn’t find “${query}” in the building. Try a room number like 204, or tap a place below.`);
   };
 
+  const leaveVisitor = async () => {
+    saveVisitorType("");
+    setVisitorType("");
+    if (roleRef.current === "visitor") await logoutUser().catch(() => {});
+  };
+
   const handleSignOut = async () => {
+    saveVisitorType("");
+    setVisitorType("");
     await logoutUser();
     setSignedInUser(null);
     setRole("guest");
@@ -1080,6 +1120,8 @@ export default function App() {
     recordVisit(user, nextRole);
     recordSignIn(user, nextRole);
     roleRef.current = nextRole;
+    // Signed in with a real account: no longer a visitor.
+    if (user && !user.isAnonymous) { saveVisitorType(""); setVisitorType(""); }
     if (nextRole === "admin") {
       // However the admin signed in (username, email, Google, or a page reload), they land on the
       // admin side, never in the student portal.
@@ -1116,7 +1158,9 @@ export default function App() {
               {isAdmin && <button type="button" className="ss-btn ss-btn-quiet" onClick={() => { setMenuOpen(false); handleSignOut(); }}>Sign out</button>}
               {signedInUser || isAdmin
                 ? <button type="button" className="ss-btn ss-btn-primary" onClick={openAccount}>{isAdmin ? "Admin panel" : "My Campus"}</button>
-                : <button type="button" className="ss-btn ss-btn-primary" onClick={openLogin}>Sign in</button>}
+                : visitorType
+                  ? <button type="button" className="ss-btn ss-btn-primary" onClick={openLogin} title="You're a visitor. Tap to sign in or change.">Visitor · {VISITOR_TYPES.find((item) => item.role === visitorType)?.short || "Visitor"}</button>
+                  : <button type="button" className="ss-btn ss-btn-primary" onClick={openLogin}>Sign in</button>}
             </div>
           </nav>
           <button type="button" className="ss-menu" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen} aria-controls="ss-nav" aria-label={menuOpen ? "Close menu" : "Open menu"}>
@@ -1331,12 +1375,12 @@ export default function App() {
       {noticeOpen && !mapState && !arOpen && !adminView && <PrivacyNotice onDone={() => setNoticeOpen(false)} />}
       <AnnouncementPopup hidden={Boolean(noticeOpen || route3d || mapState || arOpen || loginOpen || accountOpen || createAccountOpen || adminLoginOpen || adminView)} />
       <PolicyDialog />
-      {feedbackStart && <FeedbackDialog user={signedInUser} role={feedbackRole(role)} start={feedbackStart} onClose={() => setFeedbackStart(null)} />}
+      {feedbackStart && <FeedbackDialog user={signedInUser} role={feedbackRole(role, visitorType)} start={feedbackStart} onClose={() => setFeedbackStart(null)} />}
       <Suspense fallback={<ScreenLoading />}>
       {arOpen && <ArLiveView onClose={() => setArOpen(false)} initialStart={arOpen.start || ""} initialDestination={arOpen.end || ""} />}
       {route3d && <Route3DView start={route3d.start} end={route3d.end} onClose={() => setRoute3d(null)} onOpenMap={(key, mapFloor) => { setRoute3d(null); setMapState({ destination: key, floor: mapFloor }); }} />}
       {mapState && <CampusMap onClose={() => setMapState(null)} initialFloor={mapState.floor || 2} initialDestination={mapState.destination || null} initialEmergency={Boolean(mapState.emergency)} initialStart={mapState.start || null} />}
-      {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} onCreate={openCreateAccount} onSignedIn={(user) => { setSignedInUser(user); setLoginOpen(false); if (ADMIN_EMAIL && String(user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase()) { setRole("admin"); roleRef.current = "admin"; } openAccount(); }} onAdminSignedIn={(user) => { setLoginOpen(false); setSignedInUser(user); setRole("admin"); setAdminView("content"); }} />}
+      {loginOpen && <LoginModal visitorType={visitorType} onVisitor={(type) => { setVisitorType(type); setLoginOpen(false); }} onLeaveVisitor={leaveVisitor} onClose={() => setLoginOpen(false)} onCreate={openCreateAccount} onSignedIn={(user) => { setSignedInUser(user); setLoginOpen(false); if (ADMIN_EMAIL && String(user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase()) { setRole("admin"); roleRef.current = "admin"; } openAccount(); }} onAdminSignedIn={(user) => { setLoginOpen(false); setSignedInUser(user); setRole("admin"); setAdminView("content"); }} />}
       {accountOpen && signedInUser && !isAdmin && <MyCampus
         user={signedInUser}
         onClose={() => setAccountOpen(false)}
