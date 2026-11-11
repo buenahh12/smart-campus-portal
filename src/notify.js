@@ -2,7 +2,7 @@
 // (api/email-subscribers.mjs) through EmailJS, so no email keys are in the website: the
 // function checks that the caller is the administrator and keeps the EmailJS keys on the server.
 // Setup steps are at the top of that file.
-import { auth } from './firebase';
+import { appCheckToken, auth } from './firebase';
 
 const EMAIL_ENDPOINT = import.meta.env.VITE_EMAIL_ENDPOINT || 'https://smart-campus-portal-one.vercel.app/api/email-subscribers';
 
@@ -11,9 +11,11 @@ const EMAIL_ENDPOINT = import.meta.env.VITE_EMAIL_ENDPOINT || 'https://smart-cam
 export async function emailSubscribers({ subject, message }) {
   const idToken = await auth?.currentUser?.getIdToken();
   if (!idToken) throw new Error('Sign in again as the administrator to send email updates.');
+  // With App Check enforced, the function reads the subscriber list with this site's proof too.
+  const check = await appCheckToken();
   const response = await fetch(EMAIL_ENDPOINT, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}`, ...(check ? { 'X-Firebase-AppCheck': check } : {}) },
     body: JSON.stringify({ subject, message }),
   });
   const result = await response.json().catch(() => ({}));

@@ -9,10 +9,17 @@ export function cors(req, res) {
     res.setHeader("Vary", "Origin");
   }
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Firebase-AppCheck");
 }
 
 export const bearerToken = (req) => String(req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+
+// The website's App Check token, passed on when a function reads Firestore (needed once App
+// Check is enforced). Only something shaped like a JWT is forwarded.
+export const appCheckHeader = (req) => {
+  const token = String(req.headers["x-firebase-appcheck"] || "");
+  return token && token.length < 4096 && /^[\w-]+\.[\w-]+\.[\w-]+$/.test(token) ? { "X-Firebase-AppCheck": token } : {};
+};
 
 // The request must carry the administrator's Firebase ID token. Firebase checks the token's
 // signature and expiry and tells us whose account it is; only the admin account passes.

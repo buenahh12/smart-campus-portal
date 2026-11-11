@@ -14,7 +14,7 @@
 //
 // POST /api/email-subscribers   Authorization: Bearer <Firebase ID token>
 // body: { "subject": "...", "message": "..." }  ->  { configured, total, sent, failed, notSent }
-import { bearerToken, cors, isAdmin, jsonBody } from "./_admin.mjs";
+import { appCheckHeader, bearerToken, cors, isAdmin, jsonBody } from "./_admin.mjs";
 
 export const config = { maxDuration: 60 };
 
@@ -22,13 +22,13 @@ const SITE_URL = process.env.SITE_URL || "https://smart-campus-portal-one.vercel
 const TIME_BUDGET_MS = 50000; // stop before Vercel's 60 s limit and report what was not sent
 const pause = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 
-async function listSubscribers(idToken) {
+async function listSubscribers(idToken, extraHeaders = {}) {
   const project = process.env.VITE_FIREBASE_PROJECT_ID;
   const people = [];
   let pageToken = "";
   do {
     const url = `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/subscribers?pageSize=300${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ""}`;
-    const response = await fetch(url, { headers: { Authorization: `Bearer ${idToken}` } });
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${idToken}`, ...extraHeaders } });
     if (!response.ok) throw new Error(`Subscriber list: HTTP ${response.status}`);
     const page = await response.json();
     for (const item of page.documents || []) {
@@ -60,7 +60,7 @@ export default async function handler(req, res) {
 
   let subscribers;
   try {
-    subscribers = await listSubscribers(idToken);
+    subscribers = await listSubscribers(idToken, appCheckHeader(req));
   } catch {
     return res.status(502).json({ error: "The subscriber list could not be read." });
   }

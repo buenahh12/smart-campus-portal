@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
+import { getToken, initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 import { doc, getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, serverTimestamp, setDoc } from 'firebase/firestore';
 import { 
   getAuth, 
@@ -33,9 +33,18 @@ const app = hasFirebaseConfig ? initializeApp(firebaseConfig) : null;
 // counters or sign-in records. Turned on by VITE_APPCHECK_SITE_KEY (a reCAPTCHA v3 site key);
 // then enforce App Check for Cloud Firestore in the Firebase console.
 const APP_CHECK_SITE_KEY = import.meta.env.VITE_APPCHECK_SITE_KEY;
-if (app && APP_CHECK_SITE_KEY) {
-  initializeAppCheck(app, { provider: new ReCaptchaV3Provider(APP_CHECK_SITE_KEY), isTokenAutoRefreshEnabled: true });
-}
+const appCheck = app && APP_CHECK_SITE_KEY
+  ? initializeAppCheck(app, { provider: new ReCaptchaV3Provider(APP_CHECK_SITE_KEY), isTokenAutoRefreshEnabled: true })
+  : null;
+// This site's App Check proof, for our own server functions to pass on to Firestore ('' if off).
+export const appCheckToken = async () => {
+  if (!appCheck) return '';
+  try {
+    return (await getToken(appCheck)).token;
+  } catch {
+    return '';
+  }
+};
 // Offline copy on the phone: announcements, closures and room names last seen online still show
 // without internet, and visit counts made offline are sent when the connection is back. Where the
 // browser cannot store it (some private modes), Firestore keeps working online only.
