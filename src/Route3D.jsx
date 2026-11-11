@@ -7,7 +7,7 @@ import { isMainBuildingRoute } from "./building3d";
 import { usePublicCollection } from "./CampusUpdates";
 import { CMS_COLLECTIONS, isClosureActive } from "./cms";
 import { VOICE_LANGS, saveVoiceLang, savedVoiceLang, speak, stepStarts, stepText, stopSpeaking, unlockVoice, voiceSupported } from "./voiceGuide";
-import { BUILDING_NAME, PLACES, blockedAreas, blockedKeyOf, buildingOf, closureArea, mapAreaLabel, findRoute, floorLabel, placeByKey, placeTitle } from "./floorPlans";
+import { BUILDING_NAME, PLACES, blockedAreas, blockedKeyOf, routeWalkText, buildingOf, closureArea, mapAreaLabel, findRoute, floorLabel, placeByKey, placeTitle } from "./floorPlans";
 
 // Full-screen 3D directions: pick where you are and where you're going, and a glowing ball walks
 // the route through the 3D building, climbing the stairs, with the steps listed beside it.
@@ -110,7 +110,7 @@ export default function Route3DView({ start, end, onClose, onOpenMap }) {
         </div>}
         {from === to && <p className="route3d-note">You&apos;re already there.</p>}
         {showing && <>
-          <p className="route3d-summary"><b>{showing.minutes} min</b> · {showing.meters} m{showing.floors.length > 1 ? ` · ${showing.floors.length} floors` : ""}</p>
+          <p className="route3d-summary"><b>{showing.minutes} min</b> · {showing.meters} m · {routeWalkText(showing)}</p>
           <div className="route3d-actions">
             <button type="button" onClick={() => { if (view === "outside") setView("walk"); setReplay((count) => count + 1); }}><Icon name="arrow" size={15} /> Play again</button>
             {onOpenMap && <button type="button" onClick={() => onOpenMap(showing.end.key, showing.end.floor)}><Icon name="route" size={15} /> 2D map</button>}

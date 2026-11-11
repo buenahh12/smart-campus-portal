@@ -11,7 +11,29 @@
 export const BUILDING_NAME = "Main Academic Building";
 export const PLAN_WIDTH = 160;
 export const PLAN_HEIGHT = 100;
-export const METERS_PER_UNIT = 0.4; // estimate: the building is roughly 64 m wide
+// Drawing scale of the 3D model (plan units to metres). The posted plans are "not to scale", so
+// this only sets how big the model looks; real distances use WALK_METERS_PER_UNIT below.
+export const METERS_PER_UNIT = 0.4;
+// Real walking scale, measured on site (2026-11-11): main entrance to the High School Library is
+// 26 walking steps (about 18 m at ~0.68 m a step, stairs not counted) and 76 plan units of floor.
+// Used for every distance people see (2D, 3D, voice) and for placing the AR arrows.
+export const WALK_METERS_PER_UNIT = 0.235;
+// One floor of stairs (two flights and the landing), as walking distance shown in the steps.
+const STAIR_METERS = 8;
+// A normal walking step indoors, for "about 26 steps" (the way the walk was measured).
+export const STEP_METERS = 0.68;
+export const stepsFor = (meters) => Math.max(1, Math.round(meters / STEP_METERS));
+// Walking steps on the floors of a route (stairs not counted), and how many floors of stairs.
+export const routeWalk = (route) => {
+  const stairs = (route?.steps || []).filter((step) => step.stairs);
+  const floors = stairs.reduce((sum, step) => sum + Math.abs((step.toFloor ?? step.floor) - step.floor), 0);
+  const walking = Math.max(0, (route?.meters || 0) - floors * STAIR_METERS);
+  return { steps: stepsFor(walking), stairFloors: floors };
+};
+export const routeWalkText = (route) => {
+  const { steps, stairFloors } = routeWalk(route);
+  return `about ${steps} steps${stairFloors ? ` + ${stairFloors} floor${stairFloors === 1 ? "" : "s"} of stairs` : ""}`;
+};
 const STAIR_COST = 25; // one flight of stairs counts like ~10 m of walking
 const WALK_SPEED = 1.2; // metres per second
 
@@ -353,7 +375,7 @@ export function buildGraph(floors = FLOORS) {
     for (const item of plan.links || []) {
       const a = `${plan.floor}:${item.from}`;
       if (!nodes.has(a) || !nodes.has(item.to) || a === item.to) continue;
-      const w = Math.max(1, Number(item.meters) || 30) / METERS_PER_UNIT;
+      const w = Math.max(1, Number(item.meters) || 30) / WALK_METERS_PER_UNIT;
       edges.get(a).push({ to: item.to, w, tags: [], link: true });
       edges.get(item.to).push({ to: a, w, tags: [], link: true });
     }
@@ -605,8 +627,8 @@ function describe(path, via, start, end) {
       flush();
       const target = placeByKey(path[index + 1]);
       const otherBuilding = buildingOf(b.floor) !== buildingOf(a.floor);
-      steps.push({ floor: a.floor, toFloor: b.floor, link: true, kind: "walkway", text: `Walk to ${target ? placeTitle(target) : "the next building"}${otherBuilding ? ` in the ${buildingOf(b.floor)}` : ""}`, raw: edge.w * METERS_PER_UNIT });
-      walked += edge.w * METERS_PER_UNIT;
+      steps.push({ floor: a.floor, toFloor: b.floor, link: true, kind: "walkway", text: `Walk to ${target ? placeTitle(target) : "the next building"}${otherBuilding ? ` in the ${buildingOf(b.floor)}` : ""}`, raw: edge.w * WALK_METERS_PER_UNIT });
+      walked += edge.w * WALK_METERS_PER_UNIT;
       lastDirection = null;
       continue;
     }
@@ -619,19 +641,22 @@ function describe(path, via, start, end) {
         previousStep.toFloor = b.floor;
         previousStep.kind = b.floor > previousStep.floor ? "up" : "down";
         previousStep.text = `Take the ${stairsName} ${b.floor > previousStep.floor ? "up" : "down"} to the ${levelPhrase(b.floor)}`;
-        previousStep.raw += STAIR_COST * METERS_PER_UNIT;
-        walked += STAIR_COST * METERS_PER_UNIT;
+        previousStep.raw += STAIR_METERS;
+        walked += STAIR_METERS;
         lastDirection = null;
         offStairs = true;
         continue;
       }
-      steps.push({ floor: a.floor, stairsName, text: `Take the ${stairsName} ${b.floor > a.floor ? "up" : "down"} to the ${levelPhrase(b.floor)}`, stairs: true, kind: b.floor > a.floor ? "up" : "down", toFloor: b.floor, raw: STAIR_COST * METERS_PER_UNIT });
-      walked += STAIR_COST * METERS_PER_UNIT;
+      steps.push({ floor: a.floor, stairsName, text: `Take the ${stairsName} ${b.floor > a.floor ? "up" : "down"} to the ${levelPhrase(b.floor)}`, stairs: true, kind: b.floor > a.floor ? "up" : "down", toFloor: b.floor, raw: STAIR_METERS });
+      walked += STAIR_METERS;
       lastDirection = null;
       offStairs = true;
       continue;
     }
-    const meters = dist(a, b) * METERS_PER_UNIT;
+    // Into or out of the middle of a room or stairwell is not counted: walking starts and ends at
+    // the door, the way people count it (and the AR trail does).
+    const span = dist(a, b);
+    const meters = a.kind === "room" || b.kind === "room" ? 0 : span * WALK_METERS_PER_UNIT;
     walked += meters;
     const hallTag = edge.tags.find((tag) => !tag.includes("stair"));
     const hallId = hallTag?.split(":")[1] || (a.kind === "hall" && b.kind === "hall" ? a.hall : null);
@@ -646,7 +671,7 @@ function describe(path, via, start, end) {
       current.meters += meters;
       current.nodes.push(path[index + 1]);
     } else extra += meters;
-    if (meters > 0.01) lastDirection = direction;
+    if (span > 0.01) lastDirection = direction;
   }
   flush();
   const measured = steps.filter((step) => step.raw !== undefined);

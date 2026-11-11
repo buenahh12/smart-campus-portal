@@ -13,6 +13,7 @@ import {
   PLAN_WIDTH,
   blockedAreas,
   blockedKeyOf,
+  routeWalkText,
   closureArea,
   findNearestExit,
   findRoute,
@@ -680,7 +681,7 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
                 ? <>
                   <div className="map-summary">
                     <b>{route.minutes} min</b>
-                    <span>{route.meters} m{route.floors.length > 1 ? ` · ${route.floors.length} floors` : ""}</span>
+                    <span>{route.meters} m · {routeWalkText(route)}</span>
                     {route.path.every((id) => buildingOf(graphNode(id)?.floor) === BUILDING_NAME) && <button type="button" className="map-3d-button" onClick={() => window.dispatchEvent(new CustomEvent("sscai:route3d", { detail: { start: route.start.key, end: route.end.key } }))}><Icon name="cube" size={15} /> Show in 3D</button>}
                     {!emergency && <SaveRouteButton className="map-3d-button" from={route.start.key} to={route.end.key} />}
                   </div>
