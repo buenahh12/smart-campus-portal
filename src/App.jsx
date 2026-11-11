@@ -947,6 +947,12 @@ export default function App() {
     window.addEventListener("sscai:route3d", open);
     return () => window.removeEventListener("sscai:route3d", open);
   }, []);
+  // "Sign in" from a Save route button: close the map, 3D or AR and open the sign-in window.
+  useEffect(() => {
+    const open = () => { setMapState(null); setRoute3d(null); setArOpen(false); setLoginOpen(true); };
+    window.addEventListener("sscai:login", open);
+    return () => window.removeEventListener("sscai:login", open);
+  }, []);
   const [feedbackStart, setFeedbackStart] = useState(null); // open feedback form, with what it is about
   useEffect(() => {
     const open = (event) => setFeedbackStart(event.detail || {});
@@ -1327,14 +1333,20 @@ export default function App() {
       <PolicyDialog />
       {feedbackStart && <FeedbackDialog user={signedInUser} role={feedbackRole(role)} start={feedbackStart} onClose={() => setFeedbackStart(null)} />}
       <Suspense fallback={<ScreenLoading />}>
-      {arOpen && <ArLiveView onClose={() => setArOpen(false)} />}
+      {arOpen && <ArLiveView onClose={() => setArOpen(false)} initialStart={arOpen.start || ""} initialDestination={arOpen.end || ""} />}
       {route3d && <Route3DView start={route3d.start} end={route3d.end} onClose={() => setRoute3d(null)} onOpenMap={(key, mapFloor) => { setRoute3d(null); setMapState({ destination: key, floor: mapFloor }); }} />}
-      {mapState && <CampusMap onClose={() => setMapState(null)} initialFloor={mapState.floor || 2} initialDestination={mapState.destination || null} initialEmergency={Boolean(mapState.emergency)} />}
+      {mapState && <CampusMap onClose={() => setMapState(null)} initialFloor={mapState.floor || 2} initialDestination={mapState.destination || null} initialEmergency={Boolean(mapState.emergency)} initialStart={mapState.start || null} />}
       {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} onCreate={openCreateAccount} onSignedIn={(user) => { setSignedInUser(user); setLoginOpen(false); if (ADMIN_EMAIL && String(user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase()) { setRole("admin"); roleRef.current = "admin"; } openAccount(); }} onAdminSignedIn={(user) => { setLoginOpen(false); setSignedInUser(user); setRole("admin"); setAdminView("content"); }} />}
       {accountOpen && signedInUser && !isAdmin && <MyCampus
         user={signedInUser}
         onClose={() => setAccountOpen(false)}
         onSignOut={handleSignOut}
+        onOpenRoute={(how, from, to) => {
+          setAccountOpen(false);
+          if (how === "3d") setRoute3d({ start: from, end: to });
+          else if (how === "ar") setArOpen({ start: from, end: to });
+          else setMapState({ start: from, destination: to, floor: placeByKey(to)?.floor || 2 });
+        }}
         onShowMap={(place) => { setAccountOpen(false); setMapState({ destination: place?.mapKey || findPlaceKey(place?.room, place?.name), floor: place?.floor }); }}
         onShow3D={(place) => {
           setAccountOpen(false);

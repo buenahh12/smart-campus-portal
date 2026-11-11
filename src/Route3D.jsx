@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Icon from "./Icon";
 import "./analytics.css";
 import Dollhouse3D from "./Dollhouse3D";
+import { SaveRouteButton } from "./savedRoutes";
 import { isMainBuildingRoute } from "./building3d";
 import { usePublicCollection } from "./CampusUpdates";
 import { CMS_COLLECTIONS, isClosureActive } from "./cms";
@@ -113,6 +114,7 @@ export default function Route3DView({ start, end, onClose, onOpenMap }) {
           <div className="route3d-actions">
             <button type="button" onClick={() => { if (view === "outside") setView("walk"); setReplay((count) => count + 1); }}><Icon name="arrow" size={15} /> Play again</button>
             {onOpenMap && <button type="button" onClick={() => onOpenMap(showing.end.key, showing.end.floor)}><Icon name="route" size={15} /> 2D map</button>}
+            <SaveRouteButton from={showing.start.key} to={showing.end.key} />
           </div>
           {voiceSupported() && <div className="route3d-voice" role="group" aria-label="Voice guide">
             <span><Icon name="bot" size={15} /> Voice guide</span>

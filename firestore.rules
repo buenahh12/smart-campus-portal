@@ -153,13 +153,14 @@ service cloud.firestore {
     // Personal profile: saved places and preferences. Only its owner (the uid in
     // their verified JWT) can read or write it.
     function validProfile() {
-      return data().keys().hasOnly(['name', 'role', 'gradeLevel', 'section', 'savedPlaces', 'prefs', 'updatedAt'])
+      return data().keys().hasOnly(['name', 'role', 'gradeLevel', 'section', 'savedPlaces', 'savedRoutes', 'prefs', 'updatedAt'])
         && data().updatedAt == request.time
         && (!('name' in data()) || (data().name is string && data().name.size() <= 80))
         && (!('role' in data()) || data().role in ['Student', 'Faculty / Staff', 'Parent / Guardian', 'Visitor'])
         && (!('gradeLevel' in data()) || data().gradeLevel in ['', 'Nursery', 'Kindergarten', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'])
         && (!('section' in data()) || (data().section is string && data().section.size() <= 40))
         && (!('savedPlaces' in data()) || (data().savedPlaces is list && data().savedPlaces.size() <= 30))
+        && (!('savedRoutes' in data()) || (data().savedRoutes is list && data().savedRoutes.size() <= 20))
         && (!('prefs' in data()) || (data().prefs is map
           && data().prefs.keys().hasOnly(['speakAnswers', 'allClosureAlerts'])));
     }
@@ -230,11 +231,29 @@ service cloud.firestore {
     // Feedback: anyone may send one short message (no sign-in needed). A signed-in sender's uid
     // and email must be their own, and the email is optional. Only the administrator can read,
     // mark (status only) or delete feedback.
+    // The quick questions in the feedback form (see FEEDBACK_SURVEY in src/cms.js).
+    function validSurvey(s) {
+      return s is map
+        && s.keys().hasOnly(['ease', 'found', 'directions', 'sibot', 'speed', 'recommend', 'used', 'improve'])
+        && s.get('ease', 0) is int && s.get('ease', 0) >= 0 && s.get('ease', 0) <= 5
+        && s.get('found', '') in ['', 'yes', 'partly', 'no']
+        && s.get('directions', '') in ['', 'yes', 'partly', 'no', 'unused']
+        && s.get('sibot', '') in ['', 'yes', 'little', 'no', 'unused']
+        && s.get('speed', '') in ['', 'fast', 'okay', 'slow']
+        && s.get('recommend', '') in ['', 'yes', 'maybe', 'no']
+        && s.get('used', []) is list && s.get('used', []).size() <= 8
+        && s.get('used', []).hasOnly(['map', '3d', 'ar', 'sibot', 'updates', 'mycampus', 'voice', 'offline'])
+        && s.get('improve', []) is list && s.get('improve', []).size() <= 8
+        && s.get('improve', []).hasOnly(['easier', 'faster', 'rooms', 'ar', '3d', 'tagalog', 'sibot', 'look']);
+    }
+
     match /feedback/{id} {
-      allow create: if data().keys().hasOnly(['kind', 'rating', 'message', 'page', 'role', 'uid', 'email', 'status', 'createdAt'])
-        && data().kind in ['directions', 'room', 'idea', 'problem', 'other']
+      allow create: if data().keys().hasOnly(['kind', 'rating', 'message', 'page', 'role', 'uid', 'email', 'status', 'createdAt', 'survey'])
+        && data().kind in ['directions', 'room', 'idea', 'problem', 'other', 'survey']
         && data().rating is int && data().rating >= 0 && data().rating <= 3
-        && text('message', true, 1000) && text('page', false, 80) && text('role', false, 30)
+        && text('message', false, 1000)
+        && (data().message.size() > 0 || 'survey' in data())
+        && (!('survey' in data()) || validSurvey(data().survey)) && text('page', false, 80) && text('role', false, 30)
         && data().status == 'new' && data().createdAt == request.time
         && (data().uid == '' || (request.auth != null && data().uid == request.auth.uid))
         && (data().email == '' || (request.auth != null && data().email == request.auth.token.get('email', '')));

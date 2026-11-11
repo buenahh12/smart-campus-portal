@@ -7,6 +7,7 @@ import { inAppBrowserName } from "./firebase";
 import { usePlanVersion } from "./usePlan";
 import { FLOORS, METERS_PER_UNIT as M, blockedAreas, blockedKeyOf, buildingOf, closureArea, mapAreaLabel, findRoute, floorLabel, graphNode, placeByKey, placeTitle } from "./floorPlans";
 import { VOICE_LANGS, saveVoiceLang, savedVoiceLang, speak, stepText, stopSpeaking, unlockVoice, voiceSupported } from "./voiceGuide";
+import { SaveRouteButton } from "./savedRoutes";
 import "./ar.css";
 
 // AR Live View in the browser. Like the SSCA NAVI AR app, nothing knows where you are by GPS:
@@ -250,10 +251,10 @@ function chromeLink(fromKey, toKey) {
   return `intent://${path}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(`https://${path}`)};end`;
 }
 
-export default function ArLiveView({ onClose, initialDestination = "" }) {
+export default function ArLiveView({ onClose, initialDestination = "", initialStart = "" }) {
   const closures = usePublicCollection(CMS_COLLECTIONS.closures);
   const planVersion = usePlanVersion();
-  const [fromKey, setFromKey] = useState(readStart);
+  const [fromKey, setFromKey] = useState(() => linkPlace("from") || (placeByKey(initialStart)?.key) || readStart());
   const [toKey, setToKey] = useState(() => linkPlace("to") || initialDestination || "");
   const inApp = /Android/i.test(navigator.userAgent) ? inAppBrowserName() : "";
   const [mode, setMode] = useState("setup"); // setup | xr | compass
@@ -684,6 +685,7 @@ export default function ArLiveView({ onClose, initialDestination = "" }) {
             : <button type="button" className="ar-live-button" onClick={recenter}>Re-center</button>}
         <button type="button" className="ar-live-button" onClick={clear}>Clear</button>
       </div>
+      {fromKey && toKey && fromKey !== toKey && <div className="ar-live-save"><SaveRouteButton className="ar-live-button ar-live-small" from={fromKey} to={toKey} /></div>}
       {inApp && mode === "setup" && !welcome && <div className="ar-live-chrome">
         <span>{inApp} can&apos;t do full AR. Open this in Chrome so the arrows stay on the floor as you walk.</span>
         <a className="ar-live-button ar-live-small" href={chromeLink(fromKey, toKey)}>Open in Chrome</a>

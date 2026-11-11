@@ -347,13 +347,31 @@ export const FEEDBACK_KINDS = [
   { value: 'problem', label: "Something isn't working" },
   { value: 'other', label: 'Something else' },
 ];
+// Quick questions in the feedback form (all optional). Saved as feedback.survey; the allowed
+// answers are checked again in firestore.rules, so keep the two lists the same.
+export const FEEDBACK_SURVEY = [
+  { key: 'ease', question: 'How easy was SSCAI NAVI to use?', options: [[5, 'Very easy'], [4, 'Easy'], [3, 'Okay'], [2, 'Hard'], [1, 'Very hard']] },
+  { key: 'found', question: 'Did you find the room or place you were looking for?', options: [['yes', 'Yes'], ['partly', 'Partly'], ['no', 'No']] },
+  { key: 'directions', question: 'Were the directions clear?', options: [['yes', 'Yes'], ['partly', 'Partly'], ['no', 'No'], ['unused', "Didn't use"]] },
+  { key: 'sibot', question: 'Did SiBot (the chat helper) help you?', options: [['yes', 'Yes'], ['little', 'A little'], ['no', 'No'], ['unused', "Didn't use"]] },
+  { key: 'speed', question: 'How fast did it load on your phone?', options: [['fast', 'Fast'], ['okay', 'Okay'], ['slow', 'Slow']] },
+  { key: 'recommend', question: 'Would you tell a classmate or friend to use it?', options: [['yes', 'Yes'], ['maybe', 'Maybe'], ['no', 'No']] },
+];
+export const FEEDBACK_FEATURES = [
+  ['map', '2D floor plan'], ['3d', '3D directions'], ['ar', 'AR live view'], ['sibot', 'SiBot'],
+  ['updates', 'Campus updates'], ['mycampus', 'My Campus'], ['voice', 'Voice guide'], ['offline', 'Offline / app'],
+];
+export const FEEDBACK_IMPROVE = [
+  ['easier', 'Make it easier'], ['faster', 'Make it faster'], ['rooms', 'More rooms and places'], ['ar', 'Better AR'],
+  ['3d', 'Better 3D'], ['tagalog', 'More Tagalog'], ['sibot', 'Smarter SiBot'], ['look', 'Nicer look'],
+];
 export const FEEDBACK_RATINGS = [
   { value: 3, face: '😀', label: 'Love it' },
   { value: 2, face: '🙂', label: "It's okay" },
   { value: 1, face: '🙁', label: 'Not good' },
 ];
 
-export function sendFeedback({ kind, rating = 0, message, page = '', user = null, role = '', replyOk = false }) {
+export function sendFeedback({ kind, rating = 0, message, page = '', user = null, role = '', replyOk = false, survey = null }) {
   if (!db) return Promise.reject(notConfigured());
   const signedIn = Boolean(user && !user.isAnonymous);
   return addDoc(collection(db, 'feedback'), {
@@ -364,6 +382,7 @@ export function sendFeedback({ kind, rating = 0, message, page = '', user = null
     role: String(role || (user?.isAnonymous ? 'Visitor (no account)' : signedIn ? 'Signed in' : 'Guest')).slice(0, 30),
     uid: user?.uid || '',
     email: replyOk && signedIn ? user.email || '' : '',
+    ...(survey && Object.keys(survey).length ? { survey } : {}),
     status: 'new',
     createdAt: serverTimestamp(),
   });

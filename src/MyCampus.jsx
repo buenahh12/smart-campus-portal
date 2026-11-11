@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import Icon from "./Icon";
 import { usePublicCollection, visibleAnnouncements } from "./CampusUpdates";
 import { CMS_COLLECTIONS, GRADE_LEVELS, MAX_SAVED_PLACES, MAX_SECTION_LENGTH, USER_ROLES, isClosureActive, placeKey, saveProfile, setEmailUpdates, watchProfile, watchSubscription } from "./cms";
-import { BUILDING_NAME, PLACES, buildingOf, classroomOf, floorLabel as planFloorLabel, placeByKey, placeTitle, sectionsOf } from "./floorPlans";
+import { MAX_SAVED_ROUTES, parseRouteId } from "./savedRoutes";
+import { BUILDING_NAME, PLACES, blockedAreas, buildingOf, findRoute, classroomOf, floorLabel as planFloorLabel, placeByKey, placeTitle, sectionsOf } from "./floorPlans";
 import { searchPlace } from "./placeSearch";
 import { openFeedback } from "./Feedback";
 import { refreshEmailConfirmed, sendConfirmationEmail, wantsEmailUpdates, wishForEmailUpdates } from "./firebase";
@@ -89,7 +90,7 @@ const statusTone = (status) => (status === "Available" ? "good" : status === "In
 
 // Personal navigation hub for signed-in users: saved places, route alerts for
 // those places, and preferences, all stored on their account in Firestore.
-export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D, renderAssistant }) {
+export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D, onOpenRoute = () => {}, renderAssistant }) {
   const [profile, setProfile] = useState(); // undefined while loading, null if never saved
   const [profileError, setProfileError] = useState("");
   const [search, setSearch] = useState("");
@@ -198,6 +199,18 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
     }
   };
 
+  // Saved routes, checked against today's closures so a blocked one says so.
+  const savedRouteIds = profile?.savedRoutes || [];
+  const blockedNow = blockedAreas(activeClosures);
+  const myRoutes = savedRouteIds.map((id) => {
+    const { from, to } = parseRouteId(id);
+    const start = placeByKey(from);
+    const end = placeByKey(to);
+    const route = start && end ? findRoute(from, to, blockedNow) : null;
+    return { id, from, to, start, end, route };
+  });
+  const removeRoute = (id) => update({ savedRoutes: savedRouteIds.filter((item) => item !== id) });
+
   const toggleSaved = (place) => {
     const key = place.saveKey;
     if (savedKeys.includes(key)) {
@@ -270,6 +283,26 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
             <div className="student-card-heading"><span className="mc-card-icon" aria-hidden="true"><Icon name="heart" size={22} /></span><div><p className="kicker">SAVED TO YOUR ACCOUNT</p><h2>My places</h2></div><span className="pending-badge">{savedPlaces.length} / {MAX_SAVED_PLACES}</span></div>
             <div className="mc-place-list">
               {savedPlaces.length ? savedPlaces.map((place) => placeRow(place, { showSave: false })) : <p className="updates-empty">{profile === undefined && !profileError ? "Loading your places…" : "Nothing saved yet. Search for a room or office above and tap Save. Your places follow you on any device you sign in to."}</p>}
+            </div>
+          </section>
+          <section className="student-card mc-routes-card tone-lime">
+            <div className="student-card-heading"><span className="mc-card-icon" aria-hidden="true"><Icon name="route" size={22} /></span><div><p className="kicker">SAVED TO YOUR ACCOUNT</p><h2>My routes</h2></div><span className="pending-badge">{myRoutes.length} / {MAX_SAVED_ROUTES}</span></div>
+            <div className="mc-place-list">
+              {myRoutes.length ? myRoutes.map(({ id, from, to, start, end, route }) => <article className={`mc-place mc-route ${route?.blocked ? "affected" : ""}`} key={id}>
+                <div className="mc-place-info">
+                  {start && end ? <b>{placeTitle(start)} <span aria-hidden="true">→</span><span className="sr-only"> to </span> {placeTitle(end)}</b> : <b>A place on this route is no longer on the map</b>}
+                  {start && end && <small>{planFloorLabel(start.floor)} to {planFloorLabel(end.floor)}{route && !route.blocked ? ` · ${route.minutes} min · ${route.meters} m` : ""}</small>}
+                  {route?.blocked && <span className="mc-place-alert"><Icon name="alert" size={13} /> Closed right now: no open way. Ask school staff.</span>}
+                </div>
+                <div className="mc-place-actions">
+                  {start && end && <>
+                    <button type="button" onClick={() => onOpenRoute("2d", from, to)} aria-label={`Open this route on the 2D floor plan`}><Icon name="route" size={14} /> 2D</button>
+                    {buildingOf(start.floor) === BUILDING_NAME && buildingOf(end.floor) === BUILDING_NAME && <button type="button" onClick={() => onOpenRoute("3d", from, to)} aria-label="Open this route in 3D"><Icon name="cube" size={14} /> 3D</button>}
+                    <button type="button" onClick={() => onOpenRoute("ar", from, to)} aria-label="Open this route in AR live view"><Icon name="scan" size={14} /> AR</button>
+                  </>}
+                  <button type="button" className="remove" onClick={() => removeRoute(id)} aria-label="Remove this saved route">Remove</button>
+                </div>
+              </article>) : <p className="updates-empty">{profile === undefined && !profileError ? "Loading your routes…" : "No saved routes yet. Open a route on the 2D floor plan, in 3D or in AR and tap ☆ Save route. It shows up here, on any device you sign in to."}</p>}
             </div>
           </section>
           <section className="student-card mc-prefs-card tone-sky">

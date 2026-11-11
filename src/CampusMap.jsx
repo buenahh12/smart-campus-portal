@@ -4,6 +4,7 @@ import { usePublicCollection } from "./CampusUpdates";
 import { CMS_COLLECTIONS, isClosureActive } from "./cms";
 import { usePlanVersion } from "./usePlan";
 import { openFeedback } from "./Feedback";
+import { SaveRouteButton } from "./savedRoutes";
 import {
   BUILDING_NAME,
   FLOORS,
@@ -544,10 +545,10 @@ export const placeOptions = () => FLOORS.map(({ floor }) => ({
     .sort((a, b) => (a.type === "exit") - (b.type === "exit") || placeTitle(a).localeCompare(placeTitle(b), undefined, { numeric: true })),
 }));
 
-export default function CampusMap({ onClose, initialFloor = 2, initialDestination = null, initialEmergency = false }) {
+export default function CampusMap({ onClose, initialFloor = 2, initialDestination = null, initialEmergency = false, initialStart = null }) {
   const closures = usePublicCollection(CMS_COLLECTIONS.closures);
   const planVersion = usePlanVersion();
-  const [startKey, setStartKey] = useState(readStart);
+  const [startKey, setStartKey] = useState(() => (initialStart && placeByKey(initialStart) ? initialStart : readStart()));
   const [destKey, setDestKey] = useState(initialDestination);
   const [emergency, setEmergency] = useState(initialEmergency);
   const [selectedKey, setSelectedKey] = useState(initialDestination);
@@ -681,6 +682,7 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
                     <b>{route.minutes} min</b>
                     <span>{route.meters} m{route.floors.length > 1 ? ` · ${route.floors.length} floors` : ""}</span>
                     {route.path.every((id) => buildingOf(graphNode(id)?.floor) === BUILDING_NAME) && <button type="button" className="map-3d-button" onClick={() => window.dispatchEvent(new CustomEvent("sscai:route3d", { detail: { start: route.start.key, end: route.end.key } }))}><Icon name="cube" size={15} /> Show in 3D</button>}
+                    {!emergency && <SaveRouteButton className="map-3d-button" from={route.start.key} to={route.end.key} />}
                   </div>
                   {emergency && <p className="map-alert">In a real emergency, stay calm and follow your teacher and school staff.</p>}
                   <ol className="map-steps">
