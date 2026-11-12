@@ -222,7 +222,7 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
     }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap; // soft shadows come from shadow.radius
     element.appendChild(renderer.domElement);
 
     const world = new THREE.Scene();

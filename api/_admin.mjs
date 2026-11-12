@@ -24,8 +24,8 @@ export const appCheckHeader = (req) => {
 // The request must carry the administrator's Firebase ID token. Firebase checks the token's
 // signature and expiry and tells us whose account it is; only the admin account passes.
 export async function isAdmin(idToken) {
-  const apiKey = process.env.VITE_FIREBASE_API_KEY;
-  const adminEmail = (process.env.VITE_ADMIN_EMAIL || "").toLowerCase();
+  const apiKey = (process.env.VITE_FIREBASE_API_KEY || "").trim();
+  const adminEmail = (process.env.VITE_ADMIN_EMAIL || "").trim().toLowerCase();
   if (!idToken || idToken.length > 4096 || !apiKey || !adminEmail) return false;
   try {
     const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {

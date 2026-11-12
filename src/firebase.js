@@ -17,13 +17,17 @@ import {
   signOut
 } from 'firebase/auth';
 
+// Settings from Vercel, without stray spaces or line breaks (a pasted key once ended in a
+// line break, which made reCAPTCHA refuse it).
+const clean = (value) => (typeof value === 'string' ? value.trim() : value);
+
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
+  apiKey: clean(import.meta.env.VITE_FIREBASE_API_KEY),
+  authDomain: clean(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN),
+  projectId: clean(import.meta.env.VITE_FIREBASE_PROJECT_ID),
+  storageBucket: clean(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET),
+  messagingSenderId: clean(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID),
+  appId: clean(import.meta.env.VITE_FIREBASE_APP_ID)
 };
 
 const hasFirebaseConfig = Object.values(firebaseConfig).every(Boolean);
@@ -32,11 +36,11 @@ const app = hasFirebaseConfig ? initializeApp(firebaseConfig) : null;
 // App Check: only this website may use the database, so scripts cannot flood the visit
 // counters or sign-in records. Turned on by VITE_APPCHECK_SITE_KEY (the reCAPTCHA / Fraud Defense site key);
 // then enforce App Check for Cloud Firestore in the Firebase console.
-const APP_CHECK_SITE_KEY = import.meta.env.VITE_APPCHECK_SITE_KEY;
+const APP_CHECK_SITE_KEY = clean(import.meta.env.VITE_APPCHECK_SITE_KEY);
 const appCheck = app && APP_CHECK_SITE_KEY
   ? initializeAppCheck(app, {
     // Fraud Defense (reCAPTCHA Enterprise) by default; VITE_APPCHECK_PROVIDER=classic for the old v3.
-    provider: import.meta.env.VITE_APPCHECK_PROVIDER === 'classic' ? new ReCaptchaV3Provider(APP_CHECK_SITE_KEY) : new ReCaptchaEnterpriseProvider(APP_CHECK_SITE_KEY),
+    provider: clean(import.meta.env.VITE_APPCHECK_PROVIDER) === 'classic' ? new ReCaptchaV3Provider(APP_CHECK_SITE_KEY) : new ReCaptchaEnterpriseProvider(APP_CHECK_SITE_KEY),
     isTokenAutoRefreshEnabled: true,
   })
   : null;
@@ -112,7 +116,7 @@ export const requestPasswordReset = (email) => {
 };
 // There is exactly one administrator: the configured admin account (admin1).
 // firestore.rules enforces the same single account on the server.
-const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL || '').toLowerCase();
+const ADMIN_EMAIL = (clean(import.meta.env.VITE_ADMIN_EMAIL) || '').toLowerCase();
 export const isAdminToken = (token) => Boolean(ADMIN_EMAIL) && String(token.claims.email || '').toLowerCase() === ADMIN_EMAIL;
 
 export const loginAsAdmin = async ({ email, password }) => {

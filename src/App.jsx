@@ -220,8 +220,8 @@ function useReveal() {
 }
 
 // The administrator's username (VITE_ADMIN_USERNAME, "admin1" by default) and Firebase email.
-const ADMIN_USERNAME = (import.meta.env.VITE_ADMIN_USERNAME || "admin1").toLowerCase();
-const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || "";
+const ADMIN_USERNAME = (import.meta.env.VITE_ADMIN_USERNAME || "admin1").trim().toLowerCase();
+const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL || "").trim();
 
 function LoginModal({ onClose, onCreate, onSignedIn = () => {}, onAdminSignedIn = () => {}, onVisitor = () => {}, visitorType = "", onLeaveVisitor = () => {} }) {
   const [visitorStep, setVisitorStep] = useState(false);
