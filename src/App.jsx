@@ -68,7 +68,7 @@ function OfflinePanel({ offlineApp }) {
     <div className="ss-offline-lists">
       <div>
         <h4>Works offline</h4>
-        <ul><li>2D floor plans and directions</li><li>Routes across floors and stairs</li><li>3D dollhouse</li><li>AR live view</li><li>Nearest exit and SiBot&apos;s answers</li></ul>
+        <ul><li>2D floor plans and directions</li><li>Routes across floors and stairs</li><li>3D Guide View</li><li>AR live view</li><li>Nearest exit and SiBot&apos;s answers</li></ul>
       </div>
       <div>
         <h4>Needs internet</h4>
@@ -806,8 +806,8 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
     } else if (hasAny(["2d", "floor plan", "floor map", "directions", "navigate"])) {
       answer = "Opening the 2D floor plan. Tap any room to get directions, or use Route to the nearest exit.";
       onOpenMap?.({});
-    } else if (hasAny(["3d", "dollhouse", "building map", "campus map"])) {
-      answer = "The 3D campus map is in Explore the Platform. Choose a floor to look around the campus buildings.";
+    } else if (hasAny(["3d", "guide view", "dollhouse", "building map", "campus map"])) {
+      answer = "The 3D Guide View is in the 3D & AR section. Tap a floor number to look inside the building, or tap Watch a route in 3D to follow the green pin.";
       onNavigate("features");
     } else if (hasAny(["address", "where is the school", "school located", "where are you located", "campus location", "location of the school", "directions to the school", "how do i get to school"])) {
       answer = "Saint Simon of Cyrene Academy, Inc. is at N.I.A. Road / 39 Reyes Compound, Carsadang Bago II, Imus, Cavite, Philippines. I've scrolled to the map so you can get directions.";
@@ -1196,7 +1196,7 @@ export default function App() {
             <div className="ss-ways" data-reveal>
               <article className="ss-way" id="features">
                 <span className="ss-way-icon" aria-hidden="true"><Icon name="cube" size={26} /></span>
-                <h3>3D dollhouse</h3>
+                <h3>3D Guide View</h3>
                 <p>See the school in 3D. Tap a floor number to look inside, then open the map to get directions.</p>
                 <div className="floor-selector">
                   <div className="floor-head">
