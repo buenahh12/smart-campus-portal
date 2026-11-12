@@ -39,8 +39,10 @@ const app = hasFirebaseConfig ? initializeApp(firebaseConfig) : null;
 const APP_CHECK_SITE_KEY = clean(import.meta.env.VITE_APPCHECK_SITE_KEY);
 const appCheck = app && APP_CHECK_SITE_KEY
   ? initializeAppCheck(app, {
-    // Fraud Defense (reCAPTCHA Enterprise) by default; VITE_APPCHECK_PROVIDER=classic for the old v3.
-    provider: clean(import.meta.env.VITE_APPCHECK_PROVIDER) === 'classic' ? new ReCaptchaV3Provider(APP_CHECK_SITE_KEY) : new ReCaptchaEnterpriseProvider(APP_CHECK_SITE_KEY),
+    // reCAPTCHA v3 (classic): the site key was made on the classic reCAPTCHA page, and Google
+    // refuses it on the Enterprise path (400 on recaptcha/enterprise/clr). For a Fraud Defense
+    // (Enterprise) key from Google Cloud, set VITE_APPCHECK_PROVIDER=enterprise.
+    provider: clean(import.meta.env.VITE_APPCHECK_PROVIDER) === 'enterprise' ? new ReCaptchaEnterpriseProvider(APP_CHECK_SITE_KEY) : new ReCaptchaV3Provider(APP_CHECK_SITE_KEY),
     isTokenAutoRefreshEnabled: true,
   })
   : null;
