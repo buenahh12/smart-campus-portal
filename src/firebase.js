@@ -36,7 +36,11 @@ const app = hasFirebaseConfig ? initializeApp(firebaseConfig) : null;
 // App Check: only this website may use the database, so scripts cannot flood the visit
 // counters or sign-in records. Turned on by VITE_APPCHECK_SITE_KEY (the reCAPTCHA / Fraud Defense site key);
 // then enforce App Check for Cloud Firestore in the Firebase console.
-const APP_CHECK_SITE_KEY = clean(import.meta.env.VITE_APPCHECK_SITE_KEY);
+// The site key is public (every visitor's browser sees it), so it lives here rather than in
+// Vercel: pasting it there kept going wrong (I and l look alike, the copy button adds a line
+// break). Checked with Google on 2026-11-12. VITE_APPCHECK_SITE_KEY="off" turns App Check off.
+const SSCAI_RECAPTCHA_SITE_KEY = '6LeGPRsuAAAAAKd_7Ix0LPwVDxGmRxMYKMhxFRNQ';
+const APP_CHECK_SITE_KEY = clean(import.meta.env.VITE_APPCHECK_SITE_KEY) === 'off' ? '' : SSCAI_RECAPTCHA_SITE_KEY;
 const appCheck = app && APP_CHECK_SITE_KEY
   ? initializeAppCheck(app, {
     // reCAPTCHA v3 (classic): the site key was made on the classic reCAPTCHA page, and Google
