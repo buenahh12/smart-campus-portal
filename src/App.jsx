@@ -50,74 +50,20 @@ function AppStatus({ online, updateReady, onUpdate }) {
   return null;
 }
 
-// "Download the app?" offer, a few seconds after the page opens. Android Chrome installs for real;
-// iPhone Safari has no install button, so it shows the two steps; Messenger and other in-app
-// browsers cannot install, so it hands the page to Chrome first. "Not now" waits a week.
-const INSTALL_SNOOZE_KEY = "campus-install-snoozed-until";
-const installSnoozed = () => {
-  try {
-    return Number(localStorage.getItem(INSTALL_SNOOZE_KEY) || 0) > Date.now();
-  } catch {
-    return false;
-  }
-};
-
-function InstallPrompt({ offlineApp, hidden }) {
-  const [ready, setReady] = useState(false);
-  const [closed, setClosed] = useState(installSnoozed);
-  const inApp = /Android/i.test(navigator.userAgent) ? inAppBrowserName() : "";
-  useEffect(() => {
-    const timer = window.setTimeout(() => setReady(true), 4000);
-    return () => window.clearTimeout(timer);
-  }, []);
-  const kind = offlineApp.canInstall ? "android" : offlineApp.iosInstallTip ? "ios" : inApp ? "inapp" : "";
-  if (!ready || closed || hidden || !kind) return null;
-  const notNow = () => {
-    try { localStorage.setItem(INSTALL_SNOOZE_KEY, String(Date.now() + 7 * 24 * 60 * 60 * 1000)); } catch { /* storage unavailable */ }
-    setClosed(true);
-  };
-  // Close the card at once; the browser's own install window takes over from here.
-  const download = () => {
-    setClosed(true);
-    offlineApp.install();
-  };
-  return <aside className="install-prompt" role="dialog" aria-labelledby="install-prompt-title">
-    <img src={asset("icon-192.png")} alt="" width="56" height="56" />
-    <div>
-      <h2 id="install-prompt-title">Download the SSCAI NAVI app?</h2>
-      <p>Floor plans, directions and AR live view work at school even without Wi-Fi. About 1 MB.</p>
-      {kind === "ios" && <ol><li>Tap <b>Share</b> <span aria-hidden="true">⬆</span> at the bottom of Safari.</li><li>Tap <b>Add to Home Screen</b>.</li></ol>}
-      {kind === "inapp" && <p className="install-prompt-note">{inApp} can&apos;t install apps. Open this page in Chrome, then tap Download.</p>}
-      <div className="install-prompt-actions">
-        {kind === "android" && <button type="button" className="primary" onClick={download}>Download app</button>}
-        {kind === "inapp" && <a className="primary" href={chromeIntentFor(window.location.href.split("#")[0])}>Open in Chrome</a>}
-        <button type="button" onClick={notNow}>{kind === "ios" ? "Got it" : "Not now"}</button>
-      </div>
-    </div>
-  </aside>;
-}
-
 // Fourth panel of "Three ways to find your way": offline mode, always visible. Says whether the
-// site is saved on this device, what works without internet, and how to get the app here.
+// site is saved on this device and what works without internet. (No install button: the site
+// saves itself for offline use when opened once.)
 function OfflinePanel({ offlineApp }) {
-  const inApp = /Android/i.test(navigator.userAgent) ? inAppBrowserName() : "";
   const status = offlineApp.savedOffline
     ? { tone: "ready", text: "Ready offline on this device" }
     : offlineApp.offlineSupported
       ? { tone: "saving", text: offlineApp.online ? "Saving for offline use…" : "Open once with internet to save it" }
       : { tone: "off", text: "Saves itself on the published site" };
-  let action;
-  if (offlineApp.installed) action = <p className="ss-offline-done"><Icon name="download" size={16} /> You&apos;re using the app. It opens from your home screen, even offline.</p>;
-  else if (offlineApp.canInstall) action = <div className="dollhouse-actions"><button type="button" onClick={offlineApp.install}><Icon name="download" size={16} /> Download the app</button></div>;
-  else if (offlineApp.iosInstallTip) action = <ol className="ss-offline-steps"><li>Tap <b>Share</b> <span aria-hidden="true">⬆</span> at the bottom of Safari.</li><li>Tap <b>Add to Home Screen</b>.</li></ol>;
-  else if (inApp) action = <div className="dollhouse-actions"><a href={chromeIntentFor(window.location.href.split("#")[0])}>Open in Chrome to download</a></div>;
-  else action = <p className="ss-offline-hint">To add an icon, open this page in Chrome or Edge and choose <b>Install</b> from the menu. Even without it, this browser keeps the offline copy.</p>;
   return <article className="ss-way ss-way-offline" id="offline">
     <div className="ss-offline-intro">
       <span className="ss-way-icon" aria-hidden="true"><Icon name="download" size={26} /></span>
       <h3>Offline mode <span className={`ss-offline-status is-${status.tone}`}>{status.text}</span></h3>
       <p>No Wi-Fi at school? Open SSCAI NAVI once with internet and it saves itself on your phone. After that you can find your way with no Wi-Fi or data.</p>
-      {action}
     </div>
     <div className="ss-offline-lists">
       <div>
@@ -1154,7 +1100,6 @@ export default function App() {
             <a className="ss-nav-link" href="#updates" onClick={() => setMenuOpen(false)}>Campus updates</a>
             <a className="ss-nav-link" href="#visit" onClick={() => setMenuOpen(false)}>Visit</a>
             <div className="ss-nav-actions">
-              {offlineApp.canInstall && <button type="button" className="ss-btn ss-btn-quiet" onClick={() => { setMenuOpen(false); offlineApp.install(); }}>Install app</button>}
               {isAdmin && <button type="button" className="ss-btn ss-btn-quiet" onClick={() => { setMenuOpen(false); handleSignOut(); }}>Sign out</button>}
               {signedInUser || isAdmin
                 ? <button type="button" className="ss-btn ss-btn-primary" onClick={openAccount}>{isAdmin ? "Admin panel" : "My Campus"}</button>
@@ -1346,7 +1291,7 @@ export default function App() {
           <div className="ss-footer-school" id="about">
             <a className="ss-brand" href="#top"><img src={asset("logologooo.jpg")} alt="" width="44" height="44" /><span><b>Saint Simon of Cyrene Academy, Inc.</b><small>Since 2006</small></span></a>
             <p>A private, non-stock, non-profit school in Imus, Cavite, teaching learners from nursery through senior high school.</p>
-            <p className="ss-offline-tip"><b>No Wi-Fi at school?</b> Open SSCAI NAVI once with internet and the floor plans, directions and AR keep working offline.{offlineApp.canInstall && <> <button type="button" onClick={offlineApp.install}>Install the app</button></>}{offlineApp.iosInstallTip && " On iPhone, tap Share, then Add to Home Screen."}</p>
+            <p className="ss-offline-tip"><b>No Wi-Fi at school?</b> Open SSCAI NAVI once with internet and the floor plans, directions and AR keep working offline.</p>
           </div>
           <div>
             <h2>Visit</h2>
@@ -1371,7 +1316,6 @@ export default function App() {
       </footer>
       {!accountOpen && !loginOpen && !mapState && !arOpen && !route3d && <SiiBot onSignIn={openLogin} onSignOut={handleSignOut} onOpenAccount={openAccount} alreadySignedIn={Boolean(signedInUser)} onNavigate={navigateTo} onOpenMap={setMapState} />}
       <AppStatus online={offlineApp.online} updateReady={offlineApp.updateReady} onUpdate={offlineApp.applyUpdate} />
-      <InstallPrompt offlineApp={offlineApp} hidden={Boolean(noticeOpen || route3d || mapState || arOpen || loginOpen || accountOpen || createAccountOpen || adminLoginOpen || adminView || offlineApp.updateReady)} />
       {noticeOpen && !mapState && !arOpen && !adminView && <PrivacyNotice onDone={() => setNoticeOpen(false)} />}
       <AnnouncementPopup hidden={Boolean(noticeOpen || route3d || mapState || arOpen || loginOpen || accountOpen || createAccountOpen || adminLoginOpen || adminView)} />
       <PolicyDialog />
