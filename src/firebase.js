@@ -43,10 +43,10 @@ const SSCAI_RECAPTCHA_SITE_KEY = '6LeGPRsuAAAAAKd_7Ix0LPwVDxGmRxMYKMhxFRNQ';
 const APP_CHECK_SITE_KEY = clean(import.meta.env.VITE_APPCHECK_SITE_KEY) === 'off' ? '' : SSCAI_RECAPTCHA_SITE_KEY;
 const appCheck = app && APP_CHECK_SITE_KEY
   ? initializeAppCheck(app, {
-    // reCAPTCHA v3 (classic): the site key was made on the classic reCAPTCHA page, and Google
-    // refuses it on the Enterprise path (400 on recaptcha/enterprise/clr). For a Fraud Defense
-    // (Enterprise) key from Google Cloud, set VITE_APPCHECK_PROVIDER=enterprise.
-    provider: clean(import.meta.env.VITE_APPCHECK_PROVIDER) === 'enterprise' ? new ReCaptchaEnterpriseProvider(APP_CHECK_SITE_KEY) : new ReCaptchaV3Provider(APP_CHECK_SITE_KEY),
+    // Fraud Defense (reCAPTCHA Enterprise): the provider registered in Firebase App Check. (The
+    // earlier 400s were a mistyped key, not the provider.) VITE_APPCHECK_PROVIDER=classic uses
+    // reCAPTCHA v3 instead, which also needs the classic provider registered with the secret key.
+    provider: clean(import.meta.env.VITE_APPCHECK_PROVIDER) === 'classic' ? new ReCaptchaV3Provider(APP_CHECK_SITE_KEY) : new ReCaptchaEnterpriseProvider(APP_CHECK_SITE_KEY),
     isTokenAutoRefreshEnabled: true,
   })
   : null;
