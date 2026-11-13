@@ -26,6 +26,12 @@ import {
 } from "./floorPlans";
 
 const DEFAULT_START = "1:entrance";
+// Room photos shown while a room on the 2D map is pressed and held ("<floor>:<room id>").
+// Add more rooms here as their photos are taken (put the picture in public/campus/).
+const ROOM_PHOTOS = {
+  "1:g-101": { file: "campus/library-elementary.jpg", info: "Bookshelves, reading tables and a computer for students. Please keep quiet inside.", alt: "The ground floor library with green walls, bookshelves, a globe and reading tables" },
+};
+const HOLD_MS = 450;
 const START_STORAGE = "campus-map-start";
 const ASPECT = (PLAN_HEIGHT + 16) / (PLAN_WIDTH + 8);
 const isNarrow = () => typeof window !== "undefined" && window.innerWidth <= 900;
@@ -247,6 +253,23 @@ function FloorPlan2D({ plan, route, startKey, destKey, selectedKey, blocked, onP
   const [view, setView] = useState(homeView);
   const pointers = useRef(new Map());
   const gesture = useRef({ moved: false, distance: null });
+  // Press and hold a room that has a photo: the photo shows until the finger lifts.
+  const [peekKey, setPeekKey] = useState(null);
+  const holdTimer = useRef(0);
+  const endPeek = () => {
+    clearTimeout(holdTimer.current);
+    setPeekKey(null);
+  };
+  useEffect(() => () => clearTimeout(holdTimer.current), []);
+  const startHold = (key) => {
+    clearTimeout(holdTimer.current);
+    if (!ROOM_PHOTOS[key]) return;
+    holdTimer.current = setTimeout(() => {
+      if (gesture.current.moved || pointers.current.size !== 1) return;
+      gesture.current.moved = true; // lifting the finger now does not also pick the room
+      setPeekKey(key);
+    }, HOLD_MS);
+  };
   const floor = plan.floor;
   const runs = routeRuns(route, floor);
   const badges = stairBadges(route, floor);
@@ -311,7 +334,8 @@ function FloorPlan2D({ plan, route, startKey, destKey, selectedKey, blocked, onP
     if (pointers.current.size === 1) {
       const dx = event.clientX - previous.x;
       const dy = event.clientY - previous.y;
-      if (Math.abs(dx) + Math.abs(dy) > 3) {
+      if (Math.abs(dx) + Math.abs(dy) > 3 && !gesture.current.moved) {
+        clearTimeout(holdTimer.current);
         gesture.current.moved = true;
         event.currentTarget.setPointerCapture?.(event.pointerId);
       }
@@ -337,6 +361,7 @@ function FloorPlan2D({ plan, route, startKey, destKey, selectedKey, blocked, onP
   };
   const onPointerUp = (event) => {
     pointers.current.delete(event.pointerId);
+    endPeek();
     if (pointers.current.size < 2) gesture.current.distance = null;
   };
   const pick = (key) => !gesture.current.moved && onPick(key);
@@ -357,6 +382,8 @@ function FloorPlan2D({ plan, route, startKey, destKey, selectedKey, blocked, onP
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
+        onPointerLeave={endPeek}
+        onContextMenu={(event) => ROOM_PHOTOS[peekKey] || event.target.closest?.(".has-photo") ? event.preventDefault() : undefined}
       >
         <defs>
           <pattern id="plan-grid" width="5" height="5" patternUnits="userSpaceOnUse"><path d="M5 0H0V5" className="plan-grid-line" /></pattern>
@@ -396,8 +423,8 @@ function FloorPlan2D({ plan, route, startKey, destKey, selectedKey, blocked, onP
           const key = `${floor}:${item.id}`;
           const [x, y, w, h] = item.rect;
           const closed = blocked.has(key);
-          const classes = ["plan-room", `type-${item.type}`, item.unlabeled && "unlabeled", key === selectedKey && "selected", key === dest?.key && "destination", key === startKey && "start", closed && "closed"].filter(Boolean).join(" ");
-          return <g key={item.id} className={classes} onClick={() => pick(key)} onKeyDown={(event) => (event.key === "Enter" || event.key === " ") && onPick(key)} tabIndex={0} role="button" aria-label={`${placeTitle({ ...item, floor })}${closed ? ", closed" : ""}`}>
+          const classes = ["plan-room", `type-${item.type}`, item.unlabeled && "unlabeled", key === selectedKey && "selected", key === dest?.key && "destination", key === startKey && "start", closed && "closed", ROOM_PHOTOS[key] && "has-photo"].filter(Boolean).join(" ");
+          return <g key={item.id} className={classes} onPointerDown={() => startHold(key)} onClick={() => pick(key)} onKeyDown={(event) => (event.key === "Enter" || event.key === " ") && onPick(key)} tabIndex={0} role="button" aria-label={`${placeTitle({ ...item, floor })}${closed ? ", closed" : ""}`}>
             <rect x={x} y={y} width={w} height={h} className="plan-room-fill" />
             {item.type === "stairs" && (item.shape === "u" && item.door ? <UStair item={item} floor={floor} /> : <path d={stairTreads(item.rect)} className="plan-treads" />)}
             {closed && <rect x={x} y={y} width={w} height={h} className="plan-closed-fill" />}
@@ -517,6 +544,18 @@ function FloorPlan2D({ plan, route, startKey, destKey, selectedKey, blocked, onP
         </g>
         </g>
       </svg>
+      {peekKey && ROOM_PHOTOS[peekKey] && (() => {
+        const photo = ROOM_PHOTOS[peekKey];
+        const room = plan.rooms.find((item) => `${floor}:${item.id}` === peekKey);
+        return <figure className="plan-peek" role="status">
+          <img src={`${import.meta.env.BASE_URL}${photo.file}`} alt={photo.alt} draggable="false" />
+          <figcaption>
+            <b>{room ? placeTitle({ ...room, floor }) : "Room"}</b>
+            <small>{floorLabel(floor)} · {buildingOf(floor)}</small>
+            <span>{room?.notes || photo.info}</span>
+          </figcaption>
+        </figure>;
+      })()}
       <div className="plan-zoom" role="group" aria-label="Map zoom">
         <button type="button" onClick={() => zoomCenter(1 / 1.35)} aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></button>
         <button type="button" onClick={() => zoomCenter(1.35)} aria-label="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /></svg></button>
