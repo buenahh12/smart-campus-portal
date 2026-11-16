@@ -149,7 +149,7 @@ const SECTIONS = [
     singular: "restriction",
     fields: [
       // The area picked here is what the 2D map, 3D directions and AR live view route around.
-      { name: "mapArea", label: "Pathway or hallway", type: "select", required: true, options: MAP_AREAS, hint: "The 2D floor plan, 3D directions and AR live view will route everyone around it and mark it CLOSED while the restriction is in effect." },
+      { name: "mapArea", label: "Pathway or hallway", type: "select", required: true, options: MAP_AREAS, hint: "The 2D Guide, 3D Guide View and AR live view will route everyone around it and mark it CLOSED while the restriction is in effect." },
       { name: "pathway", label: "Name people will see (optional)", type: "text", max: 100, placeholder: "Leave blank to use the hallway's name" },
       { name: "building", type: "hidden" },
       { name: "floor", type: "hidden" },
@@ -365,7 +365,7 @@ export default function AdminCms({ onClose, onSignOut, onOpenAnalytics, onOpenSi
     <div className="admin-shell" role="dialog" aria-modal="true" aria-labelledby="cms-title">
       <div className="admin-dashboard cms-dashboard">
         <header className="admin-dashboard-header">
-          <div><p className="kicker">SSCAI ADMINISTRATION</p><h2 id="cms-title">Content manager</h2><p>Update announcements, pathway restrictions, rooms, offices, and the names on the floor plan. Changes go live on SSCAI NAVI right away.</p></div>
+          <div><p className="kicker">SSCAI ADMINISTRATION</p><h2 id="cms-title">Content manager</h2><p>Update announcements, pathway restrictions, rooms, offices, and the names on the 2D Guide. Changes go live on SSCAI NAVI right away.</p></div>
           <div className="admin-header-actions">
             {onOpenAnalytics && <button onClick={onOpenAnalytics}>Site visits</button>}
             {onOpenSignIns && <button onClick={onOpenSignIns}>Sign-ins</button>}
@@ -377,7 +377,7 @@ export default function AdminCms({ onClose, onSignOut, onOpenAnalytics, onOpenSi
         </header>
         <div className="cms-tabs" role="tablist" aria-label="Content type">
           {SECTIONS.map((item) => <button key={item.key} type="button" role="tab" aria-selected={activeKey === item.key} className={activeKey === item.key ? "active" : ""} onClick={() => switchSection(item.key)}>{item.label}<span>{data[item.key]?.length ?? "–"}</span></button>)}
-          <button type="button" role="tab" aria-selected={activeKey === FLOOR_PLAN_TAB} className={activeKey === FLOOR_PLAN_TAB ? "active" : ""} onClick={() => switchSection(FLOOR_PLAN_TAB)}>Floor plan</button>
+          <button type="button" role="tab" aria-selected={activeKey === FLOOR_PLAN_TAB} className={activeKey === FLOOR_PLAN_TAB ? "active" : ""} onClick={() => switchSection(FLOOR_PLAN_TAB)}>2D Guide</button>
         </div>
         {loadError && <p className="auth-error" role="alert">{loadError}</p>}
         {activeKey === FLOOR_PLAN_TAB ? <AdminFloorPlan /> : <div className="cms-grid">

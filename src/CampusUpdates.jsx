@@ -96,7 +96,7 @@ export default function CampusUpdates({ onShowMap }) {
               <div><b>{item.name}</b><small>{item.kind} · {item.floorText}{item.room ? ` · ${item.room}` : ""}</small>{item.hours && <small>{item.hours}</small>}{item.notes && <small>{item.notes}</small>}</div>
               <div className="directory-actions">
                 {item.status && <span className={`cms-badge ${item.status === "Available" ? "good" : item.status === "In use" ? "warn" : "bad"}`}>{item.status}</span>}
-                {item.mapKey && onShowMap && <button type="button" className="directory-map" onClick={() => onShowMap(item.mapKey)} aria-label={`Show ${item.name} on the floor plan`}><Icon name="route" size={14} /> Map</button>}
+                {item.mapKey && onShowMap && <button type="button" className="directory-map" onClick={() => onShowMap(item.mapKey)} aria-label={`Show ${item.name} on the 2D Guide`}><Icon name="route" size={14} /> Map</button>}
               </div>
             </div>) : <p className="updates-empty">{term ? "No matching rooms or offices." : "No rooms are listed yet."}</p>}          </div>
         </article>

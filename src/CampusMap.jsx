@@ -657,13 +657,13 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
     <div className="map-shell" role="dialog" aria-modal="true" aria-labelledby="campus-map-title">
       <header className="map-header">
         <div className="map-title">
-          <h2 id="campus-map-title">Floor plan</h2>
+          <h2 id="campus-map-title">2D Guide</h2>
           <span>{buildingOf(floor)}</span>
         </div>
-        <button className="map-close" onClick={onClose} aria-label="Close floor plan"><Icon name="close" size={20} /></button>
+        <button className="map-close" onClick={onClose} aria-label="Close the 2D Guide"><Icon name="close" size={20} /></button>
       </header>
       <div className="map-body">
-        <section className="map-stage" aria-label="Floor plan">
+        <section className="map-stage" aria-label="2D Guide map">
           <div className="map-floors" role="tablist" aria-label="Floor">
             <span>Floor</span>
             {[...FLOORS].reverse().map((item) => <button key={item.floor} type="button" role="tab" aria-selected={floor === item.floor} aria-label={floorLabel(item.floor)} className={floor === item.floor ? "active" : ""} onClick={() => setFloor(item.floor)}>

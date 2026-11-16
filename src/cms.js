@@ -58,7 +58,7 @@ export function watchCollection(name, onData, onError = () => {}, { publicOnly =
 // Logging never blocks the change itself: if a line can't be written, the change still stands.
 export const LOG_TYPES = {
   announcements: 'Announcement', pathwayClosures: 'Pathway restriction', rooms: 'Room', offices: 'Office',
-  mapRooms: 'Floor plan room', planFloors: 'Added floor', feedback: 'Feedback',
+  mapRooms: '2D Guide room', planFloors: 'Added floor', feedback: 'Feedback',
 };
 const LOG_SKIP_FIELDS = new Set(['updatedAt', 'updatedBy', 'pictureData', 'pictureSeed', 'rooms', 'halls', 'links']);
 const titleOf = (data = {}) => String(data.title || data.name || data.pathway || data.label || data.building || '').slice(0, 120);
@@ -380,7 +380,7 @@ export const FEEDBACK_SURVEY = [
   { key: 'recommend', question: 'Would you tell a classmate or friend to use it?', options: [['yes', 'Yes'], ['maybe', 'Maybe'], ['no', 'No']] },
 ];
 export const FEEDBACK_FEATURES = [
-  ['map', '2D floor plan'], ['3d', '3D directions'], ['ar', 'AR live view'], ['sibot', 'SiBot'],
+  ['map', '2D Guide'], ['3d', '3D directions'], ['ar', 'AR live view'], ['sibot', 'SiBot'],
   ['updates', 'Campus updates'], ['mycampus', 'My Campus'], ['voice', 'Voice guide'], ['offline', 'Offline / app'],
 ];
 export const FEEDBACK_IMPROVE = [

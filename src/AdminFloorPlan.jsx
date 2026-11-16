@@ -19,7 +19,7 @@ const formFor = (item) => ({ name: item.unlabeled ? "" : item.name, code: item.c
 export default function AdminFloorPlan() {
   const [mode, setMode] = useState("rename");
   return <>
-    <div className="va-segment fp-mode" role="tablist" aria-label="Floor plan tools">
+    <div className="va-segment fp-mode" role="tablist" aria-label="2D Guide tools">
       <button type="button" role="tab" aria-selected={mode === "rename"} className={mode === "rename" ? "active" : ""} onClick={() => setMode("rename")}>Rename rooms</button>
       <button type="button" role="tab" aria-selected={mode === "add"} className={mode === "add" ? "active" : ""} onClick={() => setMode("add")}>Add floors from blueprints</button>
     </div>
@@ -65,9 +65,9 @@ function RenameRooms() {
     setError("");
     try {
       await setItem(CMS_COLLECTIONS.mapRooms, mapRoomDocId(`${floor}:${selected.id}`), record);
-      setNotice(`${record.code ? `${record.code} · ` : ""}${record.name} is saved. The floor plan, search, and SiBot use the new name now.`);
+      setNotice(`${record.code ? `${record.code} · ` : ""}${record.name} is saved. The 2D Guide, search, and SiBot use the new name now.`);
     } catch (problem) {
-      setError(problem?.code === "permission-denied" ? "Permission denied. Only the administrator can change the floor plan." : problem?.message || "The room could not be saved. Try again.");
+      setError(problem?.code === "permission-denied" ? "Permission denied. Only the administrator can change the 2D Guide." : problem?.message || "The room could not be saved. Try again.");
     } finally {
       setSaving(false);
     }
@@ -137,7 +137,7 @@ function RenameRooms() {
           <label>Room number (optional)<input value={values.code} maxLength={20} onChange={(event) => setValues({ ...values, code: event.target.value })} placeholder="e.g. Room 101" /></label>
           <label>Used as<select value={values.type} onChange={(event) => setValues({ ...values, type: event.target.value })}>{EDITABLE_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}</select></label>
           <label>Notes (optional)<textarea rows={3} value={values.notes} maxLength={300} onChange={(event) => setValues({ ...values, notes: event.target.value })} placeholder="e.g. Adviser: Ms. Santos" /></label>
-          <small className="cms-hint">Shown as {typeLabel(values.type).toLowerCase()} on the floor plan. Search and SiBot will find it by its new name.</small>
+          <small className="cms-hint">Shown as {typeLabel(values.type).toLowerCase()} on the 2D Guide. Search and SiBot will find it by its new name.</small>
           {error && <p className="auth-error" role="alert">{error}</p>}
           {notice && <p className="auth-success" role="status">{notice}</p>}
           <button className="attendance-save" type="submit" disabled={saving}><Icon name="arrow" size={16} /> {saving ? "Saving…" : "Save room"}</button>

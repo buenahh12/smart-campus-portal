@@ -240,7 +240,7 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
       </div>
       <div className="mc-place-actions">
         {place.status && <span className={`cms-badge ${statusTone(place.status)}`}>{place.status}</span>}
-        <button type="button" onClick={() => onShowMap(place)} aria-label={`Show ${place.name} on the 2D floor plan`}><Icon name="route" size={14} /> 2D map</button>
+        <button type="button" onClick={() => onShowMap(place)} aria-label={`Show ${place.name} on the 2D Guide`}><Icon name="route" size={14} /> 2D map</button>
         {place.mapKey && place.building === BUILDING_NAME && <button type="button" onClick={() => onShow3D(place)} aria-label={`Show ${place.name} in 3D`}><Icon name="cube" size={14} /> 3D</button>}
         {showSave
           ? <button type="button" className={saved ? "saved" : ""} onClick={() => toggleSaved(place)} aria-pressed={saved}>{saved ? "Saved" : "Save"}</button>
@@ -302,13 +302,13 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
                 </div>
                 <div className="mc-place-actions">
                   {start && end && <>
-                    <button type="button" onClick={() => onOpenRoute("2d", from, to)} aria-label={`Open this route on the 2D floor plan`}><Icon name="route" size={14} /> 2D</button>
+                    <button type="button" onClick={() => onOpenRoute("2d", from, to)} aria-label={`Open this route on the 2D Guide`}><Icon name="route" size={14} /> 2D</button>
                     {buildingOf(start.floor) === BUILDING_NAME && buildingOf(end.floor) === BUILDING_NAME && <button type="button" onClick={() => onOpenRoute("3d", from, to)} aria-label="Open this route in 3D"><Icon name="cube" size={14} /> 3D</button>}
                     <button type="button" onClick={() => onOpenRoute("ar", from, to)} aria-label="Open this route in AR live view"><Icon name="scan" size={14} /> AR</button>
                   </>}
                   <button type="button" className="remove" onClick={() => removeRoute(id)} aria-label="Remove this saved route">Remove</button>
                 </div>
-              </article>) : <p className="updates-empty">{profile === undefined && !profileError ? "Loading your routes…" : "No saved routes yet. Open a route on the 2D floor plan, in 3D or in AR and tap ☆ Save route. It shows up here, on any device you sign in to."}</p>}
+              </article>) : <p className="updates-empty">{profile === undefined && !profileError ? "Loading your routes…" : "No saved routes yet. Open a route on the 2D Guide, in 3D or in AR and tap ☆ Save route. It shows up here, on any device you sign in to."}</p>}
             </div>
           </section>
           <section className="student-card mc-prefs-card tone-sky">
@@ -318,7 +318,7 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
               <label className="mc-field">Grade level<select value={gradeLevel} onChange={(event) => update({ gradeLevel: event.target.value, section: "" })}><option value="">Choose…</option>{GRADE_LEVELS.map((item) => <option key={item}>{item}</option>)}</select></label>
               <label className="mc-field">Section<input value={sectionDraft ?? section} maxLength={MAX_SECTION_LENGTH} list="mc-sections" placeholder={sectionsOf(gradeLevel)[0] ? `e.g. ${sectionsOf(gradeLevel)[0]}` : "Your section"} onChange={(event) => setSectionDraft(event.target.value)} onBlur={() => { if (sectionDraft !== null && sectionDraft.trim() !== section) update({ section: sectionDraft.trim() }); setSectionDraft(null); }} /></label>
               <datalist id="mc-sections">{sectionsOf(gradeLevel).map((item) => <option key={item} value={item} />)}</datalist>
-              {gradeLevel && section && !myClassroom && <small className="mc-grade-note">Your classroom isn&apos;t on the floor plan yet, so it can&apos;t be shown.</small>}
+              {gradeLevel && section && !myClassroom && <small className="mc-grade-note">Your classroom isn&apos;t on the 2D Guide yet, so it can&apos;t be shown.</small>}
             </div>}
             <label className="mc-toggle"><input type="checkbox" checked={prefs.speakAnswers} onChange={(event) => update({ prefs: { ...prefs, speakAnswers: event.target.checked } })} /><span><b>Read SiBot answers aloud</b><small>SiBot speaks every answer, not only voice questions.</small></span></label>
             <label className="mc-toggle"><input type="checkbox" checked={prefs.allClosureAlerts} onChange={(event) => update({ prefs: { ...prefs, allClosureAlerts: event.target.checked } })} /><span><b>Show closures across the whole campus</b><small>Turn off to only see closures near your saved places.</small></span></label>

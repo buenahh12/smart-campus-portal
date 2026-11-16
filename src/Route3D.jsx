@@ -92,7 +92,7 @@ export default function Route3DView({ start, end, onClose, onOpenMap }) {
       <div className="route3d-stage">
         <Dollhouse3D blocked={blockedKey} zoom={view !== "walk"} pov={view === "walk" && Boolean(showing)} className="route3d-canvas" onProgress={view === "outside" ? null : onProgress} floor={showing?.end.floor || 1} route={view === "outside" ? null : showing} highlight={showing?.end.key || null} view={view === "outside" ? "outside" : "inside"}
           label={showing ? `3D route from ${placeTitle(showing.start)} to ${placeTitle(showing.end)}` : "3D model of the Main Academic Building"}
-          fallback={<p className="route3d-fallback">3D isn&apos;t available on this device. Use the 2D floor plan instead.</p>} />
+          fallback={<p className="route3d-fallback">3D isn&apos;t available on this device. Use the 2D Guide instead.</p>} />
         <div className="va-segment route3d-views" role="group" aria-label="View">
           <button type="button" className={view === "walk" ? "active" : ""} aria-pressed={view === "walk"} onClick={() => setView("walk")}>Walk</button>
           <button type="button" className={view === "inside" ? "active" : ""} aria-pressed={view === "inside"} onClick={() => setView("inside")}>Above</button>

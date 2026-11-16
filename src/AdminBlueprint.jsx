@@ -328,9 +328,9 @@ export default function AdminBlueprint() {
         setImageChanged(false);
       }
       update({ published: Boolean(publish) });
-      setNotice(publish ? `${plan.building}, ${plan.level === 1 ? "ground floor" : `floor ${plan.level}`} is published. It is on the floor plan, in routes, search, SiBot and AR now.` : "Draft saved. Only you can see it until you publish.");
+      setNotice(publish ? `${plan.building}, ${plan.level === 1 ? "ground floor" : `floor ${plan.level}`} is published. It is on the 2D Guide, in routes, search, SiBot and AR now.` : "Draft saved. Only you can see it until you publish.");
     } catch (problem) {
-      setError(problem?.code === "permission-denied" ? "Permission denied. Only the administrator can change the floor plan (and the database rules must be deployed)." : problem?.message || "The floor could not be saved. Try again.");
+      setError(problem?.code === "permission-denied" ? "Permission denied. Only the administrator can change the 2D Guide (and the database rules must be deployed)." : problem?.message || "The floor could not be saved. Try again.");
     } finally {
       setBusy("");
     }
@@ -356,7 +356,7 @@ export default function AdminBlueprint() {
     return <div className="bp-home">
       <div className="bp-intro">
         <h3>Add a floor or building from a blueprint</h3>
-        <p>Upload the contractor&apos;s blueprint, draw the rooms, hallways, stairs and doors on top (or let the AI draft them), check that it connects to the rest of the school, then publish. It joins the floor plan, routes, search, SiBot and AR.</p>
+        <p>Upload the contractor&apos;s blueprint, draw the rooms, hallways, stairs and doors on top (or let the AI draft them), check that it connects to the rest of the school, then publish. It joins the 2D Guide, routes, search, SiBot and AR.</p>
         <button type="button" className="attendance-save" onClick={startNew}><Icon name="plus" size={16} /> New floor</button>
       </div>
       {creating && <form className="cms-form bp-create" onSubmit={createFloor}>

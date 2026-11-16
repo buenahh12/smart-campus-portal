@@ -36,7 +36,7 @@ const savedStart = () => {
 const Dollhouse3D = lazy(() => import("./Dollhouse3D").catch(() => ({ default: ({ fallback }) => fallback })));
 
 // Sign-in and account changes need Firebase online; everything for finding rooms does not.
-const NEEDS_INTERNET = "This needs an internet connection. Floor plans, directions and AR live view still work offline.";
+const NEEDS_INTERNET = "This needs an internet connection. The 2D Guide, directions and AR live view still work offline.";
 const isOfflineError = (error) => error?.code === "auth/network-request-failed" || !navigator.onLine;
 
 // Offline notice, and the button for a new version saved in the background.
@@ -45,7 +45,7 @@ function AppStatus({ online, updateReady, onUpdate }) {
     return <div className="app-status" role="status"><span>A new version of SSCAI NAVI is ready.</span><button type="button" onClick={onUpdate}>Update</button></div>;
   }
   if (!online) {
-    return <div className="app-status app-status-offline" role="status"><span><b>You&apos;re offline.</b> Floor plans, directions and AR live view still work. New announcements show when you&apos;re back online.</span></div>;
+    return <div className="app-status app-status-offline" role="status"><span><b>You&apos;re offline.</b> The 2D Guide, directions and AR live view still work. New announcements show when you&apos;re back online.</span></div>;
   }
   return null;
 }
@@ -68,7 +68,7 @@ function OfflinePanel({ offlineApp }) {
     <div className="ss-offline-lists">
       <div>
         <h4>Works offline</h4>
-        <ul><li>2D floor plans and directions</li><li>Routes across floors and stairs</li><li>3D Guide View</li><li>AR live view</li><li>Nearest exit and SiBot&apos;s answers</li></ul>
+        <ul><li>2D Guide and directions</li><li>Routes across floors and stairs</li><li>3D Guide View</li><li>AR live view</li><li>Nearest exit and SiBot&apos;s answers</li></ul>
       </div>
       <div>
         <h4>Needs internet</h4>
@@ -798,13 +798,13 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
       answer = "AR Live View is in Explore the Platform. Open it for a visual walkthrough with directions and room distance.";
       onNavigate("features");
     } else if (hasAny(["emergency", "fire exit", "nearest exit", "safest route", "evacuate", "safety route", "earthquake", "way out"])) {
-      answer = "I’m showing the nearest exit on the floor plan. In a real emergency, stay calm and follow your teacher and school staff first.";
+      answer = "I’m showing the nearest exit on the 2D Guide. In a real emergency, stay calm and follow your teacher and school staff first.";
       onOpenMap?.({ emergency: true });
     } else if (planPlace && hasAny(["where", "take me", "go to", "find", "how do i get", "directions", "room", "office", "clinic", "library", "guidance", "laboratory", "lab", "cr", "c.r.", "comfort", "restroom", "toilet", "bathroom", "banyo", "nasaan", "saan", "grade"])) {
-      answer = `${placeTitle(planPlace)} is on the ${planFloorLabel(planPlace.floor).toLowerCase()} of the Main Academic Building. I’ve opened the floor plan with directions.`;
+      answer = `${placeTitle(planPlace)} is on the ${planFloorLabel(planPlace.floor).toLowerCase()} of the Main Academic Building. I’ve opened the 2D Guide with directions.`;
       onOpenMap?.({ destination: planPlace.key, floor: planPlace.floor });
-    } else if (hasAny(["2d", "floor plan", "floor map", "directions", "navigate"])) {
-      answer = "Opening the 2D floor plan. Tap any room to get directions, or use Route to the nearest exit.";
+    } else if (hasAny(["2d", "2d guide", "floor plan", "floor map", "directions", "navigate"])) {
+      answer = "Opening the 2D Guide. Tap any room to get directions, or use Route to the nearest exit.";
       onOpenMap?.({});
     } else if (hasAny(["3d", "guide view", "dollhouse", "building map", "campus map"])) {
       answer = "The 3D Guide View is in the 3D & AR section. Tap a floor number to look inside the building, or tap Watch a route in 3D to follow the green pin.";
@@ -830,7 +830,7 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
     } else if (hasAny(["visitor", "guest", "parent", "can i enter", "public access"])) {
       answer = "Visitors can look at the public campus map without signing in. Please ask school staff about visiting rules before coming to campus.";
     } else if (hasAny(["room", "office", "restroom", "comfort room", "library", "clinic", "where can i find", "how do i get to", "take me to", "where is"])) {
-      answer = "Open the 2D floor plan and tap a room to get directions. If you still need help, ask a teacher or staff member.";
+      answer = "Open the 2D Guide and tap a room to get directions. If you still need help, ask a teacher or staff member.";
       onOpenMap?.({});
     } else if (hasAny(["saved place", "my places", "favorite", "favourite", "bookmark"])) {
       answer = alreadySignedIn
@@ -838,7 +838,7 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
         : "Sign in to save rooms and offices to your account and get alerts when a hallway near them is closed.";
       if (alreadySignedIn) onOpenAccount?.(); else onSignIn?.();
     } else if (hasAny(["sscai navi", "ssca navi", "what is navi", "what is this app", "what is this website", "what is this site"])) {
-      answer = "SSCAI NAVI is the campus navigation system of Saint Simon of Cyrene Academy, Inc.. It shows the floor plans, gives step-by-step directions and AR guidance to any room, finds the nearest exit, and shares campus updates, even with no Wi-Fi once you have opened it.";
+      answer = "SSCAI NAVI is the campus navigation system of Saint Simon of Cyrene Academy, Inc.. It shows the 2D Guide and the 3D Guide View, gives step-by-step directions and AR guidance to any room, finds the nearest exit, and shares campus updates, even with no Wi-Fi once you have opened it.";
     } else if (hasAny(["who is saint simon", "tell me about the school", "about the school", "what is this school", "what does sscai mean", "what kind of school"])) {
       answer = "Saint Simon of Cyrene Academy, Inc. (SSCAI) is a private, non-stock, non-profit school in Imus, Cavite. It provides basic education from early childhood through Senior High School and is recognized by the DepEd Division of City of Imus.";
       onNavigate("about");
@@ -1095,7 +1095,7 @@ export default function App() {
             <span><b>Saint Simon of Cyrene Academy, Inc.</b><small>SSCAI NAVI</small></span>
           </a>
           <nav id="ss-nav" className={`ss-nav ${menuOpen ? "open" : ""}`} aria-label="Main">
-            <button type="button" className="ss-nav-link" onClick={() => { setMenuOpen(false); setMapState({ floor: 2 }); }}>Floor plan</button>
+            <button type="button" className="ss-nav-link" onClick={() => { setMenuOpen(false); setMapState({ floor: 2 }); }}>2D Guide</button>
             <a className="ss-nav-link" href="#explore" onClick={() => setMenuOpen(false)}>3D &amp; AR</a>
             <a className="ss-nav-link" href="#updates" onClick={() => setMenuOpen(false)}>Campus updates</a>
             <a className="ss-nav-link" href="#visit" onClick={() => setMenuOpen(false)}>Visit</a>
@@ -1218,7 +1218,7 @@ export default function App() {
                 </div>
                 <div className="dollhouse-actions">
                   <button type="button" className="dollhouse-route" onClick={() => setRoute3d({})}><Icon name="cube" size={16} /> Watch a route in 3D</button>
-                  <button type="button" onClick={() => setMapState({ floor })}><Icon name="route" size={16} /> Open the 2D floor plan</button>
+                  <button type="button" onClick={() => setMapState({ floor })}><Icon name="route" size={16} /> Open the 2D Guide</button>
                 </div>
               </article>
               <article className="ss-way">
@@ -1263,7 +1263,7 @@ export default function App() {
                 <address>N.I.A. Road / 39 Reyes Compound<br />Carsadang Bago II, Imus, Cavite<br />Philippines</address>
                 <dl>
                   <div><dt>Office hours</dt><dd>Monday to Friday, 7:00 AM to 5:00 PM</dd></div>
-                  <div><dt>On campus</dt><dd>Use the floor plan above to find a room once you arrive.</dd></div>
+                  <div><dt>On campus</dt><dd>Use the 2D Guide above to find a room once you arrive.</dd></div>
                 </dl>
                 <div className="ss-visit-actions">
                   <a className="ss-btn ss-btn-primary" href={MAP_DIRECTIONS_URL} target="_blank" rel="noreferrer"><Icon name="route" size={18} /> Get directions</a>
@@ -1279,7 +1279,7 @@ export default function App() {
           <div className="ss-container ss-emergency-inner" data-reveal>
             <div>
               <h2 id="ss-emergency-title" className="ss-display"><span>In an</span> <span className="t-stripe">emergency</span></h2>
-              <p>Stay calm and follow your teacher and school staff. The floor plan shows the closest exit or fire stairs from any room, and you don&apos;t need to sign in.</p>
+              <p>Stay calm and follow your teacher and school staff. The 2D Guide shows the closest exit or fire stairs from any room, and you don&apos;t need to sign in.</p>
             </div>
             <button type="button" className="ss-btn ss-btn-danger" onClick={() => setMapState({ emergency: true })}><Icon name="alert" size={18} /> Show the nearest exit</button>
           </div>
@@ -1291,7 +1291,7 @@ export default function App() {
           <div className="ss-footer-school" id="about">
             <a className="ss-brand" href="#top"><img src={asset("logologooo.jpg")} alt="" width="44" height="44" /><span><b>Saint Simon of Cyrene Academy, Inc.</b><small>Since 2006</small></span></a>
             <p>A private, non-stock, non-profit school in Imus, Cavite, teaching learners from nursery through senior high school.</p>
-            <p className="ss-offline-tip"><b>No Wi-Fi at school?</b> Open SSCAI NAVI once with internet and the floor plans, directions and AR keep working offline.</p>
+            <p className="ss-offline-tip"><b>No Wi-Fi at school?</b> Open SSCAI NAVI once with internet and the 2D Guide, directions and AR keep working offline.</p>
           </div>
           <div>
             <h2>Visit</h2>

@@ -634,7 +634,7 @@ export default function ArLiveView({ onClose, initialDestination = "", initialSt
   else if (fromKey === toKey) message = "You are already there.";
   else if (route?.blocked) message = "No open route right now: a hallway or stairway on the way is closed.";
   // Two buildings' plans have no shared position to lay one trail across, so AR stays inside one.
-  else if (crossesBuildings) message = `This route goes to another building. Use the floor plan to walk to ${buildingOf(destination.floor)}, then start AR from a room there.`;
+  else if (crossesBuildings) message = `This route goes to another building. Use the 2D Guide to walk to ${buildingOf(destination.floor)}, then start AR from a room there.`;
   else if (mode === "setup") message = `Stand in the doorway of ${placeTitle(placeByKey(fromKey))} with your back to the room, facing the hallway. Then tap Start.`;
   else if (mode === "xr") {
     const { section } = tracking;
