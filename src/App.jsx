@@ -54,6 +54,14 @@ function AppStatus({ online, updateReady, onUpdate }) {
 // site is saved on this device and what works without internet. (No install button: the site
 // saves itself for offline use when opened once.)
 function OfflinePanel({ offlineApp }) {
+  const inApp = /Android/i.test(navigator.userAgent) ? inAppBrowserName() : "";
+  // Install on the home screen (a PWA: no app store, nothing big to download). Only here, never a pop-up.
+  let action;
+  if (offlineApp.installed) action = <p className="ss-offline-done"><Icon name="download" size={16} /> Installed. SSCAI NAVI opens from your home screen, even offline.</p>;
+  else if (offlineApp.canInstall) action = <div className="dollhouse-actions"><button type="button" onClick={offlineApp.install}><Icon name="download" size={16} /> Install app</button></div>;
+  else if (offlineApp.iosInstallTip) action = <ol className="ss-offline-steps"><li>Tap <b>Share</b> <span aria-hidden="true">⬆</span> at the bottom of Safari.</li><li>Tap <b>Add to Home Screen</b>.</li></ol>;
+  else if (inApp) action = <div className="dollhouse-actions"><a href={chromeIntentFor(window.location.href.split("#")[0])}>Open in Chrome to install</a></div>;
+  else action = <p className="ss-offline-hint">To add it to your home screen, open the browser menu and choose <b>Install app</b> or <b>Add to Home screen</b>. No app store, nothing big to download.</p>;
   const status = offlineApp.savedOffline
     ? { tone: "ready", text: "Ready offline on this device" }
     : offlineApp.offlineSupported
@@ -75,6 +83,7 @@ function OfflinePanel({ offlineApp }) {
         <ul><li>Signing in</li><li>New announcements and closures (the last ones seen still show)</li><li>The street map and voice questions</li></ul>
       </div>
     </div>
+    {action}
   </article>;
 }
 

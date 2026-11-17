@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 
 // Offline app support for the page: registers the service worker (dist/sw.js, built from
 // src/serviceWorker.js), tracks whether the phone is online, offers a new version when one has
-// been saved in the background, and keeps the browser's own "Install app" bar from showing (the
-// site has no install button; it saves itself for offline use instead).
+// been saved in the background, and keeps the browser's own "Install app" bar from popping up:
+// installing is offered only by the Install app button in the Offline mode section.
 
 let installEvent = null;
 let waitingWorker = null;
@@ -14,7 +14,7 @@ const notify = () => listeners.forEach((listener) => listener());
 
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeinstallprompt', (event) => {
-    event.preventDefault(); // no "Install app" bar from the browser
+    event.preventDefault(); // no pop-up bar; the Offline mode section has the button
     installEvent = event;
     notify();
   });
