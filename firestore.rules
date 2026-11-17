@@ -217,8 +217,9 @@ service cloud.firestore {
     match /signIns/{id} {
       allow read, delete: if isAdmin();
       allow create: if request.auth != null
-        && data().keys().hasOnly(['uid', 'email', 'name', 'role', 'method', 'device', 'os', 'browser', 'screen', 'at'])
+        && data().keys().hasOnly(['uid', 'email', 'name', 'role', 'method', 'device', 'os', 'browser', 'screen', 'at', 'purpose'])
         && data().uid == request.auth.uid
+        && (!('purpose' in data()) || (data().method == 'anonymous' && text('purpose', true, 60)))
         && data().email == request.auth.token.get('email', '')
         && text('name', false, 80)
         && data().role in ['', 'Student', 'Faculty / Staff', 'Parent / Guardian', 'Visitor', 'Enrollee / Applicant', 'School personnel', 'Other visitor']
@@ -226,6 +227,13 @@ service cloud.firestore {
         && data().device in ['Phone', 'Tablet', 'Computer']
         && text('os', true, 30) && text('browser', true, 30) && text('screen', false, 20)
         && data().at == request.time;
+      // A visitor ending the visit adds the time out to their own row, once; nothing else changes.
+      allow update: if request.auth != null
+        && resource.data.uid == request.auth.uid
+        && resource.data.method == 'anonymous'
+        && !('endedAt' in resource.data)
+        && data().diff(resource.data).affectedKeys().hasOnly(['endedAt'])
+        && data().endedAt == request.time;
     }
 
     // Feedback: anyone may send one short message (no sign-in needed). A signed-in sender's uid

@@ -193,6 +193,46 @@ export const saveVisitorType = (value) => {
     else localStorage.removeItem(VISITOR_KEY);
   } catch { /* private window: just not remembered */ }
 };
+// Why a visitor came, and the words that find the place in the building (placeSearch.js). The
+// first one found is where "Show the way" goes; with none, the 2D Guide opens at the entrance.
+export const VISIT_PURPOSES = [
+  { id: 'enroll', label: 'Enrollment / Registrar', find: ['registrar', 'resgistrar', 'records'] },
+  { id: 'pay', label: 'Payment / Cashier', find: ['cashier', 'accounting', 'finance'] },
+  { id: 'teacher', label: 'Meet a teacher', find: ['faculty'] },
+  { id: 'principal', label: 'Principal / Director', find: ['director', 'principal'] },
+  { id: 'guidance', label: 'Guidance office', find: ['guidance'] },
+  { id: 'clinic', label: 'Clinic', find: ['clinic'] },
+  { id: 'learner', label: 'Pick up or visit a learner', find: [] },
+  { id: 'other', label: 'Other', find: [] },
+];
+// The visit on this device: { name, purpose, find }. Kept until the visitor ends the visit.
+const VISIT_KEY = 'sscai-visit';
+const VISIT_ID_KEY = 'sscai-visit-id';
+export const readVisit = () => {
+  try {
+    const value = JSON.parse(localStorage.getItem(VISIT_KEY) || 'null');
+    return value && typeof value.purpose === 'string' ? value : null;
+  } catch {
+    return null;
+  }
+};
+export const saveVisit = (value) => {
+  try {
+    if (value) localStorage.setItem(VISIT_KEY, JSON.stringify(value));
+    else { localStorage.removeItem(VISIT_KEY); localStorage.removeItem(VISIT_ID_KEY); }
+  } catch { /* private window: just not remembered */ }
+};
+// Ending a visit writes the time out on the visitor's own log row (firestore.rules allows only that).
+export async function endVisit() {
+  let id = '';
+  try { id = localStorage.getItem(VISIT_ID_KEY) || ''; } catch { /* storage off */ }
+  if (!db || !id || !auth?.currentUser?.isAnonymous) return;
+  try {
+    await updateDoc(doc(db, 'signIns', id), { endedAt: serverTimestamp() });
+  } catch (error) {
+    console.warn('The visit end could not be recorded:', error);
+  }
+}
 export const MAX_SAVED_PLACES = 30;
 // Students also give their grade level and section (same lists as validProfile in firestore.rules).
 export const GRADE_LEVELS = ['Nursery', 'Kindergarten', ...Array.from({ length: 12 }, (_, i) => `Grade ${i + 1}`)];
@@ -316,21 +356,26 @@ const firstTimeThisSession = (key) => {
 export async function recordSignIn(user, role) {
   if (!db || !user || role === 'admin' || !firstTimeThisSession(`campus-signin:${user.uid}`)) return;
   let profile = {};
+  const visit = user.isAnonymous ? readVisit() : null;
   if (!user.isAnonymous) {
     try {
       profile = (await getDoc(doc(db, 'users', user.uid))).data() || {};
     } catch { /* profile unreadable: leave role blank */ }
   }
   try {
-    await addDoc(collection(db, 'signIns'), {
+    const row = await addDoc(collection(db, 'signIns'), {
       uid: user.uid,
       email: user.email || '',
-      name: (profile.name || user.displayName || '').slice(0, 80),
+      name: (visit?.name || profile.name || user.displayName || '').slice(0, 80),
+      ...(visit?.purpose ? { purpose: visit.purpose.slice(0, 60) } : {}),
       role: user.isAnonymous ? readVisitorType() || 'Visitor' : profile.role || '',
       method: user.isAnonymous ? 'anonymous' : user.providerData[0]?.providerId || 'password',
       ...describeDevice(),
       at: serverTimestamp(),
     });
+    if (visit) {
+      try { localStorage.setItem(VISIT_ID_KEY, row.id); } catch { /* storage off: no time out */ }
+    }
   } catch (error) {
     console.warn('Sign-in could not be recorded:', error);
   }

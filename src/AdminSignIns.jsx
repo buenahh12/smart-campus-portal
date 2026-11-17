@@ -26,6 +26,8 @@ function periodRange(period) {
 
 const methodLabel = (method) => SIGN_IN_METHODS[method] || method || "Unknown";
 const whenText = (row) => row.at?.toDate ? row.at.toDate().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "Just now";
+const timeOnly = (stamp) => stamp?.toDate ? stamp.toDate().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "";
+const visitText = (row) => row.purpose ? `${row.purpose}${row.endedAt ? ` · left ${timeOnly(row.endedAt)}` : ""}` : "";
 const who = (row) => row.name || (row.method === "anonymous" ? "Visitor" : "No name");
 
 function countBy(rows, pick) {
@@ -86,7 +88,7 @@ export default function AdminSignIns({ onClose, onOpenContent, onOpenVisits }) {
     const term = search.trim().toLowerCase();
     return rows.filter((row) => (method === "all" || row.method === method)
       && (device === "all" || row.device === device)
-      && (!term || `${row.name} ${row.email} ${row.role}`.toLowerCase().includes(term)));
+      && (!term || `${row.name} ${row.email} ${row.role} ${row.purpose || ""}`.toLowerCase().includes(term)));
   }, [rows, search, method, device]);
 
   // One row per person: their latest sign-in, how many times, and every device type they used.
@@ -108,8 +110,8 @@ export default function AdminSignIns({ onClose, onOpenContent, onOpenVisits }) {
   const periodLabel = PERIODS.find(([key]) => key === period)[1];
 
   const exportCsv = () => {
-    const header = ["Date and time", "Name", "Email", "Role", "Sign-in method", "Device", "System", "Browser", "Screen"];
-    const lines = filtered.map((row) => [whenText(row), who(row), row.email, row.role, methodLabel(row.method), row.device, row.os, row.browser, row.screen]);
+    const header = ["Date and time", "Name", "Email", "Role", "Purpose of visit", "Time out", "Sign-in method", "Device", "System", "Browser", "Screen"];
+    const lines = filtered.map((row) => [whenText(row), who(row), row.email, row.role, row.purpose || "", timeOnly(row.endedAt), methodLabel(row.method), row.device, row.os, row.browser, row.screen]);
     const csv = [header, ...lines].map((line) => line.map((cell) => `"${String(cell ?? "").replaceAll('"', '""')}"`).join(",")).join("\n");
     const link = document.createElement("a");
     link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
@@ -135,7 +137,7 @@ export default function AdminSignIns({ onClose, onOpenContent, onOpenVisits }) {
           <div className="va-segment" role="group" aria-label="Time period">
             {PERIODS.map(([key, label]) => <button key={key} type="button" aria-pressed={period === key} className={period === key ? "active" : ""} onClick={() => setPeriod(key)}>{label}</button>)}
           </div>
-          <label className="si-search">Search<input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, email, or role" /></label>
+          <label className="si-search">Search<input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, email, role, or purpose" /></label>
           <label>Signed in with<select value={method} onChange={(event) => setMethod(event.target.value)}>
             <option value="all">Any method</option>
             {Object.entries(SIGN_IN_METHODS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
@@ -175,7 +177,7 @@ export default function AdminSignIns({ onClose, onOpenContent, onOpenVisits }) {
             <table>
               <thead><tr>
                 <th scope="col">{grouping === "person" ? "Last sign-in" : "Date and time"}</th>
-                <th scope="col">Name</th><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Signed in with</th>
+                <th scope="col">Name</th><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Visit</th><th scope="col">Signed in with</th>
                 <th scope="col">Device</th><th scope="col">System</th><th scope="col">Browser</th>
                 {grouping === "person" && <th scope="col">Times</th>}
               </tr></thead>
@@ -185,6 +187,7 @@ export default function AdminSignIns({ onClose, onOpenContent, onOpenVisits }) {
                   <th scope="row">{who(row)}</th>
                   <td>{row.email || "—"}</td>
                   <td>{row.role || "—"}</td>
+                  <td>{visitText(row) || "—"}</td>
                   <td>{methodLabel(row.method)}</td>
                   <td>{grouping === "person" ? [...row.devices].join(", ") : row.device}</td>
                   <td>{row.os}</td>

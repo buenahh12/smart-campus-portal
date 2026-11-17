@@ -31,9 +31,10 @@ const PAGES = {
         </ul>
         <p>Your profile keeps your name, role, your grade level and section (students only, if you give them), saved places and settings, so they follow you to any device. Only you can read your profile.</p>
       </>],
+      ["Visitors (no account)", <p key="v">Like the guard&apos;s logbook, a visitor gives their name, the kind of visitor they are, and why they came (for example Enrollment or Clinic). The school&apos;s visitor log keeps that with the time they came and the time they ended the visit, plus the device type and browser. No email or account is needed.</p>],
       ["Email updates (only if you turn them on)", <p key="e">If you turn on email updates in My Campus, we keep your email and name so the school can email you announcements. The emails are sent through EmailJS. You can turn them off at any time in My Campus.</p>],
       ["Feedback", <p key="f">If you send feedback, the school keeps what it is about, your message, your rating (if you chose one), what you were looking at (for example a route), and whether you were signed in. Your email is kept only if you tick &quot;The school may reply to me&quot;. Only the administrator can read feedback.</p>],
-      ["Who can see it", <p key="w">Only the school&apos;s administrator account can see sign-in records, the visit counts and the email list. The database rules block everyone else. Your information is not sold and is not used for ads. It is stored with Google Firebase, and the site is hosted on Vercel.</p>],
+      ["Who can see it", <p key="w">Only the school&apos;s administrator account can see sign-in records, the visitor log, the visit counts and the email list. The database rules block everyone else. Your information is not sold and is not used for ads. It is stored with Google Firebase, and the site is hosted on Vercel.</p>],
       ["How long we keep it", <p key="h">Records are kept until the school&apos;s administrator deletes them, or until you ask us to delete yours.</p>],
       ["Your rights", <p key="r">Under the Data Privacy Act of 2012 (Republic Act No. 10173) you can ask to see, correct or delete your information, or ask how it is used. Ask at the school office (Monday to Friday, 7:00 AM to 5:00 PM) or message the school&apos;s Facebook page.</p>],
     ],
@@ -114,7 +115,7 @@ export function PrivacyNotice({ onDone }) {
     <span className="privacy-notice-icon" aria-hidden="true"><Icon name="shield" size={22} /></span>
     <div>
       <h2 id="privacy-notice-title">Your privacy</h2>
-      <p>You can find any room without giving your name. We count visits without names, and your phone saves a copy of the site so it works without Wi-Fi. The AR camera stays on your phone. If you sign in, the school sees your email, how you signed in, and your device type and browser.</p>
+      <p>You can find any room without giving your name. Visitors who start a visit write their name and purpose in the school&apos;s visitor log. We count page visits without names, and your phone saves a copy of the site so it works without Wi-Fi. The AR camera stays on your phone. If you sign in, the school sees your email, how you signed in, and your device type and browser.</p>
       <div className="privacy-notice-actions">
         <button type="button" className="ss-btn ss-btn-primary" onClick={done}>OK, got it</button>
         <a href="#privacy" onClick={done}>Read the Privacy Policy</a>
