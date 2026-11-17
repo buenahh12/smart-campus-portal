@@ -8,6 +8,7 @@ import { usePlanVersion } from "./usePlan";
 import { FLOORS, WALK_METERS_PER_UNIT as M, stepsFor, blockedAreas, blockedKeyOf, buildingOf, closureArea, mapAreaLabel, findRoute, floorLabel, graphNode, placeByKey, placeTitle } from "./floorPlans";
 import { VOICE_LANGS, saveVoiceLang, savedVoiceLang, speak, stepText, stopSpeaking, unlockVoice, voiceSupported } from "./voiceGuide";
 import { SaveRouteButton } from "./savedRoutes";
+import Icon from "./Icon";
 import "./ar.css";
 
 // AR Live View in the browser. Like the SSCA NAVI AR app, nothing knows where you are by GPS:
@@ -706,7 +707,7 @@ export default function ArLiveView({ onClose, initialDestination = "", initialSt
           <b>SSCAI NAVI</b>
         </div>
         <span className="ar-live-title-actions">
-          {voiceSupported() && <button type="button" className={`ar-live-button ar-live-small ar-live-voice${voice !== "off" ? " on" : ""}`} onClick={cycleVoice} aria-label={`Voice guide: ${VOICE_LANGS[voice]}. Tap to change.`}>🔊 {VOICE_LANGS[voice]}</button>}
+          {voiceSupported() && <button type="button" className={`ar-live-button ar-live-small ar-live-voice${voice !== "off" ? " on" : ""}`} onClick={cycleVoice} aria-label={`Voice guide: ${VOICE_LANGS[voice]}. Tap to change.`}><Icon name="volume" size={16} /> {VOICE_LANGS[voice]}</button>}
           <button type="button" className="ar-live-button ar-live-small" onClick={close}>Close</button>
         </span>
       </div>

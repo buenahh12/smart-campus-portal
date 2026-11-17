@@ -388,7 +388,7 @@ export default function AdminBlueprint() {
   return <div className="fp-admin">
     <div className="fp-admin-plan">
       <div className="fp-admin-head">
-        <div><button type="button" className="cms-link-button" onClick={() => setDraft(null)}>← All added floors</button><h3 className="bp-title">{title} <span className={`cms-badge ${draft.published ? "good" : "warn"}`}>{draft.published ? "Published" : "Draft"}</span></h3></div>
+        <div><button type="button" className="cms-link-button" onClick={() => setDraft(null)}><Icon name="arrowLeft" size={14} /> All added floors</button><h3 className="bp-title">{title} <span className={`cms-badge ${draft.published ? "good" : "warn"}`}>{draft.published ? "Published" : "Draft"}</span></h3></div>
         <div className="bp-row">
           <label className="cms-link-button bp-upload">{image ? "Replace blueprint" : "Upload blueprint"}<input type="file" accept="image/*" onChange={upload} /></label>
           <button type="button" className="cms-link-button" onClick={generate} disabled={!image || Boolean(busy)}><Icon name="sparkle" size={14} /> Generate with AI</button>

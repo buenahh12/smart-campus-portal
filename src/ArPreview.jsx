@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Icon from "./Icon";
 
 const asset = (file) => `${import.meta.env.BASE_URL}${file}`;
 
@@ -41,9 +42,9 @@ export default function ArPreview() {
         ))}
 
         <div className="arp-top">
-          <span className="arp-back">←</span>
+          <span className="arp-back"><Icon name="arrowLeft" size={16} /></span>
           <span className="arp-title"><b>{DEST}</b><small>{DEST_SUB}</small></span>
-          <span className="arp-more">⋮</span>
+          <span className="arp-more"><Icon name="more" size={16} /></span>
         </div>
 
         <div className="arp-scene" key={i}>

@@ -4,6 +4,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { BUILDING_NAME, FLOORS, METERS_PER_UNIT as M, PLAN_HEIGHT, PLAN_WIDTH } from "./floorPlans";
 import { STAIR, buildExterior, buildRoute, stairFrame } from "./building3d";
 import { concreteTexture, courtRailing, courtyard, furnishFloor, hexTexture, scaleUv, tileTexture, woodTexture } from "./interior3d";
+import Icon from "./Icon";
 
 // 3D dollhouse of the Main Academic Building, built from the same rectangles as the 2D
 // floor plan. The building method (floor slabs, 2.5 m walls with door gaps, stacked floors)
@@ -587,8 +588,8 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
     <div ref={holder} className="ss-dollhouse-canvas" role="img" aria-label={label} />
     {onOpen && <button type="button" className="ss-dollhouse-open" onClick={onOpen}>{openLabel}</button>}
     {zoom && <div className="ss-dollhouse-zoom" role="group" aria-label="Zoom">
-      <button type="button" onClick={() => zoomBy(0.75)} aria-label="Zoom in">+</button>
-      <button type="button" onClick={() => zoomBy(1.33)} aria-label="Zoom out">−</button>
+      <button type="button" onClick={() => zoomBy(0.75)} aria-label="Zoom in"><Icon name="plus" size={20} /></button>
+      <button type="button" onClick={() => zoomBy(1.33)} aria-label="Zoom out"><Icon name="minus" size={20} /></button>
     </div>}
     <span className="ss-dollhouse-hint" aria-hidden="true">{zoom ? "Drag to turn · pinch or scroll to zoom" : "Drag to turn · two fingers on phones"}</span>
   </div>;

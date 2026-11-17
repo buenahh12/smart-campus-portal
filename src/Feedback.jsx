@@ -59,7 +59,7 @@ export function FeedbackDialog({ user, role, start = {}, onClose }) {
           <legend>Overall, how do you like SSCAI NAVI?</legend>
           {FEEDBACK_RATINGS.map((item) => <label key={item.value} className={rating === item.value ? "chosen" : ""} title={item.label}>
             <input type="radio" name="feedback-rating" value={item.value} checked={rating === item.value} onChange={() => setRating(item.value)} />
-            <span aria-hidden="true">{item.face}</span><small>{item.label}</small>
+            <span aria-hidden="true"><Icon name={item.face} size={24} /></span><small>{item.label}</small>
           </label>)}
         </fieldset>
         {FEEDBACK_SURVEY.map((item) => <fieldset className="feedback-kinds feedback-question" key={item.key}>
@@ -200,7 +200,7 @@ export default function AdminFeedback({ onClose, onOpenContent, onOpenVisits, on
           return <article key={row.id} className={`fb-item status-${status}`}>
             <div className="fb-item-head">
               <span className="fb-kind">{row.kind === "survey" ? "Survey only" : kindLabel(row.kind)}</span>
-              {face && <span className="fb-face" title={face.label}>{face.face} {face.label}</span>}
+              {face && <span className="fb-face" title={face.label}><Icon name={face.face} size={16} /> {face.label}</span>}
               <span className={`cms-badge ${status === "new" ? "warn" : "good"}`}>{status === "new" ? "New" : status === "seen" ? "Seen" : "Done"}</span>
             </div>
             {row.message && <p className="fb-message">{row.message}</p>}

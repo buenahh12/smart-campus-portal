@@ -296,7 +296,7 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
             <div className="mc-place-list">
               {myRoutes.length ? myRoutes.map(({ id, from, to, start, end, route }) => <article className={`mc-place mc-route ${route?.blocked ? "affected" : ""}`} key={id}>
                 <div className="mc-place-info">
-                  {start && end ? <b>{placeTitle(start)} <span aria-hidden="true">→</span><span className="sr-only"> to </span> {placeTitle(end)}</b> : <b>A place on this route is no longer on the map</b>}
+                  {start && end ? <b>{placeTitle(start)} <span className="mc-route-arrow" aria-hidden="true"><Icon name="arrow" size={14} /></span><span className="sr-only"> to </span> {placeTitle(end)}</b> : <b>A place on this route is no longer on the map</b>}
                   {start && end && <small>{planFloorLabel(start.floor)} to {planFloorLabel(end.floor)}{route && !route.blocked ? ` · ${route.minutes} min · ${route.meters} m` : ""}</small>}
                   {route?.blocked && <span className="mc-place-alert"><Icon name="alert" size={13} /> Closed right now: no open way. Ask school staff.</span>}
                 </div>
@@ -308,7 +308,7 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
                   </>}
                   <button type="button" className="remove" onClick={() => removeRoute(id)} aria-label="Remove this saved route">Remove</button>
                 </div>
-              </article>) : <p className="updates-empty">{profile === undefined && !profileError ? "Loading your routes…" : "No saved routes yet. Open a route on the 2D Guide, in 3D or in AR and tap ☆ Save route. It shows up here, on any device you sign in to."}</p>}
+              </article>) : <p className="updates-empty">{profile === undefined && !profileError ? "Loading your routes…" : "No saved routes yet. Open a route on the 2D Guide, in 3D or in AR and tap Save route. It shows up here, on any device you sign in to."}</p>}
             </div>
           </section>
           <section className="student-card mc-prefs-card tone-sky">
@@ -338,8 +338,8 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
             <button type="button" className="mc-feedback-button" onClick={() => openFeedback()}>Send feedback to the school</button>
           </section>
           <section className="student-card announcements-card tone-purple">
-            <div className="student-card-heading"><span className="mc-card-icon" aria-hidden="true"><Icon name="sparkle" size={22} /></span><div><p className="kicker">SCHOOL BROADCAST</p><h2>Announcements</h2></div></div>
-            {notices.length ? notices.map((item) => <article className="announcement-item" key={item.id}><span><Icon name="sparkle" size={16} /></span><div><div><b>{item.title}</b><small>{item.pinned ? "Pinned" : item.updatedAt?.toDate?.().toLocaleDateString("en-US", { month: "short", day: "numeric" }) || "School notice"}</small></div><p>{item.body}</p></div></article>) : <p className="updates-empty">{announcements.loading ? "Loading announcements…" : "No announcements right now."}</p>}
+            <div className="student-card-heading"><span className="mc-card-icon" aria-hidden="true"><Icon name="megaphone" size={22} /></span><div><p className="kicker">SCHOOL BROADCAST</p><h2>Announcements</h2></div></div>
+            {notices.length ? notices.map((item) => <article className="announcement-item" key={item.id}><span><Icon name="megaphone" size={16} /></span><div><div><b>{item.title}</b><small>{item.pinned ? "Pinned" : item.updatedAt?.toDate?.().toLocaleDateString("en-US", { month: "short", day: "numeric" }) || "School notice"}</small></div><p>{item.body}</p></div></article>) : <p className="updates-empty">{announcements.loading ? "Loading announcements…" : "No announcements right now."}</p>}
           </section>
         </div>
         <footer className="student-portal-footer"><a className="student-portal-brand footer-brand" href="#about" onClick={onClose}><span className="brand-mark" /><span><b>SAINT SIMON OF CYRENE ACADEMY, INC.</b><small>MY CAMPUS</small></span></a><div className="student-footer-account"><div><b>{name}</b><span>{role}</span></div><button onClick={onSignOut}>Sign out <Icon name="arrow" size={15} /></button></div></footer>

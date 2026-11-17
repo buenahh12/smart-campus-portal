@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "./firebase";
 import { saveProfile, watchProfile } from "./cms";
+import Icon from "./Icon";
 
 // Saved routes: "From → To" pairs kept on the signed-in person's profile (users/{uid}.savedRoutes,
 // see validProfile in firestore.rules), saved from the 2D map, 3D directions or AR live view and
@@ -77,7 +78,7 @@ export function SaveRouteButton({ from, to, className = "", noteClassName = "" }
   };
   return <>
     <button type="button" className={`save-route ${saved ? "saved" : ""} ${className}`} onClick={click} aria-pressed={saved} disabled={busy}>
-      <span aria-hidden="true">{saved ? "★" : "☆"}</span> {saved ? "Saved" : "Save route"}
+      <Icon name="star" size={17} filled={saved} /> {saved ? "Saved" : "Save route"}
     </button>
     {note && <p className={`save-route-note ${noteClassName}`} role="status">
       {note === "signin"

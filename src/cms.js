@@ -388,9 +388,9 @@ export const FEEDBACK_IMPROVE = [
   ['3d', 'Better 3D'], ['tagalog', 'More Tagalog'], ['sibot', 'Smarter SiBot'], ['look', 'Nicer look'],
 ];
 export const FEEDBACK_RATINGS = [
-  { value: 3, face: '😀', label: 'Love it' },
-  { value: 2, face: '🙂', label: "It's okay" },
-  { value: 1, face: '🙁', label: 'Not good' },
+  { value: 3, face: 'smile', label: 'Love it' },
+  { value: 2, face: 'meh', label: "It's okay" },
+  { value: 1, face: 'frown', label: 'Not good' },
 ];
 
 export function sendFeedback({ kind, rating = 0, message, page = '', user = null, role = '', replyOk = false, survey = null }) {

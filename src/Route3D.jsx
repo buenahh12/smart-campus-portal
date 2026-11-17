@@ -101,7 +101,7 @@ export default function Route3DView({ start, end, onClose, onOpenMap }) {
       </div>
       <aside className="route3d-panel">
         <label>From (where you are)<select value={from} onChange={(event) => setFrom(event.target.value)}>{places.map(option)}</select></label>
-        <button type="button" className="route3d-swap" onClick={() => { setFrom(to); setTo(from); }} aria-label="Swap from and to">⇅ Swap</button>
+        <button type="button" className="route3d-swap" onClick={() => { setFrom(to); setTo(from); }} aria-label="Swap from and to"><Icon name="swap" size={16} /> Swap</button>
         <label>To (where you&apos;re going)<select value={to} onChange={(event) => setTo(event.target.value)}>{places.map(option)}</select></label>
         {route?.blocked && <p className="map-alert">No open route right now because a hallway or stairway is closed. Please ask school staff for help.</p>}
         {closedHere.length > 0 && <div className="route3d-closed" role="status">
