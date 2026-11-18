@@ -69,3 +69,32 @@ async function fontFromCache(request) {
   }).catch(() => saved);
   return saved || fresh;
 }
+
+// Phone notifications from api/push-announcement.mjs ("Walang pasok bukas" on the lock screen).
+self.addEventListener("push", (event) => {
+  let note = {};
+  try { note = event.data ? event.data.json() : {}; } catch { note = { title: event.data?.text() || "" }; }
+  const title = note.title || "SSCAI NAVI";
+  event.waitUntil(self.registration.showNotification(title, {
+    body: note.body || "",
+    icon: scoped("./icon-192.png"),
+    tag: note.tag || "sscai-update",
+    renotify: true,
+    data: { url: note.url || scoped("./#updates") },
+  }));
+});
+
+// Tapping the notification opens the site at the announcements (or focuses it if already open).
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || scoped("./#updates");
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    const tab = windows.find((client) => client.url.startsWith(self.registration.scope));
+    if (tab) {
+      await tab.focus();
+      return tab.navigate ? tab.navigate(url).catch(() => {}) : undefined;
+    }
+    return self.clients.openWindow(url);
+  })());
+});

@@ -8,6 +8,7 @@ export default function Icon({ name, size = 20, filled = false }) {
     arrowLeft: <path d="M19 12H5m6-6-6 6 6 6" />,
     building: <><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" /><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2m12-13h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2M10 6h4m-4 4h4m-4 4h4m-4 4h4" /></>,
     bot: <><rect x="4" y="8" width="16" height="12" rx="3" /><path d="M12 8V4m-2 0h4M2 13v3m20-3v3M9 13v1m6-1v1" /></>,
+    bell: <><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0" /></>,
     book: <><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20" /><path d="M9 7h6" /></>,
     chat: <><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /><path d="M8 12h.01M12 12h.01M16 12h.01" /></>,
     check: <path d="M20 6 9 17l-5-5" />,

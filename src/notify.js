@@ -23,3 +23,22 @@ export async function emailSubscribers({ subject, message }) {
   if (!response.ok) throw new Error(result.error || 'The email updates could not be sent.');
   return result;
 }
+
+const PUSH_ENDPOINT = import.meta.env.VITE_PUSH_ENDPOINT || 'https://smart-campus-portal-one.vercel.app/api/push-announcement';
+
+// Phone notification to everyone who tapped "Notify me". configured is false until
+// VAPID_PRIVATE_KEY is added in Vercel (see api/push-announcement.mjs).
+export async function pushToPhones({ title, message }) {
+  const idToken = await auth?.currentUser?.getIdToken();
+  if (!idToken) throw new Error('Sign in again as the administrator to send notifications.');
+  const check = await appCheckToken();
+  const response = await fetch(PUSH_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}`, ...(check ? { 'X-Firebase-AppCheck': check } : {}) },
+    body: JSON.stringify({ title, message }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (response.status === 503 && result.configured === false) return result;
+  if (!response.ok) throw new Error(result.error || 'The phone notifications could not be sent.');
+  return result;
+}

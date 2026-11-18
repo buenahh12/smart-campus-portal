@@ -528,3 +528,21 @@ body .student-portal-shell .mc-welcome-skip { justify-self: center; min-height: 
 .siibot-install b { display: block; font-size: 15px; }
 .siibot-install small { display: block; font-size: 12px; opacity: .8; }
 .siibot-quick .icon { flex: 0 0 auto; }
+
+/* "Notify me": school announcements on the phone's lock screen */
+.notify-me { display: flex; align-items: center; gap: 12px; max-width: 720px; margin: 16px 0 0; padding: 12px 14px; border: 1px solid var(--line, #ddd6c8); border-radius: 14px; color: var(--ink, #1f2a24); background: var(--surface, #fff); text-align: left; }
+.notify-me-icon { flex: 0 0 auto; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; color: var(--forest, #2f5d46); background: var(--green-tint, #e7f0ea); }
+.notify-me.is-on .notify-me-icon { color: #fff; background: var(--forest, #2f5d46); }
+.notify-me.is-blocked .notify-me-icon, .notify-me.is-install-first .notify-me-icon { color: var(--red, #b42318); background: var(--red-tint, #fdf0ee); }
+.notify-me-text { flex: 1; min-width: 0; }
+.notify-me-text b { display: block; font-size: 16px; }
+.notify-me-text small { display: block; margin-top: 2px; color: var(--muted, #5f6b63); font-size: 13px; line-height: 1.45; }
+.notify-me-text .notify-me-problem { color: var(--red, #b42318); }
+.notify-me > button { flex: 0 0 auto; min-height: 44px; display: inline-flex; align-items: center; gap: 6px; padding: 0 16px; border: 1px solid var(--forest, #2f5d46); border-radius: 999px; color: #fff; background: var(--forest, #2f5d46); font-size: 15px; font-weight: 700; white-space: nowrap; }
+.notify-me.is-on > button { color: var(--forest, #2f5d46); background: transparent; }
+.notify-me > button:disabled { opacity: .6; }
+.notify-me.compact { margin: 0 0 12px; }
+@media (max-width: 560px) {
+  .notify-me { flex-wrap: wrap; }
+  .notify-me > button { width: 100%; justify-content: center; }
+}

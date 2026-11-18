@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import Icon from "./Icon";
 import { CMS_COLLECTIONS, deleteItem, isClosureActive, saveItem, todayKey, watchCollection } from "./cms";
 import { MAP_AREAS, buildingOf, mapAreaLabel } from "./floorPlans";
-import { emailSubscribers } from "./notify";
+import { emailSubscribers, pushToPhones } from "./notify";
 import AdminFloorPlan from "./AdminFloorPlan";
 import { auth } from "./firebase";
 import { AnnouncementArt, ClosureArt, generateAiPicture, useDebounced } from "./EventArt";
@@ -137,7 +137,9 @@ const SECTIONS = [
     badge: (item) => item.published ? (item.expiresOn && item.expiresOn < todayKey() ? ["Expired", "muted"] : ["Published", "good"]) : ["Draft", "muted"],
     // Email subscribers when an announcement is published for the first time.
     emailLabel: "Email subscribers when this is published",
+    pushLabel: "Send a phone notification when this is published (shows on the lock screen)",
     email: (item, previous) => item.published && !previous?.published ? {
+      push: item.title,
       subject: `New announcement: ${item.title}`,
       message: `${item.body}${item.expiresOn ? `\n\nShown until ${item.expiresOn}.` : ""}`,
     } : null,
@@ -172,6 +174,7 @@ const SECTIONS = [
     badge: (item) => isClosureActive(item) ? ["Closed now", "bad"] : item.active && item.startDate > todayKey() ? ["Scheduled", "warn"] : ["Open", "good"],
     // Email subscribers when a restriction is switched on.
     emailLabel: "Email subscribers about this closure",
+    pushLabel: "Send a phone notification about this closure",
     email: (item, previous) => item.active && !previous?.active ? {
       subject: `Hallway closed: ${item.pathway}`,
       message: `${item.pathway} (${item.building}, floor ${item.floor}) is closed for ${item.reason.toLowerCase()} from ${item.startDate}${item.endDate ? ` until ${item.endDate}` : ""}.${item.detour ? ` Detour: ${item.detour}.` : ""}${item.details ? `\n\n${item.details}` : ""}`,
@@ -265,6 +268,7 @@ export default function AdminCms({ onClose, onSignOut, onOpenAnalytics, onOpenSi
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
   const [sendEmail, setSendEmail] = useState(true);
+  const [sendPush, setSendPush] = useState(true);
   const section = SECTIONS.find((item) => item.key === activeKey) || SECTIONS[0];
   const items = data[activeKey] || [];
 
@@ -314,25 +318,42 @@ export default function AdminCms({ onClose, onSignOut, onOpenAnalytics, onOpenSi
     setSaving(true);
     setFormError("");
     const previous = editingId ? items.find((item) => item.id === editingId) : null;
-    const mail = sendEmail ? section.email?.(record, previous) : null;
+    const update = section.email?.(record, previous) || null;
+    const mail = sendEmail ? update : null;
+    const phone = sendPush && update ? { title: update.push || update.subject, message: update.message } : null;
     try {
       await saveItem(section.collection, editingId, record);
       const saved = `${section.title(record)} was ${editingId ? "updated" : "added"}. The change is live on SSCAI NAVI.`;
       resetForm();
+      // Phone notifications first (they are quick), then the emails.
+      let phoneNote = "";
+      if (phone) {
+        try {
+          const result = await pushToPhones(phone);
+          phoneNote = !result.configured
+            ? " No phone notification was sent because notifications aren't set up yet (add VAPID_PRIVATE_KEY in Vercel)."
+            : result.total === 0
+              ? " No one has turned on phone notifications yet."
+              : ` Phone notification sent to ${result.sent} of ${result.total} phone${result.total === 1 ? "" : "s"}.`;
+        } catch (pushError) {
+          phoneNote = ` The phone notifications were not sent: ${pushError.message}`;
+        }
+      }
       if (!mail) {
-        setNotice(saved);
+        setNotice(saved + phoneNote);
       } else {
-        setNotice(`${saved} Sending email updates…`);
+        setNotice(`${saved}${phoneNote} Sending email updates…`);
         try {
           const result = await emailSubscribers(mail);
-          setNotice(!result.configured
+          // "<saved>< phone note> <email result>"
+          setNotice((!result.configured
             ? `${saved} No email was sent because the email service isn't set up yet (see api/email-subscribers.mjs).`
             : result.total === 0
               ? `${saved} No one has turned on email updates yet, so no email was sent.`
-              : `${saved} Email sent to ${result.sent} of ${result.total} subscriber${result.total === 1 ? "" : "s"}${result.failed ? ` (${result.failed} failed)` : ""}${result.notSent ? ` (${result.notSent} not sent: time ran out, save again to retry)` : ""}.`);
+              : `${saved} Email sent to ${result.sent} of ${result.total} subscriber${result.total === 1 ? "" : "s"}${result.failed ? ` (${result.failed} failed)` : ""}${result.notSent ? ` (${result.notSent} not sent: time ran out, save again to retry)` : ""}.`).replace(saved, saved + phoneNote));
         } catch (mailError) {
           // The change itself is saved; only the emails failed.
-          setNotice(`${saved} The email updates were not sent: ${mailError.message}`);
+          setNotice(`${saved}${phoneNote} The email updates were not sent: ${mailError.message}`);
         }
       }
     } catch (error) {
@@ -395,6 +416,7 @@ export default function AdminCms({ onClose, onSignOut, onOpenAnalytics, onOpenSi
               </label>)}
             {section.preview?.(values, (name, value) => setValues((current) => ({ ...current, [name]: value })))}
             {formError && <p className="auth-error" role="alert">{formError}</p>}
+            {section.email && <label className="cms-check cms-email-check"><input type="checkbox" checked={sendPush} onChange={(event) => setSendPush(event.target.checked)} />{section.pushLabel}</label>}
             {section.email && <label className="cms-check cms-email-check"><input type="checkbox" checked={sendEmail} onChange={(event) => setSendEmail(event.target.checked)} />{section.emailLabel}</label>}
             {notice && <p className="auth-success" role="status">{notice}</p>}
             <button className="attendance-save" type="submit" disabled={saving}><Icon name={editingId ? "arrow" : "plus"} size={16} /> {saving ? "Saving…" : editingId ? "Save changes" : `Add ${section.singular}`}</button>

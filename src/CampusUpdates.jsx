@@ -4,6 +4,26 @@ import { CMS_COLLECTIONS, isClosureActive, todayKey, watchCollection } from "./c
 import { PLACES, buildingOf, findPlaceKey, floorLabel as planFloorLabel } from "./floorPlans";
 import { usePlanVersion } from "./usePlan";
 import { AnnouncementArt, ClosureArt } from "./EventArt";
+import { usePush } from "./push";
+
+// "Notify me": school announcements (like "Walang pasok bukas") on this phone's lock screen.
+export function NotifyMe({ compact = false }) {
+  const { status, busy, problem, toggle } = usePush();
+  if (status === "unsupported") return null;
+  return <div className={`notify-me is-${status}${compact ? " compact" : ""}`}>
+    <span className="notify-me-icon" aria-hidden="true"><Icon name="bell" size={22} /></span>
+    <div className="notify-me-text">
+      {status === "on" && <><b>Notifications are on for this phone</b><small>You&apos;ll get &ldquo;walang pasok&rdquo; and other school announcements on your lock screen.</small></>}
+      {status === "off" && <><b>Get announcements on your phone</b><small>Like a text message: &ldquo;walang pasok&rdquo;, class changes and closed hallways show on your lock screen. No sign-in needed.</small></>}
+      {status === "blocked" && <><b>Notifications are blocked</b><small>Allow notifications for this site in your browser settings (tap the lock icon beside the address), then reload.</small></>}
+      {status === "install-first" && <><b>On iPhone, add the app first</b><small>Tap Share, then Add to Home Screen. Open SSCAI NAVI from your Home Screen and tap Notify me there.</small></>}
+      {problem && <small className="notify-me-problem" role="alert">{problem}</small>}
+    </div>
+    {(status === "on" || status === "off") && <button type="button" onClick={toggle} disabled={busy} aria-pressed={status === "on"}>
+      {busy ? "Please wait…" : status === "on" ? "Turn off" : <><Icon name="bell" size={16} /> Notify me</>}
+    </button>}
+  </div>;
+}
 
 // Live, read-only view of an admin-managed collection for any visitor.
 export function usePublicCollection(name) {
@@ -65,6 +85,7 @@ export default function CampusUpdates({ onShowMap }) {
       <div className="ss-section-head" data-reveal>
         <h2 id="updates-title" className="ss-display"><span>On campus</span> <span className="t-stripe">today</span></h2>
         <p>Closed hallways, school announcements, and the room directory, kept up to date by school staff.</p>
+        <NotifyMe />
       </div>
       {unavailable && <p className="updates-unavailable">{unavailable}</p>}
       <div className="updates-grid" data-reveal>

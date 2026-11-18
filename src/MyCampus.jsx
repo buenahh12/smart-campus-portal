@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import Icon from "./Icon";
-import { usePublicCollection, visibleAnnouncements } from "./CampusUpdates";
+import { NotifyMe, usePublicCollection, visibleAnnouncements } from "./CampusUpdates";
 import { CMS_COLLECTIONS, GRADE_LEVELS, MAX_SAVED_PLACES, MAX_SECTION_LENGTH, USER_ROLES, isClosureActive, placeKey, saveProfile, setEmailUpdates, watchProfile, watchSubscription } from "./cms";
 import { MAX_SAVED_ROUTES, parseRouteId } from "./savedRoutes";
 import { BUILDING_NAME, PLACES, blockedAreas, buildingOf, findRoute, classroomOf, floorLabel as planFloorLabel, placeByKey, placeTitle, sectionsOf } from "./floorPlans";
@@ -335,6 +335,7 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
                 setProfileError("Your email setting could not be saved. Check your connection and try again.");
               }).finally(() => setEmailSaving(false));
             }} /><span><b>Email me announcements and closed hallways</b><small>Sent to {user.email} when the school posts an update.</small></span></label>}
+            <NotifyMe compact />
             <button type="button" className="mc-feedback-button" onClick={() => openFeedback()}>Send feedback to the school</button>
           </section>
           <section className="student-card announcements-card tone-purple">

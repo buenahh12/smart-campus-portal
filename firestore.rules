@@ -211,6 +211,19 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
+    // Phone notifications: anyone can turn them on for their own phone (no sign-in needed). The id
+    // is a hash of the phone's private push address, so it can't be guessed, and nobody but the
+    // administrator can read or list the addresses.
+    match /pushSubscriptions/{id} {
+      allow read: if isAdmin();
+      allow delete: if id.matches('^[0-9a-f]{64}$');
+      allow create, update: if id.matches('^[0-9a-f]{64}$')
+        && data().keys().hasOnly(['endpoint', 'p256dh', 'auth', 'updatedAt'])
+        && text('endpoint', true, 1000) && data().endpoint.matches('^https://.+')
+        && text('p256dh', true, 200) && text('auth', true, 100)
+        && data().updatedAt == request.time;
+    }
+
     // Sign-in records: each signed-in person can add rows about themselves only (the uid and
     // email must match their verified token). Nobody can edit them; only the administrator
     // can read or delete them.
