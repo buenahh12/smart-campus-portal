@@ -33,6 +33,7 @@ const DEFAULT_START = "1:entrance";
 // Add more rooms here as their photos are taken (put the picture in public/campus/).
 const ROOM_PHOTOS = {
   "1:g-101": { file: "campus/library-elementary.jpg", info: "Bookshelves, reading tables and a computer for students. Please keep quiet inside.", alt: "The ground floor library with green walls, bookshelves, a globe and reading tables" },
+  "2:clinic": { file: "campus/clinic.jpg", info: "The school nurse, first aid, a bed to rest and a wheelchair. Come here if you feel sick or get hurt.", alt: "The school clinic with blue walls, a bed, a wheelchair, medicine drawers and a \"When to visit the nurse\" board" },
   "3:library-hs": { file: "campus/library-high-school-room.jpg", info: "General, Filipiniana, SHS and reference books, reading tables and the librarian's desk. Please keep quiet inside.", alt: "The high school library with blue walls, tall bookshelves, a globe, and students studying at reading tables" },
 };
 const HOLD_MS = 450;
