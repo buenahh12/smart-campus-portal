@@ -18,9 +18,10 @@ const WALL_THICKNESS = 0.15;
 const SLAB = 0.2;
 const DOOR_WIDTH = 1.0;
 
-// Like an architect's model: white walls, wood floors in rooms, light tiles in hallways and C.R.s.
+// Like the real school (walk-through videos): lime green walls with a darker green strip, white
+// doors, grey concrete floors in rooms and hallways, cream tiles in offices, light tiles in C.R.s.
 const COLORS = {
-  hall: "#ebe4d3",
+  hall: "#b7bab3", // grey, shiny concrete hallways
   wall: "#9bd35c", // lime green walls inside, as in the photos
   base: "#3f8f3a", // darker green strip along the bottom of the walls
   door: "#f3f2ec",
@@ -64,7 +65,7 @@ function buildFloor(plan, materialFor) {
     mesh.position.set(cx, SLAB / 2 + lift, cz);
     group.add(mesh);
   };
-  const floorTexture = (item) => (item.type === "cr" ? "crtile" : ["classroom", "office", "lab", "facility"].includes(item.type) ? "wood" : "");
+  const floorTexture = (item) => (item.type === "cr" ? "crtile" : item.type === "office" ? "tile" : ["classroom", "lab", "facility"].includes(item.type) ? "concrete" : "");
 
   plan.halls.forEach((hall) => slab(hall.rect, COLORS.hall, 0, "concrete"));
   // Every wall line on this floor, merged, so a wall two rooms share is drawn once.
@@ -312,6 +313,7 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
     // and lets the camera drift after it.
     const stepWalk = (walk, time) => {
       const { curve, length, ball, halo, floors: routeFloors, ballHeight } = walk.group.userData;
+      const pointOn = (u) => curve.getPointAt(Math.min(0.9999, Math.max(0, Number.isFinite(u) ? u : 0))) || walk.lastPoint || curve.getPointAt(0);
       if (walk.started === undefined) walk.started = time;
       const dt = Math.min(0.1, walk.last === undefined ? 0 : (time - walk.last) / 1000);
       walk.last = time;
@@ -321,7 +323,9 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
       const restarted = walk.travelled !== undefined && travelled < walk.travelled - 1;
       walk.travelled = travelled;
       progress.current?.(Math.min(1, travelled / length), restarted);
-      const point = curve.getPointAt(Math.min(1, travelled / length));
+      const point = pointOn(travelled / length);
+      if (!point) return;
+      walk.lastPoint = point.clone();
       ball.position.copy(point);
       if (!reduceMotion) {
         halo.scale.setScalar(1 + Math.sin(time / 220) * 0.12);
@@ -355,8 +359,8 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
         // Eye level, a few steps behind the pin, looking where it is going. The camera turns at a
         // steady pace (so the U-turn on a stair landing is a smooth swing, not a flip) and climbs
         // with the pin. On a restart it cuts straight back to the start.
-        const ahead = curve.getPointAt(Math.min(1, (travelled + 5) / length));
-        const behind = curve.getPointAt(Math.max(0, (travelled - 5) / length));
+        const ahead = pointOn((travelled + 5) / length);
+        const behind = pointOn((travelled - 5) / length);
         const direction = ahead.clone().sub(behind).setY(0);
         const wanted = direction.lengthSq() < 0.01 ? walk.angle ?? 0 : Math.atan2(direction.x, direction.z);
         if (walk.angle === undefined || restarted || reduceMotion) walk.angle = wanted;

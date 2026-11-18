@@ -66,9 +66,9 @@ export function scaleUv(geometry, width, depth, metresPerRepeat = 2) {
 }
 
 const FURNITURE = {
-  wood: "#b98450",
-  woodLight: "#d4ab78",
-  chair: "#4f8f5e",
+  wood: "#dedbd3", // white folding and classroom tables (the photos have no wooden desks)
+  woodLight: "#ebe8e1",
+  chair: "#4cc4ac", // teal plastic monobloc chairs, as in the library, clinic and labs
   board: "#2f5a3d",
   metal: "#9aa3a6",
   shelf: "#8a5b36",
