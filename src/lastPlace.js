@@ -27,12 +27,19 @@ export function lastPlace() {
   }
 }
 
-// "8 min ago", "just now".
+// "just now", "8 min ago", "2 hours ago".
 export function agoText(at) {
   const minutes = Math.round((Date.now() - at) / 60000);
   if (minutes < 1) return "just now";
-  return minutes === 1 ? "1 min ago" : `${minutes} min ago`;
+  if (minutes < 60) return minutes === 1 ? "1 min ago" : `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  return hours === 1 ? "1 hour ago" : `${hours} hours ago`;
 }
+
+// Worth offering as "I'm still at …": we know when it was saved (older phones saved the place
+// without a time), and it was within the last 12 hours.
+const RECENT_MS = 12 * 60 * 60 * 1000;
+export const isRecent = (last) => Boolean(last && last.at > 0 && Date.now() - last.at < RECENT_MS);
 
 // A starting point on a floor when we don't know the room: the room nearest the middle of that
 // floor, so the guess is never far off. (Stairs and exits are left out: the From list can't show them.)

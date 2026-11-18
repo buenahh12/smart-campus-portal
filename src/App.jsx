@@ -21,7 +21,7 @@ import { BUILDING_NAME, FLOORS, PLACES, blockedKeyOf, findPlaceKey, floorShort, 
 import { searchPlace } from "./placeSearch";
 import { PolicyDialog, PrivacyNotice, privacyNoticeSeen } from "./Policies";
 import { FeedbackDialog, openFeedback } from "./Feedback";
-import { agoText, floorStart, lastPlace } from "./lastPlace";
+import { agoText, floorStart, isRecent, lastPlace } from "./lastPlace";
 
 // Where the person said they are, last time they used the floor plan (to pick the nearest CR).
 const savedStart = () => {
@@ -1088,7 +1088,7 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
         <div className="sibot-floor-grid">
           {mainFloors().map((floor) => <button key={floor} type="button" onClick={() => goExit(floorStart(floor), floor, true)}>{planFloorLabel(floor)}</button>)}
         </div>
-        {last && <button type="button" className="sibot-floor-last" onClick={() => goExit(last.key, last.place.floor)}>I&apos;m still at {placeTitle(last.place)} <small>({agoText(last.at)})</small></button>}
+        {isRecent(last) && <button type="button" className="sibot-floor-last" onClick={() => goExit(last.key, last.place.floor)}>I&apos;m still at {placeTitle(last.place)} <small>({agoText(last.at)})</small></button>}
         <button type="button" className="sibot-menu-cancel" onClick={() => setMenu(null)}>Cancel</button>
       </div>}
       <button
