@@ -60,11 +60,11 @@ function OfflinePanel({ offlineApp }) {
   const inApp = /Android/i.test(navigator.userAgent) ? inAppBrowserName() : "";
   // Install on the home screen (a PWA: no app store, nothing big to download). Only here, never a pop-up.
   let action;
-  if (offlineApp.installed) action = <p className="ss-offline-done"><Icon name="download" size={16} /> Installed. SSCAI NAVI opens from your home screen, even offline.</p>;
-  else if (offlineApp.canInstall) action = <div className="dollhouse-actions"><button type="button" onClick={offlineApp.install}><Icon name="download" size={16} /> Install app</button></div>;
+  if (offlineApp.installed) action = <p className="ss-offline-done"><Icon name="addHome" size={16} /> On your home screen. Tap the SSCAI NAVI icon to open it, even offline.</p>;
+  else if (offlineApp.canInstall) action = <div className="dollhouse-actions"><button type="button" onClick={offlineApp.install}><Icon name="addHome" size={16} /> Add to Home screen</button></div>;
   else if (offlineApp.iosInstallTip) action = <ol className="ss-offline-steps"><li>Tap <b>Share</b> <span className="ss-inline-icon"><Icon name="share" size={15} /></span> at the bottom of Safari.</li><li>Tap <b>Add to Home Screen</b>.</li></ol>;
-  else if (inApp) action = <div className="dollhouse-actions"><a href={chromeIntentFor(window.location.href.split("#")[0])}>Open in Chrome to install</a></div>;
-  else action = <p className="ss-offline-hint"><b>Already installed?</b> Open SSCAI NAVI from your home screen (the school logo). If it isn&apos;t there yet, open the browser menu and choose <b>Install app</b> or <b>Add to Home screen</b>. No app store, nothing big to download.</p>;
+  else if (inApp) action = <div className="dollhouse-actions"><a href={chromeIntentFor(window.location.href.split("#")[0])}>Open in Chrome to add it</a></div>;
+  else action = <p className="ss-offline-hint"><b>Already added?</b> Open SSCAI NAVI from your home screen (the school logo). If it isn&apos;t there yet, open the browser menu (&#8942;) and choose <b>Add to Home screen</b>. It&apos;s just a shortcut icon: no app store, nothing to download.</p>;
   const status = offlineApp.savedOffline
     ? { tone: "ready", text: "Ready offline on this device" }
     : offlineApp.offlineSupported
@@ -871,8 +871,8 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
       openAccessibility();
     } else if (hasAny(["install", "download the app", "download app", "home screen", "add to home", "get the app", "offline", "no wifi", "no wi-fi", "without internet"])) {
       answer = offlineApp.installed
-        ? "SSCAI NAVI is already installed on this device. Open it from your home screen. It works even without Wi-Fi."
-        : "You can install SSCAI NAVI on your home screen. There's no app store and nothing big to download, and it works without Wi-Fi. Tap Install app at the top of this chat, or I'll show you the steps for your phone.";
+        ? "SSCAI NAVI is already on your home screen. Tap its icon to open it. It works even without Wi-Fi."
+        : "You can add SSCAI NAVI to your home screen as an icon, like an app. It's not a download and there's no app store, and it works without Wi-Fi. Tap Add to Home screen at the top of this chat, or I'll show you the steps for your phone.";
       if (!offlineApp.installed && !offlineApp.canInstall) onNavigate("offline");
     } else if (hasAny(["ar live", "ar view", "augmented reality", "camera guide", "live view"])) {
       answer = "AR Live View is in Explore the Platform. Open it for a visual walkthrough with directions and room distance.";
@@ -1081,7 +1081,7 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
                 // Chrome on Android/computer: the real install prompt. iPhone or Messenger: the steps in Offline mode.
                 if (offlineApp.canInstall) offlineApp.install();
                 else { setOpen(false); onNavigate("offline"); }
-              }}><Icon name="download" size={18} /> <span><b>Install app</b><small>Works offline</small></span></button>}
+              }}><Icon name="addHome" size={18} /> <span><b>Add to Home</b><small>Icon on your phone</small></span></button>}
             </div>
             <p className="siibot-label">Ask a question or try a command</p>
             <div className="siibot-options">

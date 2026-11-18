@@ -31,6 +31,7 @@ export default function Icon({ name, size = 20, filled = false }) {
     monitor: <><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8m-4-4v4" /></>,
     more: <><circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" /></>,
     plus: <path d="M12 5v14M5 12h14" />,
+    addHome: <path d="M15 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6M11 18h2M19 2v6M16 5h6" />,
     restroom: <><circle cx="7" cy="4" r="1.6" /><circle cx="17" cy="4" r="1.6" /><path d="M7 8v13M5 9h4l1 6H4l1-6Zm12-1-3 7h6l-3-7Zm-1.2 7v7m2.4-7v7M12 2v20" /></>,
     route: <><circle cx="6" cy="19" r="3" /><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" /><circle cx="18" cy="5" r="3" /></>,
     scan: <path d="M3 7V5a2 2 0 0 1 2-2h2m10 0h2a2 2 0 0 1 2 2v2m0 10v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10" />,
