@@ -6,6 +6,8 @@ import { usePlanVersion } from "./usePlan";
 import { openFeedback } from "./Feedback";
 import { SaveRouteButton } from "./savedRoutes";
 import { rememberPlace } from "./lastPlace";
+import { useA11y } from "./a11y";
+import { savedVoiceLang, speak, stepText, stopSpeaking, voiceSupported } from "./voiceGuide";
 import {
   BUILDING_NAME,
   FLOORS,
@@ -594,12 +596,28 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
   const [emergency, setEmergency] = useState(initialEmergency);
   const [selectedKey, setSelectedKey] = useState(initialDestination);
   const [floor, setFloor] = useState(() => (initialStart && placeByKey(initialStart) ? placeByKey(initialStart).floor : null) || (initialEmergency || initialDestination ? placeByKey(readStart())?.floor : null) || initialFloor);
+  // Read the directions aloud (button, or automatically with Accessibility > Read directions aloud).
+  const [a11y] = useA11y();
+  const sayRoute = (current) => {
+    if (!current?.steps) return;
+    const lang = savedVoiceLang() === "tl" ? "tl" : "en";
+    const lines = [
+      current === route && emergency ? "Nearest exit." : "",
+      `${current.minutes} minute${current.minutes === 1 ? "" : "s"}, ${current.meters} metres.`,
+      ...current.steps.map((step) => stepText(step.text, lang)),
+    ].filter(Boolean);
+    speak(lines.join(". ").replace(/\.\./g, "."), lang);
+  };
   // Only a floor was picked in an emergency, so the start is that floor's stairs until they tap their room.
   const [guessedStart, setGuessedStart] = useState(askRoom);
   const activeClosures = closures.items.filter((item) => isClosureActive(item));
   const blockedKey = blockedKeyOf(activeClosures);
   const blocked = useMemo(() => blockedAreas(activeClosures), [blockedKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const route = useMemo(() => (emergency ? findNearestExit(startKey, blocked) : findRoute(startKey, destKey, blocked)), [emergency, startKey, destKey, blocked, planVersion]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (a11y.speak && route?.steps) sayRoute(route);
+  }, [route, a11y.speak]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => stopSpeaking(), []);
   const plan = FLOORS.find((item) => item.floor === floor);
   const selected = placeByKey(selectedKey);
   const routeFloors = route?.floors || [];
@@ -739,6 +757,7 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
                     <span>{route.meters} m · {routeWalkText(route)}</span>
                     {route.path.every((id) => buildingOf(graphNode(id)?.floor) === BUILDING_NAME) && <button type="button" className="map-3d-button" onClick={() => window.dispatchEvent(new CustomEvent("sscai:route3d", { detail: { start: route.start.key, end: route.end.key } }))}><Icon name="cube" size={15} /> Show in 3D</button>}
                     {!emergency && <SaveRouteButton className="map-3d-button" from={route.start.key} to={route.end.key} />}
+                    {voiceSupported() && <button type="button" className="map-3d-button map-speak" onClick={() => sayRoute(route)} aria-label="Read the directions aloud"><Icon name="volume" size={15} /> Read aloud</button>}
                   </div>
                   {emergency && <p className="map-alert">In a real emergency, stay calm and follow your teacher and school staff.</p>}
                   {emergency && <p className="map-here-hint"><Icon name="location" size={16} /> <span>{guessedStart

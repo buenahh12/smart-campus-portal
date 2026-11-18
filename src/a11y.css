@@ -1,0 +1,69 @@
+/* Accessibility settings (src/a11y.js) and the panel. Loaded last so these win. */
+
+/* Clear focus ring everywhere for keyboard users. */
+:focus-visible { outline: 3px solid var(--focus, #c97a3f); outline-offset: 2px; }
+
+/* ---------- Text size: the page grows; the full-screen 2D, 3D and AR views have their own zoom ---------- */
+html.a11y-zoomed .ss-site > *:not(.map-shell):not(.ar-live):not(.route3d):not(.ss-skip) { zoom: var(--a11y-zoom, 1); }
+
+/* ---------- High contrast ---------- */
+html.a11y-contrast {
+  --ink: #000; --ink-2: #111; --muted: #222; --paper: #fff; --surface: #fff;
+  --line: #444; --line-strong: #111; --green: #0b3a25; --green-tint: #e6efe9; --focus: #000;
+  --grain: none;
+}
+html.a11y-contrast body { background: #fff; }
+html.a11y-contrast a { text-decoration: underline; text-underline-offset: 2px; }
+html.a11y-contrast :focus-visible { outline: 4px solid #000; box-shadow: 0 0 0 7px #ffd400; }
+html.a11y-contrast small, html.a11y-contrast .muted, html.a11y-contrast p { opacity: 1 !important; }
+html.a11y-contrast button, html.a11y-contrast input, html.a11y-contrast select, html.a11y-contrast textarea { border-width: 2px; }
+html.a11y-contrast * { text-shadow: none !important; }
+
+/* ---------- Easy-to-read font: plain letters, normal width, no capitals-only words ---------- */
+html.a11y-plainfont { --display: Verdana, Tahoma, "Segoe UI", Roboto, Arial, sans-serif; --sans: Verdana, Tahoma, "Segoe UI", Roboto, Arial, sans-serif; --mono: Verdana, Tahoma, "Segoe UI", Roboto, Arial, sans-serif; }
+html.a11y-plainfont body, html.a11y-plainfont body *:not(svg):not(svg *) { font-family: Verdana, Tahoma, "Segoe UI", Roboto, Arial, sans-serif !important; font-stretch: 100% !important; text-transform: none !important; letter-spacing: .01em !important; }
+html.a11y-plainfont body p, html.a11y-plainfont body li { line-height: 1.6; word-spacing: .06em; }
+
+/* ---------- Stop animations ---------- */
+html.a11y-still *, html.a11y-still *::before, html.a11y-still *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+
+/* ---------- Header button ---------- */
+.ss-a11y { display: grid; place-items: center; width: 44px; height: 44px; margin-left: auto; padding: 0; border: 1px solid rgba(246,239,225,.45); border-radius: 50%; color: var(--cream, #f6efe1); background: transparent; }
+.ss-a11y:hover { background: rgba(246,239,225,.12); }
+.ss-a11y + .ss-menu { margin-left: 8px; }
+@media (min-width: 901px) { .ss-a11y { margin-left: 12px; } }
+
+/* ---------- Panel ---------- */
+.a11y-shell { z-index: 300; }
+.a11y-panel { width: min(460px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto; padding: 18px; border-radius: 18px; color: var(--ink, #1b2a21); background: var(--surface, #fffcf5); box-shadow: 0 24px 60px rgba(0,0,0,.3); }
+.a11y-head { display: flex; align-items: center; gap: 10px; }
+.a11y-head h2 { margin: 0; flex: 1; font-size: 24px; }
+.a11y-mark { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; color: #fff; background: var(--forest, #1c3a2a); }
+.a11y-close { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--line-strong, #cbbc9f); border-radius: 50%; color: var(--ink, #1b2a21); background: var(--surface, #fff); }
+.a11y-intro { margin: 10px 0 14px; color: var(--muted, #5d6a5e); font-size: 15px; }
+.a11y-size, .a11y-toggle { display: flex; align-items: center; gap: 12px; margin: 0 0 10px; padding: 12px 14px; border: 1px solid var(--line, #e2d7c2); border-radius: 14px; background: var(--surface, #fff); }
+.a11y-size > span, .a11y-toggle > span { flex: 1; min-width: 0; }
+.a11y-size b, .a11y-toggle b { display: block; font-size: 16px; }
+.a11y-size small, .a11y-toggle small { display: block; margin-top: 2px; color: var(--muted, #5d6a5e); font-size: 13px; line-height: 1.4; }
+.a11y-size-controls { display: flex; align-items: center; gap: 8px; }
+.a11y-size-controls button { display: grid; place-items: center; width: 48px; height: 48px; padding: 0; border: 2px solid var(--forest, #1c3a2a); border-radius: 12px; color: var(--forest, #1c3a2a); background: var(--surface, #fff); font: 800 18px/1 system-ui, sans-serif; }
+.a11y-size-controls button.big { font-size: 24px; }
+.a11y-size-controls button:disabled { opacity: .35; }
+.a11y-size-controls output { min-width: 52px; text-align: center; font-weight: 800; font-size: 16px; }
+.a11y-toggle { cursor: pointer; }
+.a11y-toggle input { flex: 0 0 auto; width: 26px; height: 26px; margin: 0; accent-color: var(--forest, #1c3a2a); }
+.a11y-note { display: flex; gap: 10px; margin: 12px 0 0; padding: 12px 14px; border-radius: 14px; color: var(--ink, #1b2a21); background: var(--green-tint, #e2ebdb); }
+.a11y-note .icon { flex: 0 0 auto; margin-top: 2px; }
+.a11y-note p { margin: 0; font-size: 14px; line-height: 1.5; }
+.a11y-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.a11y-actions button { min-height: 46px; padding: 0 18px; border-radius: 999px; font-weight: 700; font-size: 15px; }
+.a11y-reset { border: 1px solid var(--line-strong, #cbbc9f); color: var(--ink, #1b2a21); background: transparent; }
+.a11y-done { border: 1px solid var(--forest, #1c3a2a); color: #fff; background: var(--forest, #1c3a2a); }
+
+/* Read-aloud button in the 2D Guide */
+.map-speak.speaking { color: #fff; background: var(--forest, #1c3a2a); }
+
+/* With bigger text the page is narrower inside, so nothing may insist on a fixed width or one line. */
+html.a11y-zoomed .ss-site :is(div, section, article, header, footer, nav, aside, form, ul, ol, li, p, h1, h2, h3, h4, a, button, label, span, b, small, strong, em) { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+html.a11y-zoomed .ss-site :is(a, button, b, small, span) { white-space: normal; }
+html.a11y-zoomed body { min-width: 0; }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Icon from "./Icon";
+import { prefersStill } from "./a11y";
 
 const asset = (file) => `${import.meta.env.BASE_URL}${file}`;
 
@@ -27,7 +28,7 @@ export default function ArPreview() {
   const [i, setI] = useState(0);
 
   useEffect(() => {
-    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const still = prefersStill();
     if (still) return undefined;
     const id = setInterval(() => setI((n) => (n + 1) % STEPS.length), STEP_MS);
     return () => clearInterval(id);

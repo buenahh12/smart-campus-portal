@@ -5,6 +5,7 @@ import { BUILDING_NAME, FLOORS, METERS_PER_UNIT as M, PLAN_HEIGHT, PLAN_WIDTH } 
 import { STAIR, buildExterior, buildRoute, stairFrame } from "./building3d";
 import { concreteTexture, courtRailing, courtyard, furnishFloor, hexTexture, scaleUv, tileTexture, woodTexture } from "./interior3d";
 import Icon from "./Icon";
+import { prefersStill } from "./a11y";
 
 // 3D dollhouse of the Main Academic Building, built from the same rectangles as the 2D
 // floor plan. The building method (floor slabs, 2.5 m walls with door gaps, stacked floors)
@@ -266,7 +267,7 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
     exterior.visible = false;
     world.add(exterior);
 
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduceMotion = prefersStill();
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableZoom = zoom;
     controls.minDistance = 18;

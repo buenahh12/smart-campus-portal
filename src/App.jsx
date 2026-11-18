@@ -22,6 +22,8 @@ import { searchPlace } from "./placeSearch";
 import { PolicyDialog, PrivacyNotice, privacyNoticeSeen } from "./Policies";
 import { FeedbackDialog, openFeedback } from "./Feedback";
 import { agoText, floorStart, isRecent, lastPlace } from "./lastPlace";
+import { openAccessibility, prefersStill, useStill } from "./a11y";
+import AccessibilityPanel from "./AccessibilityPanel";
 
 // Where the person said they are, last time they used the floor plan (to pick the nearest CR).
 const savedStart = () => {
@@ -207,7 +209,7 @@ function OpenInBrowser({ app }) {
 function useReveal() {
   useEffect(() => {
     const show = (element) => element.setAttribute("data-revealed", "");
-    const instant = !("IntersectionObserver" in window) || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const instant = !("IntersectionObserver" in window) || prefersStill();
     const observer = instant ? null : new IntersectionObserver((entries) => entries.forEach((entry) => {
       if (entry.isIntersecting) {
         show(entry.target);
@@ -616,7 +618,7 @@ function CountUp({ value }) {
 
 function CampusFacts({ facts }) {
   const phone = useMedia("(max-width: 640px)");
-  const still = useMedia("(prefers-reduced-motion: reduce)");
+  const still = useStill();
   const [index, setIndex] = useState(0);
   const rotating = phone && !still;
   useEffect(() => {
@@ -650,7 +652,7 @@ const CAMPUS_PHOTOS = [
 const PHOTO_SECONDS = 5;
 
 function CampusPhotos() {
-  const still = useMedia("(prefers-reduced-motion: reduce)");
+  const still = useStill();
   const [index, setIndex] = useState(0);
   useEffect(() => {
     if (still) return undefined;
@@ -864,6 +866,9 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
         answer = "Choose Sign in in the top menu. I’ll open it for you now.";
         onSignIn?.();
       }
+    } else if (hasAny(["accessibility", "accessible", "bigger text", "big text", "larger text", "text size", "zoom", "can't see", "cant see", "hard to read", "blind", "low vision", "pwd", "disability", "contrast", "read aloud", "malabo"])) {
+      answer = "I've opened Accessibility. You can make the text bigger, turn on high contrast or an easy-to-read font, stop animations, and have the 2D Guide read directions aloud. SSCAI NAVI also works with TalkBack and VoiceOver.";
+      openAccessibility();
     } else if (hasAny(["install", "download the app", "download app", "home screen", "add to home", "get the app", "offline", "no wifi", "no wi-fi", "without internet"])) {
       answer = offlineApp.installed
         ? "SSCAI NAVI is already installed on this device. Open it from your home screen. It works even without Wi-Fi."
@@ -1352,6 +1357,7 @@ export default function App() {
                   : <button type="button" className="ss-btn ss-btn-primary" onClick={openLogin}>Sign in</button>}
             </div>
           </nav>
+          <button type="button" className="ss-a11y" onClick={() => { setMenuOpen(false); openAccessibility(); }} aria-label="Accessibility: bigger text, high contrast, read aloud" title="Accessibility"><Icon name="access" size={24} /></button>
           <button type="button" className="ss-menu" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen} aria-controls="ss-nav" aria-label={menuOpen ? "Close menu" : "Open menu"}>
             <Icon name={menuOpen ? "close" : "menu"} size={22} />
           </button>
@@ -1563,10 +1569,11 @@ export default function App() {
         </div>
         <div className="ss-container ss-footer-bottom">
           <span>© 2026 Saint Simon of Cyrene Academy, Inc.</span>
-          <span className="ss-footer-links"><button type="button" className="ss-footer-feedback" onClick={() => openFeedback()}>Send feedback</button> <a href="#privacy">Privacy Policy</a> <a href="#terms">Terms of Use</a> <a href="#top">Back to top</a></span>
+          <span className="ss-footer-links"><button type="button" className="ss-footer-feedback" onClick={() => openAccessibility()}>Accessibility</button> <button type="button" className="ss-footer-feedback" onClick={() => openFeedback()}>Send feedback</button> <a href="#privacy">Privacy Policy</a> <a href="#terms">Terms of Use</a> <a href="#top">Back to top</a></span>
         </div>
       </footer>
       {!accountOpen && !loginOpen && !mapState && !arOpen && !route3d && <SiiBot onSignIn={openLogin} onSignOut={handleSignOut} onOpenAccount={openAccount} alreadySignedIn={Boolean(signedInUser)} onNavigate={navigateTo} onOpenMap={setMapState} />}
+      <AccessibilityPanel />
       <AppStatus online={offlineApp.online} updateReady={offlineApp.updateReady} onUpdate={offlineApp.applyUpdate} />
       {noticeOpen && !mapState && !arOpen && !adminView && <PrivacyNotice onDone={() => setNoticeOpen(false)} />}
       <AnnouncementPopup hidden={Boolean(noticeOpen || route3d || mapState || arOpen || loginOpen || accountOpen || createAccountOpen || adminLoginOpen || adminView)} />

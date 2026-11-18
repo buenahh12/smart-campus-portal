@@ -3,6 +3,8 @@
 // which each phone draws differently.
 export default function Icon({ name, size = 20, filled = false }) {
   const paths = {
+    // Accessibility: a person with open arms in a circle.
+    access: <><circle cx="12" cy="12" r="10" /><circle cx="12" cy="7" r="1.3" /><path d="M7.5 9.6c1.5.5 3 .7 4.5.7s3-.2 4.5-.7M12 10.3v3.2m0 0-2.3 4.3m2.3-4.3 2.3 4.3" /></>,
     alert: <><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z" /><path d="M12 9v4m0 4h.01" /></>,
     arrow: <path d="M5 12h14m-6-6 6 6-6 6" />,
     arrowLeft: <path d="M19 12H5m6-6-6 6 6 6" />,
