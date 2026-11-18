@@ -65,6 +65,10 @@ export function scaleUv(geometry, width, depth, metresPerRepeat = 2) {
   return geometry;
 }
 
+// Classroom walls are painted sky blue inside (the hallway side stays green).
+export const CLASS_WALL = "#5ba8e6";
+const CLASS_WALL_BASE = "#3f8bd0";
+
 const FURNITURE = {
   wood: "#dedbd3", // white folding and classroom tables (the photos have no wooden desks)
   woodLight: "#ebe8e1",
@@ -77,6 +81,17 @@ const FURNITURE = {
   sink: "#f2f4f4",
   cabinet: "#cfc6b4",
   bench: "#e8ecef",
+  armchair: "#4a2a1e", // dark brown wooden armchairs with a writing arm (classroom photos)
+  frame: "#1e1f20",
+  whiteboard: "#f7f7f3",
+  boardFrame: "#3b3b3b",
+  tinselRed: "#c8262c",
+  tinselGreen: "#1f8a3a",
+  tinselBlue: "#1f4fc4",
+  tv: "#151718",
+  aircon: "#f4f5f5",
+  curtain: "#f3d5da",
+  teacherDesk: "#ecebe6",
 };
 
 // Furniture for one floor. toWorld(x, y) turns plan units into world x, z; M = metres per unit.
@@ -101,22 +116,75 @@ export function furnishFloor(plan, toWorld, M, materialFor, slabTop) {
     const short = wide ? depth : width;
 
     if (room.type === "classroom") {
-      // Green board on one short wall, teacher's table in front of it, rows of desks and chairs.
-      const [bx, bz] = along(0.2, short / 2);
-      put(wide ? 0.08 : Math.min(3.2, short - 1), 1.1, wide ? Math.min(3.2, short - 1) : 0.08, FURNITURE.board, bx, bz, 0.9);
-      const [tx, tz] = along(1.4, short / 2);
-      put(wide ? 0.7 : 1.4, 0.75, wide ? 1.4 : 0.7, FURNITURE.wood, tx, tz);
-      const rows = Math.max(1, Math.floor((long - 3.2) / 1.25));
-      const cols = Math.max(1, Math.floor((short - 1.2) / 1.05));
-      for (let r = 0; r < rows; r += 1) {
-        for (let c = 0; c < cols; c += 1) {
-          const a = 3 + r * 1.25;
-          const b = (short - (cols - 1) * 1.05) / 2 + c * 1.05;
-          const [cx, cz] = along(a, b);
-          put(wide ? 0.45 : 0.6, 0.72, wide ? 0.6 : 0.45, FURNITURE.woodLight, cx, cz);
-          const [sx, sz] = along(a + 0.5, b);
-          put(0.42, 0.45, 0.42, FURNITURE.chair, sx, sz);
+      // Like the classroom photos: sky blue walls, a white board with Christmas tinsel and a TV
+      // above it, a white teacher's desk with teal plastic chairs, rows of dark wooden armchairs,
+      // an aircon and pink curtains on the window wall.
+      // Sizes are given along the room (a) and across it (b), then turned into world sizes.
+      const putAB = (sa, h, sb, color, a, b, y = 0) => { const [x, z] = along(a, b); put(wide ? sa : sb, h, wide ? sb : sa, color, x, z, y); };
+      // Where the doors are, in the same along/across terms, so the blue paint leaves them open.
+      const doorsAB = [room.door, ...(room.extraDoors || [])].filter(Boolean).map(([dx, dy]) => {
+        const [wx, wz] = toWorld(dx, dy);
+        return wide ? [wx - x0, wz - z0] : [wz - z0, wx - x0];
+      });
+      const INSET = 0.1;
+      const paint = (fixed, isA, length, at) => {
+        // One wall: a thin blue coat just inside the room, cut where a door is.
+        const gaps = doorsAB.filter((d) => Math.abs((isA ? d[0] : d[1]) - fixed) < 0.5).map((d) => (isA ? d[1] : d[0])).sort((p, q) => p - q);
+        let start = 0.05;
+        for (const g of [...gaps, null]) {
+          const end = g === null ? length - 0.05 : g - 0.55;
+          if (end - start > 0.2) {
+            const mid = (start + end) / 2;
+            const size = end - start;
+            if (isA) { putAB(0.03, 2.4, size, CLASS_WALL, at, mid); putAB(0.05, 0.14, size, CLASS_WALL_BASE, at, mid); }
+            else { putAB(size, 2.4, 0.03, CLASS_WALL, mid, at); putAB(size, 0.14, 0.05, CLASS_WALL_BASE, mid, at); }
+          }
+          if (g !== null) start = g + 0.55;
         }
+        return gaps.length;
+      };
+      paint(0, true, short, INSET);
+      paint(long, true, short, long - INSET);
+      const doorsNear = paint(0, false, long, INSET);
+      const doorsFar = paint(short, false, long, short - INSET);
+
+      // Front wall: white board in a dark frame, tinsel above and below, a TV over it.
+      const boardWide = Math.min(4, short - 1.2);
+      putAB(0.05, 1.3, boardWide + 0.1, FURNITURE.boardFrame, 0.15, short / 2, 0.85);
+      putAB(0.04, 1.2, boardWide, FURNITURE.whiteboard, 0.19, short / 2, 0.9);
+      putAB(0.08, 0.1, boardWide + 0.1, FURNITURE.tinselRed, 0.2, short / 2, 2.15);
+      putAB(0.09, 0.05, boardWide + 0.1, FURNITURE.tinselGreen, 0.21, short / 2, 2.2);
+      putAB(0.08, 0.08, boardWide + 0.1, FURNITURE.tinselBlue, 0.2, short / 2, 0.82);
+      putAB(0.08, 0.6, 1.05, FURNITURE.tv, 0.18, short / 2, 2.27);
+
+      // Teacher's corner: white desk near the board, two teal plastic chairs.
+      const deskB = short > 4 ? short - 1.3 : short / 2;
+      putAB(0.75, 0.78, 1.3, FURNITURE.teacherDesk, 1.5, deskB);
+      putAB(0.44, 0.45, 0.44, FURNITURE.chair, 0.85, deskB - 0.35);
+      putAB(0.44, 0.45, 0.44, FURNITURE.chair, 0.85, deskB + 0.35);
+      putAB(0.06, 0.42, 0.44, FURNITURE.chair, 0.6, deskB - 0.35, 0.45);
+      putAB(0.06, 0.42, 0.44, FURNITURE.chair, 0.6, deskB + 0.35, 0.45);
+
+      // Rows of armchairs facing the board: wooden seat and back on a black frame, writing arm on the right.
+      const rows = Math.max(1, Math.floor((long - 3.0) / 1.1));
+      const cols = Math.max(1, Math.floor((short - 1.0) / 0.95));
+      for (let row = 0; row < rows; row += 1) {
+        for (let c = 0; c < cols; c += 1) {
+          const a = 2.9 + row * 1.1;
+          const b = (short - (cols - 1) * 0.95) / 2 + c * 0.95;
+          putAB(0.46, 0.04, 0.44, FURNITURE.armchair, a, b, 0.42);
+          putAB(0.04, 0.36, 0.42, FURNITURE.armchair, a + 0.22, b, 0.52);
+          putAB(0.5, 0.03, 0.26, FURNITURE.armchair, a - 0.14, b + 0.3, 0.68);
+          for (const [da, db] of [[-0.2, -0.19], [-0.2, 0.19], [0.2, -0.19], [0.2, 0.19]]) putAB(0.03, 0.42, 0.03, FURNITURE.frame, a + da, b + db);
+          putAB(0.03, 0.68, 0.03, FURNITURE.frame, a - 0.05, b + 0.38);
+        }
+      }
+
+      // Window wall (a long wall without a door): aircon in the middle, pink curtains either side.
+      const winB = doorsFar === 0 ? short - INSET - 0.04 : doorsNear === 0 ? INSET + 0.04 : null;
+      if (winB !== null && long > 5) {
+        putAB(0.95, 0.3, 0.24, FURNITURE.aircon, long / 2, winB + (winB > 1 ? -0.1 : 0.1), 2.0);
+        for (const at of [long * 0.28, long * 0.75]) putAB(Math.min(1.8, long * 0.25), 1.25, 0.04, FURNITURE.curtain, at, winB, 0.95);
       }
     } else if (room.type === "office") {
       const [cx, cz] = along(long / 2, short / 2);

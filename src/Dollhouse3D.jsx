@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { BUILDING_NAME, FLOORS, METERS_PER_UNIT as M, PLAN_HEIGHT, PLAN_WIDTH } from "./floorPlans";
 import { STAIR, buildExterior, buildRoute, stairFrame } from "./building3d";
-import { concreteTexture, courtRailing, courtyard, furnishFloor, hexTexture, scaleUv, tileTexture, woodTexture } from "./interior3d";
+import { CLASS_WALL, concreteTexture, courtRailing, courtyard, furnishFloor, hexTexture, scaleUv, tileTexture, woodTexture } from "./interior3d";
 import Icon from "./Icon";
 import { prefersStill } from "./a11y";
 
@@ -254,7 +254,7 @@ export default function Dollhouse3D({ floor, onOpen, label, fallback, highlight 
           const made = line
             ? new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.55 })
             : new THREE.MeshLambertMaterial({ color, transparent: true, ...(texture ? { map: TEXTURES[texture]() } : {}) });
-          made.userData.wall = color === COLORS.wall; // see-through in Walk view, so walls never hide the pin
+          made.userData.wall = color === COLORS.wall || color === CLASS_WALL; // see-through in Walk view, so walls never hide the pin
           materials.set(key, made);
         }
         return materials.get(key);
