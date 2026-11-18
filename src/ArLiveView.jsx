@@ -9,6 +9,7 @@ import { FLOORS, WALK_METERS_PER_UNIT as M, stepsFor, blockedAreas, blockedKeyOf
 import { VOICE_LANGS, saveVoiceLang, savedVoiceLang, speak, stepText, stopSpeaking, unlockVoice, voiceSupported } from "./voiceGuide";
 import { SaveRouteButton } from "./savedRoutes";
 import Icon from "./Icon";
+import { rememberPlace } from "./lastPlace";
 import "./ar.css";
 
 // AR Live View in the browser. Like the SSCA NAVI AR app, nothing knows where you are by GPS:
@@ -284,6 +285,11 @@ export default function ArLiveView({ onClose, initialDestination = "", initialSt
   const step = steps[stepIndex];
   const destination = placeByKey(toKey);
 
+  // Arrived: this is where the person is now (used by the Emergency button and the next route).
+  useEffect(() => {
+    if (tracking.atEnd && toKey) rememberPlace(toKey);
+  }, [tracking.atEnd, toKey]);
+
   useEffect(() => {
     navigator.xr?.isSessionSupported?.("immersive-ar").then(setXrSupported, () => setXrSupported(false));
   }, []);
@@ -545,7 +551,7 @@ export default function ArLiveView({ onClose, initialDestination = "", initialSt
     stopping.current = false;
     setStepIndex(0);
     setTracking({ left: Math.round(path.length), off: false, atEnd: false, section: path.sections[0] });
-    try { localStorage.setItem(START_STORAGE, fromKey); } catch { /* private mode */ }
+    rememberPlace(fromKey);
     if (xrSupported) {
       engine.current.stopCamera();
       try {

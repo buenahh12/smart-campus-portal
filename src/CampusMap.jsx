@@ -5,6 +5,7 @@ import { CMS_COLLECTIONS, isClosureActive } from "./cms";
 import { usePlanVersion } from "./usePlan";
 import { openFeedback } from "./Feedback";
 import { SaveRouteButton } from "./savedRoutes";
+import { rememberPlace } from "./lastPlace";
 import {
   BUILDING_NAME,
   FLOORS,
@@ -585,14 +586,16 @@ export const placeOptions = () => FLOORS.map(({ floor }) => ({
     .sort((a, b) => (a.type === "exit") - (b.type === "exit") || placeTitle(a).localeCompare(placeTitle(b), undefined, { numeric: true })),
 }));
 
-export default function CampusMap({ onClose, initialFloor = 2, initialDestination = null, initialEmergency = false, initialStart = null }) {
+export default function CampusMap({ onClose, initialFloor = 2, initialDestination = null, initialEmergency = false, initialStart = null, askRoom = false }) {
   const closures = usePublicCollection(CMS_COLLECTIONS.closures);
   const planVersion = usePlanVersion();
   const [startKey, setStartKey] = useState(() => (initialStart && placeByKey(initialStart) ? initialStart : readStart()));
   const [destKey, setDestKey] = useState(initialDestination);
   const [emergency, setEmergency] = useState(initialEmergency);
   const [selectedKey, setSelectedKey] = useState(initialDestination);
-  const [floor, setFloor] = useState(() => (initialEmergency || initialDestination ? placeByKey(readStart())?.floor : null) || initialFloor);
+  const [floor, setFloor] = useState(() => (initialStart && placeByKey(initialStart) ? placeByKey(initialStart).floor : null) || (initialEmergency || initialDestination ? placeByKey(readStart())?.floor : null) || initialFloor);
+  // Only a floor was picked in an emergency, so the start is that floor's stairs until they tap their room.
+  const [guessedStart, setGuessedStart] = useState(askRoom);
   const activeClosures = closures.items.filter((item) => isClosureActive(item));
   const blockedKey = blockedKeyOf(activeClosures);
   const blocked = useMemo(() => blockedAreas(activeClosures), [blockedKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -608,6 +611,10 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
   useEffect(() => {
     try { localStorage.setItem(START_STORAGE, startKey); } catch { /* storage unavailable */ }
   }, [startKey]);
+  // A start handed in by another screen (a visit, a saved route) counts as "you are here now".
+  useEffect(() => {
+    if (initialStart && !askRoom) rememberPlace(initialStart);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const onKeyDown = (event) => event.key === "Escape" && onClose();
@@ -627,17 +634,26 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
   };
   const chooseStart = (key) => {
     setStartKey(key);
+    setGuessedStart(false);
+    rememberPlace(key);
     setFloor(placeByKey(key).floor);
   };
   const pickOnMap = (key) => {
     const place = placeByKey(key);
     if (!place) return;
+    // In an emergency the destination is the exit, so tapping a room means "I'm in this room".
+    if (emergency) {
+      setSelectedKey(null);
+      if (key !== startKey || guessedStart) chooseStart(key);
+      return;
+    }
     setSelectedKey(key);
     if (place.type !== "stairs" && key !== startKey) chooseDestination(key, { jump: false });
   };
   const swap = () => {
     if (!destKey) return;
     setStartKey(destKey);
+    rememberPlace(destKey);
     setDestKey(startKey);
     setSelectedKey(startKey);
     setFloor(placeByKey(destKey).floor);
@@ -725,6 +741,9 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
                     {!emergency && <SaveRouteButton className="map-3d-button" from={route.start.key} to={route.end.key} />}
                   </div>
                   {emergency && <p className="map-alert">In a real emergency, stay calm and follow your teacher and school staff.</p>}
+                  {emergency && <p className="map-here-hint"><Icon name="location" size={16} /> <span>{guessedStart
+                    ? <>For now this starts at {placeTitle(route.start)}, in the middle of the floor. <b>Tap the room you&apos;re in</b> on the map for your closest way out.</>
+                    : <>Not at {placeTitle(route.start)}? <b>Tap the room you&apos;re in</b> on the map.</>}</span></p>}
                   <ol className="map-steps">
                     {route.steps.map((step, index) => <li key={`${route.start.key}-${route.end.key}-${index}`} style={{ "--i": index }} className={`kind-${step.kind} ${step.floor === floor ? "on-floor" : ""}`}>
                       <button type="button" onClick={() => setFloor(step.stairs || step.link ? step.toFloor : step.floor)}>

@@ -32,7 +32,7 @@ export const routeWalk = (route) => {
 };
 export const routeWalkText = (route) => {
   const { steps, stairFloors } = routeWalk(route);
-  return `about ${steps} steps${stairFloors ? ` + ${stairFloors} floor${stairFloors === 1 ? "" : "s"} of stairs` : ""}`;
+  return `about ${steps} step${steps === 1 ? "" : "s"}${stairFloors ? ` + ${stairFloors} floor${stairFloors === 1 ? "" : "s"} of stairs` : ""}`;
 };
 const STAIR_COST = 25; // one flight of stairs counts like ~10 m of walking
 const WALK_SPEED = 1.2; // metres per second

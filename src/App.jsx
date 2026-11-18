@@ -21,6 +21,7 @@ import { BUILDING_NAME, FLOORS, PLACES, blockedKeyOf, findPlaceKey, floorShort, 
 import { searchPlace } from "./placeSearch";
 import { PolicyDialog, PrivacyNotice, privacyNoticeSeen } from "./Policies";
 import { FeedbackDialog, openFeedback } from "./Feedback";
+import { agoText, floorStart, lastPlace } from "./lastPlace";
 
 // Where the person said they are, last time they used the floor plan (to pick the nearest CR).
 const savedStart = () => {
@@ -720,8 +721,29 @@ function AnnouncementPopup({ hidden }) {
 // The role shown with a feedback message (no names or emails unless they choose to be replied to).
 const feedbackRole = (role, visitorType = "") => (visitorType && (role === "visitor" || role === "guest") ? `Visitor: ${visitorType}`.slice(0, 30) : { admin: "Administrator", visitor: "Visitor (no account)", user: "Signed in", guest: "Guest" }[role] || "Guest");
 
+// Where the SiBot button was dragged to (left or right edge, and how high), kept on this phone.
+const BOT_POS_KEY = "sscai-sibot-pos";
+const readBotPos = () => {
+  try {
+    const value = JSON.parse(localStorage.getItem(BOT_POS_KEY) || "null");
+    return value && (value.side === "left" || value.side === "right") && Number.isFinite(value.bottom) ? value : null;
+  } catch {
+    return null;
+  }
+};
+
+// The 2D Guide in "nearest exit" mode, starting from the last place the person chose or reached.
+const exitMapState = (start, floor, askRoom = false) => ({ emergency: true, start, floor, askRoom });
+
 function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alreadySignedIn = false, speakAnswers = false }) {
   const [open, setOpen] = useState(false);
+  // Tapping the button opens a small menu: Emergency (way out) or Ask SiBot. "floor" asks which floor.
+  const [menu, setMenu] = useState(null);
+  const [botPos, setBotPos] = useState(readBotPos);
+  const [dragAt, setDragAt] = useState(null);
+  const dragRef = useRef(null);
+  const skipClickRef = useRef(false);
+  const wrapRef = useRef(null);
   const [question, setQuestion] = useState("");
   const [centerAnswer, setCenterAnswer] = useState("");
   const [listening, setListening] = useState(false);
@@ -844,7 +866,8 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
       onNavigate("features");
     } else if (hasAny(["emergency", "fire exit", "nearest exit", "safest route", "evacuate", "safety route", "earthquake", "way out"])) {
       answer = "I’m showing the nearest exit on the 2D Guide. In a real emergency, stay calm and follow your teacher and school staff first.";
-      onOpenMap?.({ emergency: true });
+      const last = lastPlace();
+      onOpenMap?.(last?.fresh ? exitMapState(last.key, last.place.floor) : { emergency: true });
     } else if (planPlace && hasAny(["where", "take me", "go to", "find", "how do i get", "directions", "room", "office", "clinic", "library", "guidance", "laboratory", "lab", "cr", "c.r.", "comfort", "restroom", "toilet", "bathroom", "banyo", "nasaan", "saan", "grade"])) {
       answer = `${placeTitle(planPlace)} is on the ${planFloorLabel(planPlace.floor).toLowerCase()} of the Main Academic Building. I’ve opened the 2D Guide with directions.`;
       onOpenMap?.({ destination: planPlace.key, floor: planPlace.floor });
@@ -912,6 +935,91 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
 
   const choosePrompt = (prompt) => askSiiBot(prompt);
   askRef.current = askSiiBot;
+
+  // ----- Emergency: one tap when we know where you were in the last hour, else one floor tap -----
+  const goExit = (start, floor, askRoom = false) => {
+    setMenu(null);
+    if (start) onOpenMap?.(exitMapState(start, floor, askRoom));
+  };
+  const startEmergency = () => {
+    const last = lastPlace();
+    if (last?.fresh) goExit(last.key, last.place.floor);
+    else setMenu("floor");
+  };
+
+  // ----- Drag the button anywhere; it settles on the nearest side edge -----
+  const placeFor = (event, drag) => ({
+    x: Math.min(Math.max(event.clientX - drag.dx, 8), window.innerWidth - drag.w - 8),
+    y: Math.min(Math.max(event.clientY - drag.dy, 8), window.innerHeight - drag.h - 8),
+  });
+  const onLauncherDown = (event) => {
+    if (event.button != null && event.button !== 0) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    skipClickRef.current = false;
+    dragRef.current = { id: event.pointerId, sx: event.clientX, sy: event.clientY, dx: event.clientX - rect.left, dy: event.clientY - rect.top, w: rect.width, h: rect.height, moved: false };
+  };
+  const onLauncherMove = (event) => {
+    const drag = dragRef.current;
+    if (!drag || drag.id !== event.pointerId) return;
+    if (!drag.moved) {
+      if (Math.hypot(event.clientX - drag.sx, event.clientY - drag.sy) < 10) return;
+      drag.moved = true;
+      try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* not supported */ }
+      setOpen(false);
+      setMenu(null);
+    }
+    setDragAt(placeFor(event, drag));
+  };
+  const onLauncherUp = (event) => {
+    const drag = dragRef.current;
+    dragRef.current = null;
+    if (!drag || drag.id !== event.pointerId || !drag.moved) return;
+    skipClickRef.current = true;
+    const { x, y } = placeFor(event, drag);
+    const next = {
+      side: x + drag.w / 2 < window.innerWidth / 2 ? "left" : "right",
+      bottom: Math.round(Math.max(12, window.innerHeight - y - drag.h)),
+    };
+    setDragAt(null);
+    setBotPos(next);
+    try { localStorage.setItem(BOT_POS_KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
+  };
+  const onLauncherCancel = () => {
+    dragRef.current = null;
+    setDragAt(null);
+  };
+  const onLauncherClick = () => {
+    if (skipClickRef.current) {
+      skipClickRef.current = false;
+      return;
+    }
+    if (open) setOpen(false);
+    else setMenu((current) => (current ? null : "main"));
+  };
+
+  // Close the menu on Escape or a tap outside it.
+  useEffect(() => {
+    if (!menu) return undefined;
+    const onKey = (event) => { if (event.key === "Escape") setMenu(null); };
+    const onDown = (event) => { if (!wrapRef.current?.contains(event.target)) setMenu(null); };
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onDown);
+    };
+  }, [menu]);
+
+  const roomAbove = (bottom) => `${Math.max(260, window.innerHeight - bottom - 76)}px`;
+  const wrapStyle = dragAt
+    ? { left: dragAt.x, top: dragAt.y, right: "auto", bottom: "auto" }
+    : botPos
+      ? (() => {
+        const bottom = Math.min(botPos.bottom, Math.max(12, window.innerHeight - 76));
+        return { bottom, ...(botPos.side === "left" ? { left: 12, right: "auto" } : { right: 12 }), "--sibot-room": roomAbove(bottom) };
+      })()
+      : undefined;
+  const last = menu === "floor" ? lastPlace() : null;
   useEffect(() => {
     const onAsk = (event) => askRef.current?.(String(event.detail || ""));
     window.addEventListener("sibot:ask", onAsk);
@@ -919,7 +1027,7 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
   }, []);
 
   return (
-    <div className="siibot-wrap">
+    <div ref={wrapRef} className={`siibot-wrap${botPos?.side === "left" && !dragAt ? " on-left" : ""}${botPos ? " moved" : ""}${dragAt ? " dragging" : ""}`} style={wrapStyle}>
       {centerAnswer && <div className="siibot-answer-pop" role="status" aria-live="assertive"><section className="siibot-answer-card"><div className="siibot-answer-topline"><span><Icon name="sparkle" size={16} /> SiBot answer</span><button onClick={() => setCenterAnswer("")} aria-label="Close answer"><Icon name="close" size={15} /></button></div><p>{centerAnswer}</p><button className="siibot-answer-dismiss" onClick={() => setCenterAnswer("")}>Got it</button></section></div>}
       {open && (
         <div className="siibot-panel-shell">
@@ -952,8 +1060,40 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
           </section>
         </div>
       )}
-      <button className={open ? "siibot-launcher active" : "siibot-launcher"} onClick={() => setOpen((current) => !current)} aria-expanded={open} aria-label={open ? "Close SiBot school assistant" : "Open SiBot school assistant"}>
-        <Icon name={open ? "close" : "bot"} size={21} /> <span>SiBot</span>
+      {menu === "main" && <div className="sibot-menu" role="menu" aria-label="SiBot">
+        <button type="button" role="menuitem" className="sibot-menu-exit" onClick={startEmergency}>
+          <span className="sibot-menu-icon"><Icon name="alert" size={22} /></span>
+          <span><b>Emergency</b><small>Show the nearest exit</small></span>
+        </button>
+        <button type="button" role="menuitem" onClick={() => { setMenu(null); setOpen(true); }}>
+          <span className="sibot-menu-icon"><Icon name="chat" size={22} /></span>
+          <span><b>Ask SiBot</b><small>Questions and directions</small></span>
+        </button>
+      </div>}
+      {menu === "floor" && <div className="sibot-menu sibot-floor" role="dialog" aria-labelledby="sibot-floor-title">
+        <p id="sibot-floor-title"><Icon name="alert" size={18} /> <b>Which floor are you on?</b></p>
+        <div className="sibot-floor-grid">
+          {mainFloors().map((floor) => <button key={floor} type="button" onClick={() => goExit(floorStart(floor), floor, true)}>{planFloorLabel(floor)}</button>)}
+        </div>
+        {last && <button type="button" className="sibot-floor-last" onClick={() => goExit(last.key, last.place.floor)}>I&apos;m still at {placeTitle(last.place)} <small>({agoText(last.at)})</small></button>}
+        <button type="button" className="sibot-menu-cancel" onClick={() => setMenu(null)}>Cancel</button>
+      </div>}
+      <button
+        type="button"
+        className={open || menu ? "siibot-launcher active" : "siibot-launcher"}
+        onClick={onLauncherClick}
+        onPointerDown={onLauncherDown}
+        onPointerMove={onLauncherMove}
+        onPointerUp={onLauncherUp}
+        onPointerCancel={onLauncherCancel}
+        onContextMenu={(event) => event.preventDefault()}
+        aria-expanded={Boolean(open || menu)}
+        aria-haspopup="menu"
+        aria-label={open || menu ? "Close SiBot" : "SiBot: emergency exit or ask a question. Drag to move."}
+        title="Tap for Emergency or Ask SiBot. Drag to move."
+      >
+        <Icon name={open || menu ? "close" : "bot"} size={21} /> <span>SiBot</span>
+        {!open && !menu && <i className="siibot-sos" aria-hidden="true"><Icon name="alert" size={11} /></i>}
       </button>
     </div>
   );
@@ -1410,7 +1550,7 @@ export default function App() {
       <Suspense fallback={<ScreenLoading />}>
       {arOpen && <ArLiveView onClose={() => setArOpen(false)} initialStart={arOpen.start || ""} initialDestination={arOpen.end || ""} />}
       {route3d && <Route3DView start={route3d.start} end={route3d.end} onClose={() => setRoute3d(null)} onOpenMap={(key, mapFloor) => { setRoute3d(null); setMapState({ destination: key, floor: mapFloor }); }} />}
-      {mapState && <CampusMap onClose={() => setMapState(null)} initialFloor={mapState.floor || 2} initialDestination={mapState.destination || null} initialEmergency={Boolean(mapState.emergency)} initialStart={mapState.start || null} />}
+      {mapState && <CampusMap onClose={() => setMapState(null)} initialFloor={mapState.floor || 2} initialDestination={mapState.destination || null} initialEmergency={Boolean(mapState.emergency)} initialStart={mapState.start || null} askRoom={Boolean(mapState.askRoom)} />}
       {visitEnded && <div className="modal-shell" role="dialog" aria-modal="true" aria-labelledby="visit-end-title"><div className="login-modal visit-end">
         <div className="modal-mark"><Icon name="check" size={26} /></div>
         <h2 id="visit-end-title">Thank you for visiting{visitEnded.name ? `, ${visitEnded.name.split(" ")[0]}` : ""}!</h2>
