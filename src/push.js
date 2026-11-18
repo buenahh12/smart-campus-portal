@@ -79,7 +79,10 @@ export function usePush() {
       setProblem(error.message === 'blocked'
         ? 'Notifications are blocked for this site. Allow them in your browser settings (tap the lock icon beside the address), then try again.'
         : error.message === 'dismissed' ? 'Tap Allow when your phone asks, to get notifications.'
-          : 'Notifications could not be turned on. Check your connection and try again.');
+          // The database refused the phone's address: the school hasn't switched this on yet.
+          : error.code === 'permission-denied' ? 'Phone notifications aren’t switched on by the school yet. Please try again later.'
+            : !navigator.onLine ? 'You’re offline. Connect to the internet and try again.'
+              : 'Notifications could not be turned on on this phone. Please try again later.');
     } finally {
       setStatus(pushStatus());
       setBusy(false);
