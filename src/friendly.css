@@ -519,3 +519,12 @@ body .student-portal-shell .mc-welcome-skip { justify-self: center; min-height: 
 .siibot-emergency b { display: block; font-size: 15px; }
 .siibot-emergency small { display: block; color: rgba(255,255,255,.85); font-size: 12px; }
 @media (prefers-reduced-motion: reduce) { .siibot-launcher.pressing::after { animation-duration: .6s; } }
+
+.siibot-quick { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 8px; margin: 0 0 12px; }
+.siibot-quick.one { grid-template-columns: 1fr; }
+.siibot-quick .siibot-emergency { margin: 0; }
+.siibot-install { min-height: 54px; display: flex; align-items: center; gap: 8px; padding: 9px 10px; border: 1px solid var(--forest, #2f5d46); border-radius: 12px; color: var(--forest, #2f5d46); background: var(--surface, #fff); text-align: left; }
+.siibot-install:hover { color: #fff; background: var(--forest, #2f5d46); }
+.siibot-install b { display: block; font-size: 15px; }
+.siibot-install small { display: block; font-size: 12px; opacity: .8; }
+.siibot-quick .icon { flex: 0 0 auto; }

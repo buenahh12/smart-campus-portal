@@ -740,6 +740,7 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
   // Tap the button: chat. Press and hold it: Emergency (way out). "floor" asks which floor.
   const [menu, setMenu] = useState(null);
   const [pressing, setPressing] = useState(false);
+  const offlineApp = useOfflineApp();
   const holdTimer = useRef(0);
   const [botPos, setBotPos] = useState(readBotPos);
   const [dragAt, setDragAt] = useState(null);
@@ -863,6 +864,11 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
         answer = "Choose Sign in in the top menu. I’ll open it for you now.";
         onSignIn?.();
       }
+    } else if (hasAny(["install", "download the app", "download app", "home screen", "add to home", "get the app", "offline", "no wifi", "no wi-fi", "without internet"])) {
+      answer = offlineApp.installed
+        ? "SSCAI NAVI is already installed on this device. Open it from your home screen. It works even without Wi-Fi."
+        : "You can install SSCAI NAVI on your home screen. There's no app store and nothing big to download, and it works without Wi-Fi. Tap Install app at the top of this chat, or I'll show you the steps for your phone.";
+      if (!offlineApp.installed && !offlineApp.canInstall) onNavigate("offline");
     } else if (hasAny(["ar live", "ar view", "augmented reality", "camera guide", "live view"])) {
       answer = "AR Live View is in Explore the Platform. Open it for a visual walkthrough with directions and room distance.";
       onNavigate("features");
@@ -1064,7 +1070,14 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
             <div className="siibot-conversation" ref={conversationRef} aria-live="polite" aria-relevant="additions">
               {messages.map((message) => <div className={`siibot-message ${message.role === "user" ? "from-user" : "from-bot"}`} key={message.id}><p>{message.text}</p></div>)}
             </div>
-            <button type="button" className="siibot-emergency" onClick={() => { setOpen(false); startEmergency(); }}><Icon name="alert" size={18} /> <span><b>Emergency: nearest exit</b><small>Tip: press and hold the SiBot button</small></span></button>
+            <div className={`siibot-quick${offlineApp.installed ? " one" : ""}`}>
+              <button type="button" className="siibot-emergency" onClick={() => { setOpen(false); startEmergency(); }}><Icon name="alert" size={18} /> <span><b>Emergency</b><small>Nearest exit · or hold the SiBot button</small></span></button>
+              {!offlineApp.installed && <button type="button" className="siibot-install" onClick={() => {
+                // Chrome on Android/computer: the real install prompt. iPhone or Messenger: the steps in Offline mode.
+                if (offlineApp.canInstall) offlineApp.install();
+                else { setOpen(false); onNavigate("offline"); }
+              }}><Icon name="download" size={18} /> <span><b>Install app</b><small>Works offline</small></span></button>}
+            </div>
             <p className="siibot-label">Ask a question or try a command</p>
             <div className="siibot-options">
               <button onClick={() => choosePrompt("What are the school hours?")}>School hours</button>
