@@ -476,7 +476,7 @@ function FloorPlan2D({ plan, route, startKey, destKey, selectedKey, blocked, onP
             const vertical = h > w * 1.6 && w < 12;
             const span = vertical ? h : w;
             const nameSize = clamp(span / 13, 1.25, 2);
-            const name = item.unlabeled ? "UNLABELED" : item.name.toUpperCase();
+            const name = item.name.toUpperCase(); // rooms without a posted name read "CLASSROOM" (shown lighter)
             const nameLines = vertical ? [name] : wrap(name, Math.max(5, Math.floor(span / (nameSize * 0.72))));
             const code = item.code && item.code !== item.name && item.code !== "EXIT" ? item.code : "";
             const codeSize = nameSize * 1.12;
@@ -743,7 +743,7 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
           </button>
 
           {selected && selected.key !== startKey && !emergency && <div className="map-selected">
-            <div><b>{placeTitle(selected)}</b><small>{floorLabel(selected.floor)}{selected.unlabeled ? " · name not posted yet" : ""}</small>{selected.notes && <small>{selected.notes}</small>}</div>
+            <div><b>{placeTitle(selected)}</b><small>{floorLabel(selected.floor)}</small>{selected.notes && <small>{selected.notes}</small>}</div>
             <button type="button" onClick={() => { chooseStart(selected.key); setDestKey(null); setSelectedKey(null); }}>I&apos;m here</button>
           </div>}
 
