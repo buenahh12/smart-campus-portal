@@ -5,7 +5,7 @@ import { placeOptions } from "./CampusMap";
 import { CMS_COLLECTIONS, isClosureActive } from "./cms";
 import { inAppBrowserName } from "./firebase";
 import { usePlanVersion } from "./usePlan";
-import { FLOORS, WALK_METERS_PER_UNIT as M, stepsFor, blockedAreas, blockedKeyOf, buildingOf, closureArea, mapAreaLabel, findRoute, floorLabel, graphNode, placeByKey, placeTitle } from "./floorPlans";
+import { FLOORS, PLACES, WALK_METERS_PER_UNIT as M, stepsFor, blockedAreas, blockedKeyOf, buildingOf, closureArea, mapAreaLabel, findRoute, floorLabel, graphNode, placeByKey, placeTitle } from "./floorPlans";
 import { VOICE_LANGS, saveVoiceLang, savedVoiceLang, speak, stepText, stopSpeaking, unlockVoice, voiceSupported } from "./voiceGuide";
 import { SaveRouteButton } from "./savedRoutes";
 import Icon from "./Icon";
@@ -30,6 +30,9 @@ const OFF_ROUTE_DISTANCE = 4;
 const AHEAD = 10; // metres of arrows shown in front of you; the rest appear as you walk
 const ARROW_COLORS = ["#f1c39a", "#e58a4e"]; // the site's peach, alternating with a deeper clay so the trail reads on light floors
 const START_STORAGE = "campus-map-start"; // shared with the 2D map
+const AIM_FRAMES = 12; // the phone must point along the floor (not straight down) this long before the route is laid
+const WRONG_WAY_DISTANCE = 2.5; // metres walked from the last fix without getting further along the route
+const CHECK_IN_TURN_DISTANCE = 3; // metres between fixes needed to also correct the direction, not only the position
 
 const roomOn = (floor, id) => FLOORS.find((item) => item.floor === floor)?.rooms.find((item) => item.id === id);
 const stairsName = (floor, id) => (roomOn(floor, id)?.name || "stairs").replace(/ \(.*\)/, "").toLowerCase();
@@ -209,6 +212,45 @@ function rotation(from, to) {
   return (v) => ({ x: v.x * cos - v.z * sin, z: v.x * sin + v.z * cos });
 }
 
+// The nearest named room to a point on a floor (path points are in metres), for "the corner by Room 204".
+function nearestRoomName(floor, point) {
+  let best = null;
+  for (const item of PLACES) {
+    if (item.floor !== floor || item.type === "stairs" || item.type === "exit" || item.unlabeled || !item.door) continue;
+    const d = Math.hypot(item.door[0] * M - point.x, item.door[1] * M - point.z);
+    if (!best || d < best.d) best = { d, item };
+  }
+  return best ? placeTitle(best.item).split(" · ")[0] : "";
+}
+
+// Places on the route where the person can say "I'm here" to line the arrows up again: every real
+// corner, and the start of every staircase.
+export function routeCheckpoints(path) {
+  const list = [];
+  path.sections.forEach((section) => {
+    if (section.kind === "stairs") {
+      const name = /Take the (.+?) (?:up|down)/.exec(section.text || "")?.[1] || "stairs";
+      list.push({ index: section.from, along: path.at[section.from], label: `at the ${name}` });
+      return;
+    }
+    walkSegments(path.points.slice(section.from, section.to + 1)).forEach((segment, k) => {
+      if (k === 0 || segment.turn === "straight") return;
+      const index = section.from + segment.from;
+      const room = nearestRoomName(section.floor, path.points[index]);
+      list.push({ index, along: path.at[index], label: room ? `at the corner by ${room}` : "at the corner" });
+    });
+  });
+  // Two places under 2 m apart are one stop (keep the later one, often the stairs).
+  const kept = [];
+  for (const item of list.filter((entry) => entry.along > 2 && entry.along < path.length - 1)) {
+    if (kept.length && item.along - kept[kept.length - 1].along < 2) kept.pop();
+    kept.push(item);
+  }
+  return kept;
+}
+
+const wrapAngle = (angle) => Math.atan2(Math.sin(angle), Math.cos(angle));
+
 function chevronGeometry() {
   const shape = new THREE.Shape();
   [[0, 0.3], [0.38, -0.1], [0.38, -0.3], [0, 0.02], [-0.38, -0.3], [-0.38, -0.1]].forEach(([x, y], i) => (i ? shape.lineTo(x, y) : shape.moveTo(x, y)));
@@ -219,8 +261,8 @@ function chevronGeometry() {
 
 // Distance walked along a path and how far a point is from it. Height counts for half, so the
 // same hallway on two floors is told apart without phone height changes throwing it off.
-function progressOn(points, at, x, y, z) {
-  let best = { along: 0, off: Infinity };
+function progressOn(points, at, x, y, z, near) {
+  let best = { along: 0, off: Infinity, score: Infinity };
   for (let i = 1; i < points.length; i += 1) {
     const a = points[i - 1];
     const b = points[i];
@@ -230,7 +272,11 @@ function progressOn(points, at, x, y, z) {
     const lengthSq = dx * dx + dy * dy + dz * dz || 1;
     const t = Math.max(0, Math.min(1, ((x - a.x) * dx + ((y - a.y) / 2) * dy + (z - a.z) * dz) / lengthSq));
     const off = Math.hypot(a.x + t * dx - x, a.y / 2 + t * dy - y / 2, a.z + t * dz - z);
-    if (off < best.off) best = { along: at[i - 1] + t * (at[i] - at[i - 1]), off };
+    const along = at[i - 1] + t * (at[i] - at[i - 1]);
+    // A stretch far from where you were last counts as a little further away, so a parallel
+    // hallway or the floor above can't win just because tracking drifted towards it.
+    const score = off + (near === undefined ? 0 : Math.max(0, Math.abs(along - near) - 3) * 0.4);
+    if (score < best.score) best = { along, off, score };
   }
   return best;
 }
@@ -262,7 +308,15 @@ export default function ArLiveView({ onClose, initialDestination = "", initialSt
   const inApp = /Android/i.test(navigator.userAgent) ? inAppBrowserName() : "";
   const [mode, setMode] = useState("setup"); // setup | xr | compass
   const [stepIndex, setStepIndex] = useState(0);
-  const [tracking, setTracking] = useState({ left: null, off: false, atEnd: false, section: null });
+  const [tracking, setTracking] = useState({ left: null, off: false, atEnd: false, section: null, along: 0, anchorAlong: 0, aiming: false, wrongWay: false });
+  const [arNote, setArNote] = useState("");
+  const noteTimer = useRef(0);
+  const showNote = (text) => {
+    setArNote(text);
+    window.clearTimeout(noteTimer.current);
+    noteTimer.current = window.setTimeout(() => setArNote(""), 6000);
+  };
+  useEffect(() => () => window.clearTimeout(noteTimer.current), []);
   const [problem, setProblem] = useState("");
   const [welcome, setWelcome] = useState(true);
   const [voice, setVoice] = useState(() => (voiceSupported() ? savedVoiceLang() : "off"));
@@ -282,6 +336,7 @@ export default function ArLiveView({ onClose, initialDestination = "", initialSt
   const crossesBuildings = Boolean(route?.via?.some((edge) => edge.link));
   const path = useMemo(() => (route?.path && !crossesBuildings ? routePath(route) : null), [route, crossesBuildings]);
   const steps = useMemo(() => (path ? routeSteps(path) : []), [path]);
+  const checkpoints = useMemo(() => (path ? routeCheckpoints(path) : []), [path]);
   const step = steps[stepIndex];
   const destination = placeByKey(toKey);
 
@@ -404,8 +459,68 @@ export default function ArLiveView({ onClose, initialDestination = "", initialSt
     const { renderer, camera, scene, arrows } = engine.current;
     const position = new THREE.Vector3();
     const forward = new THREE.Vector3();
-    const state = { frames: 0, world: null, along: 0, levelY: 0, startY: 0, lastReport: 0, floorShift: 0, steady: 0 };
+    const state = { frames: 0, world: null, along: 0, levelY: 0, startY: 0, lastReport: 0, floorShift: 0, steady: 0, aim: 0, anchor: null, fixes: [] };
     const startFloor = path.sections[0]?.floor;
+    // Turns the whole route around a point on the floor, then slides it.
+    const moveWorld = (pivot, angle, shift = { x: 0, z: 0 }) => {
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      state.world = state.world.map((item) => {
+        const dx = item.x - pivot.x;
+        const dz = item.z - pivot.z;
+        return { x: pivot.x + dx * cos - dz * sin + shift.x, y: item.y, z: pivot.z + dx * sin + dz * cos + shift.z };
+      });
+      engine.current.placeArrows(state.world, true);
+    };
+    // "Flip arrows": the person faced the wrong way at Start (or at the last fix); turn the route
+    // around where they stood then.
+    engine.current.flip = () => {
+      if (!state.world || !state.anchor) return false;
+      moveWorld(state.anchor, Math.PI);
+      state.fixes = [state.anchor]; // earlier fixes were measured against the unflipped route
+      return true;
+    };
+    // Where the route currently puts a distance along it.
+    const worldAt = (along) => {
+      const { at } = path;
+      let i = 1;
+      while (i < at.length - 1 && at[i] < along) i += 1;
+      const a = state.world[i - 1];
+      const b = state.world[i];
+      const t = at[i] > at[i - 1] ? Math.min(1, Math.max(0, (along - at[i - 1]) / (at[i] - at[i - 1]))) : 0;
+      return { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t };
+    };
+    // "I'm at the corner by …": two-point fix. An earlier fix far enough away (often the start
+    // doorway) and where they stand now give the real direction of the route between them; the
+    // route is turned to match it and slid so this corner is under their feet.
+    engine.current.checkIn = (index) => {
+      if (!state.world || !state.anchor || !state.world[index]) return null;
+      const here = { x: position.x, z: position.z };
+      const target = state.world[index];
+      let angle = 0;
+      let pivot = here;
+      // Newest earlier fix that is far enough away both on the route and where they really walked.
+      for (const fix of [...state.fixes].reverse()) {
+        const planned = worldAt(fix.along);
+        const ahead = { x: target.x - planned.x, z: target.z - planned.z };
+        const walked = { x: here.x - fix.x, z: here.z - fix.z };
+        if (Math.hypot(ahead.x, ahead.z) > CHECK_IN_TURN_DISTANCE && Math.hypot(walked.x, walked.z) > CHECK_IN_TURN_DISTANCE) {
+          angle = wrapAngle(Math.atan2(walked.z, walked.x) - Math.atan2(ahead.z, ahead.x));
+          pivot = planned;
+          break;
+        }
+      }
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const dx = target.x - pivot.x;
+      const dz = target.z - pivot.z;
+      const moved = { x: pivot.x + dx * cos - dz * sin, z: pivot.z + dx * sin + dz * cos };
+      moveWorld(pivot, angle, { x: here.x - moved.x, z: here.z - moved.z });
+      state.anchor = { x: here.x, z: here.z, along: path.at[index] };
+      state.fixes.push(state.anchor);
+      state.along = path.at[index];
+      return { degrees: Math.round(Math.abs(angle) * 180 / Math.PI) };
+    };
     renderer.setAnimationLoop((time, frame) => {
       try {
       renderer.render(scene, camera);
@@ -414,8 +529,18 @@ export default function ArLiveView({ onClose, initialDestination = "", initialSt
       xrCamera.getWorldPosition(position);
       xrCamera.getWorldDirection(forward);
       if (!state.world && state.frames > 2) {
+        // Wait until the phone points along the floor (not straight down or up) and is held there:
+        // the direction it points now is taken as "down the hallway" for the whole route.
         const length = Math.hypot(forward.x, forward.z);
-        const facing = length > 0.05 ? { x: forward.x / length, z: forward.z / length } : { x: 0, z: -1 };
+        state.aim = length > 0.45 ? state.aim + 1 : 0;
+        if (state.aim < AIM_FRAMES) {
+          if (time - state.lastReport > 300) {
+            state.lastReport = time;
+            setTracking((current) => (current.aiming ? current : { ...current, aiming: true }));
+          }
+          return;
+        }
+        const facing = { x: forward.x / length, z: forward.z / length };
         const { point, dir } = anchorAt(path, 0);
         const rotate = rotation(dir, facing);
         const base = position.y - PHONE_HEIGHT - point.y;
@@ -425,8 +550,11 @@ export default function ArLiveView({ onClose, initialDestination = "", initialSt
         });
         state.levelY = position.y;
         state.startY = position.y;
+        state.anchor = { x: position.x, z: position.z, along: 0 };
+        state.fixes = [state.anchor];
         arrows.position.y = 0;
         engine.current.placeArrows(state.world, true);
+        setTracking((current) => ({ ...current, aiming: false }));
       }
       if (!state.world) return;
 
@@ -447,6 +575,8 @@ export default function ArLiveView({ onClose, initialDestination = "", initialSt
           const dz = position.z - exit.z;
           const dy = feet - exit.y;
           state.world = state.world.map((item) => ({ x: item.x + dx, y: item.y + dy, z: item.z + dz }));
+          state.anchor = { x: position.x, z: position.z, along: path.at[walk.from - 1] };
+          state.fixes.push(state.anchor);
           state.levelY = position.y;
           arrows.position.y = 0; // the floor finder sets it again for this floor
           engine.current.placeArrows(state.world, true);
@@ -456,19 +586,24 @@ export default function ArLiveView({ onClose, initialDestination = "", initialSt
       const onStartLevel = Math.abs(position.y - state.levelY) < 1;
       const hits = onStartLevel && frame && engine.current.hitSource ? frame.getHitTestResults(engine.current.hitSource) : [];
       const floor = hits[0]?.getPose(renderer.xr.getReferenceSpace())?.transform.position.y;
-      if (floor !== undefined && floor < position.y - 0.6) arrows.position.y = floor - (state.levelY - PHONE_HEIGHT);
+      // Eased towards the floor found under the camera, so the arrows don't jump up and down.
+      if (floor !== undefined && floor < position.y - 0.6) arrows.position.y += (floor - (state.levelY - PHONE_HEIGHT) - arrows.position.y) * 0.15;
 
       if (time - state.lastReport > 250) {
         state.lastReport = time;
         const feet = position.y - PHONE_HEIGHT - arrows.position.y;
-        const { along, off } = progressOn(state.world, path.at, position.x, feet, position.z);
+        const { along, off } = progressOn(state.world, path.at, position.x, feet, position.z, state.along);
         state.along = along;
         const left = Math.max(0, path.length - along);
+        // Walked a few metres from the last fix but got no further along the route: probably
+        // facing the wrong way at Start.
+        const walked = Math.hypot(position.x - state.anchor.x, position.z - state.anchor.z);
+        const wrongWay = walked > WRONG_WAY_DISTANCE && along - state.anchor.along < 0.8 && left > ARRIVE_DISTANCE;
         // Only the next few metres of arrows, so none float far ahead or on other floors.
         arrows.children.forEach((arrow) => { arrow.visible = arrow.userData.along === undefined ? left < AHEAD + 2 : arrow.userData.along > along - 1 && arrow.userData.along < along + AHEAD; });
         const section = path.sections.find((item) => item.kind === "stairs" && along >= item.start - 1 && along <= item.end)
           || path.sections.find((item) => along >= item.start && along <= item.end) || path.sections[0];
-        setTracking({ left: Math.round(left), off: off > OFF_ROUTE_DISTANCE, atEnd: left < ARRIVE_DISTANCE, section });
+        setTracking({ left: Math.round(left), off: off > OFF_ROUTE_DISTANCE, atEnd: left < ARRIVE_DISTANCE, section, along, anchorAlong: state.anchor.along, aiming: false, wrongWay });
       }
       } catch (error) {
         // One bad frame must not stop the AR; keep drawing.
@@ -550,7 +685,8 @@ export default function ArLiveView({ onClose, initialDestination = "", initialSt
     setProblem("");
     stopping.current = false;
     setStepIndex(0);
-    setTracking({ left: Math.round(path.length), off: false, atEnd: false, section: path.sections[0] });
+    setTracking({ left: Math.round(path.length), off: false, atEnd: false, section: path.sections[0], along: 0, anchorAlong: 0, aiming: true, wrongWay: false });
+    setArNote("");
     rememberPlace(fromKey);
     if (xrSupported) {
       engine.current.stopCamera();
@@ -574,6 +710,15 @@ export default function ArLiveView({ onClose, initialDestination = "", initialSt
           .then((space) => session.requestHitTestSource?.({ space }))
           .then((source) => { if (engine.current) engine.current.hitSource = source || null; })
           .catch(() => {});
+        // Pulling down the control panel (or a call) pauses AR; tracking may jump when it comes back.
+        let hidden = false;
+        session.addEventListener("visibilitychange", () => {
+          if (session.visibilityState !== "visible") hidden = true;
+          else if (hidden) {
+            hidden = false;
+            showNote("AR was paused. If the arrows look off, tap \u201cI'm at\u2026\u201d when you reach the next corner.");
+          }
+        });
         session.addEventListener("end", () => {
           renderer.setAnimationLoop(null);
           if (!engine.current) return;
@@ -615,7 +760,19 @@ export default function ArLiveView({ onClose, initialDestination = "", initialSt
   const clear = () => {
     if (mode !== "setup") stop();
     setToKey("");
-    setTracking({ left: null, off: false, atEnd: false, section: null });
+    setTracking({ left: null, off: false, atEnd: false, section: null, along: 0, anchorAlong: 0, aiming: false, wrongWay: false });
+  };
+
+  // The next place on the route where "I'm here" can line the arrows up again.
+  const nextCheckpoint = mode === "xr" && !tracking.aiming && !tracking.atEnd
+    ? checkpoints.find((item) => item.along > Math.max(tracking.anchorAlong + 0.5, tracking.along - 4))
+    : null;
+  const checkIn = () => {
+    const result = nextCheckpoint && engine.current?.checkIn?.(nextCheckpoint.index);
+    if (result) showNote(`Lined up ${nextCheckpoint.label}.${result.degrees >= 5 ? ` The arrows turned ${result.degrees}\u00b0.` : ""}`);
+  };
+  const flip = () => {
+    if (engine.current?.flip?.()) showNote("Arrows turned around. Follow them from where you started.");
   };
 
   useEffect(() => () => {
@@ -642,10 +799,15 @@ export default function ArLiveView({ onClose, initialDestination = "", initialSt
   else if (route?.blocked) message = "No open route right now: a hallway or stairway on the way is closed.";
   // Two buildings' plans have no shared position to lay one trail across, so AR stays inside one.
   else if (crossesBuildings) message = `This route goes to another building. Use the 2D Guide to walk to ${buildingOf(destination.floor)}, then start AR from a room there.`;
-  else if (mode === "setup") message = `Stand in the doorway of ${placeTitle(placeByKey(fromKey))} with your back to the room, facing the hallway. Then tap Start.`;
+  else if (mode === "setup") message = placeByKey(fromKey)?.type === "exit"
+    ? `Stand at the ${placeTitle(placeByKey(fromKey))}, facing into the building. Point the phone at the floor ahead, then tap Start.`
+    : `Stand in the doorway of ${placeTitle(placeByKey(fromKey))} with your back to the room. Point the phone down the hallway, then tap Start.`;
   else if (mode === "xr") {
     const { section } = tracking;
-    if (tracking.atEnd) message = `You have arrived at ${placeTitle(destination)}.`;
+    if (tracking.aiming) message = "Point your phone down the hallway, at the floor ahead, and hold it still\u2026";
+    else if (tracking.atEnd) message = `You have arrived at ${placeTitle(destination)}.`;
+    else if (tracking.wrongWay) message = "Wrong way? The arrows may be turned around. Tap Flip arrows, or turn around and follow them.";
+    else if (arNote) message = arNote;
     else if (tracking.off) message = "You are off the route. Walk back to the arrows.";
     else if (section?.kind === "stairs") message = `${section.text}, following the arrows on the steps.`;
     else message = `Follow the arrows to ${destinationText}. ${tracking.left} m left (about ${stepsFor(tracking.left)} steps)`;
@@ -662,7 +824,9 @@ export default function ArLiveView({ onClose, initialDestination = "", initialSt
   // Tagalog. Nothing is said while choosing rooms.
   const { section: xrSection } = tracking;
   const voiceLine = mode === "setup" || problem ? ""
-    : mode === "xr" ? (tracking.atEnd ? `You have arrived at ${placeTitle(destination)}.`
+    : mode === "xr" ? (tracking.aiming ? "Point your phone down the hallway."
+      : tracking.atEnd ? `You have arrived at ${placeTitle(destination)}.`
+      : tracking.wrongWay ? "Wrong way? Tap Flip arrows, or turn around."
       : tracking.off ? "You are off the route. Walk back to the arrows."
         : xrSection?.kind === "stairs" ? `${xrSection.text}, following the arrows on the steps.`
           : `Follow the arrows to ${destinationText}.`)
@@ -697,7 +861,7 @@ export default function ArLiveView({ onClose, initialDestination = "", initialSt
           <li><b>Stand in the doorway</b> with your back to the room, facing the hallway, and tap Start.</li>
           <li><b>Follow the arrows</b> along the hallways and up or down the stairs, all the way to the room.</li>
         </ol>
-        <p className="ar-live-tip">{xrSupported ? "Hold your phone up and point the camera at the floor ahead." : inApp ? `${inApp} can't track the floor. For the full AR view, open this in Chrome.` : "This phone uses the compass guide: the arrows turn with your phone, and you tap Next at each turn."}</p>
+        <p className="ar-live-tip">{xrSupported ? "Hold your phone up and point the camera at the floor ahead. At corners and stairs, tap \u201cI'm at\u2026\u201d to line the arrows up again." : inApp ? `${inApp} can't track the floor. For the full AR view, open this in Chrome.` : "This phone uses the compass guide: the arrows turn with your phone, and you tap Next at each turn."}</p>
         <div className="ar-live-welcome-actions">
           <button type="button" className="ar-live-button ar-live-primary" onClick={() => setWelcome(false)}>Get started</button>
           {inApp
@@ -727,6 +891,26 @@ export default function ArLiveView({ onClose, initialDestination = "", initialSt
             : <button type="button" className="ar-live-button" onClick={stop}>Stop</button>}
         <button type="button" className="ar-live-button" onClick={clear}>Clear</button>
       </div>
+      {mode === "setup" && ready && !welcome && <div className="ar-live-howto">
+        <svg viewBox="0 0 120 64" aria-hidden="true">
+          <rect x="2" y="2" width="44" height="60" rx="3" className="room" />
+          <text x="24" y="36" textAnchor="middle">Room</text>
+          <rect x="44" y="22" width="6" height="20" className="door" />
+          <text x="88" y="12" textAnchor="middle">Hallway</text>
+          <circle cx="58" cy="32" r="6" className="you" />
+          <path d="M66 32h40m-8-7 8 7-8 7" className="aim" />
+        </svg>
+        <ol>
+          <li>Stand in the doorway, <b>back to the room</b>.</li>
+          <li><b>Point the phone down the hallway</b>, at the floor.</li>
+          <li>Tap <b>Start</b> and hold still for a second.</li>
+        </ol>
+        <small>Recording your screen? Start the recording first. Opening the control panel pauses AR.</small>
+      </div>}
+      {mode === "xr" && !tracking.aiming && <div className="ar-live-fix">
+        {nextCheckpoint && <button type="button" className="ar-live-button ar-live-small" onClick={checkIn}><Icon name="location" size={15} /> I&apos;m {nextCheckpoint.label}</button>}
+        <button type="button" className={`ar-live-button ar-live-small${tracking.wrongWay ? " ar-live-primary" : ""}`} onClick={flip}><Icon name="swap" size={15} /> Flip arrows</button>
+      </div>}
       {fromKey && toKey && fromKey !== toKey && <div className="ar-live-save"><SaveRouteButton className="ar-live-button ar-live-small" from={fromKey} to={toKey} /></div>}
       {inApp && mode === "setup" && !welcome && <div className="ar-live-chrome">
         <span>{inApp} can&apos;t do full AR. Open this in Chrome so the arrows stay on the floor as you walk.</span>

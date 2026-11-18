@@ -75,3 +75,17 @@
 
 .ar-live-closed { margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; border-left: 4px solid #ff5a4f; background: rgba(214, 45, 36, .22); color: #fff; font-size: 12.5px; line-height: 1.35; }
 .ar-live-closed b { color: #ffd2cd; }
+
+/* How to stand at Start, and the in-AR fix buttons */
+.ar-live-howto { display: grid; grid-template-columns: 96px 1fr; gap: 4px 10px; align-items: center; margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,.08); }
+.ar-live-howto svg { width: 96px; height: auto; }
+.ar-live-howto svg text { fill: #f6efe2; font-size: 9px; font-weight: 700; }
+.ar-live-howto .room { fill: rgba(255,255,255,.12); stroke: #f6efe2; stroke-width: 1.5; }
+.ar-live-howto .door { fill: #f1c39a; }
+.ar-live-howto .you { fill: #f1c39a; }
+.ar-live-howto .aim { fill: none; stroke: #e58a4e; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.ar-live-howto ol { margin: 0; padding-left: 18px; color: #f6efe2; font-size: 13px; line-height: 1.45; }
+.ar-live-howto small { grid-column: 1 / -1; color: rgba(246,239,226,.75); font-size: 12px; line-height: 1.4; }
+.ar-live-fix { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.ar-live-fix .ar-live-button { display: inline-flex; align-items: center; gap: 6px; }
+.ar-live-fix .ar-live-button:first-child:not(:last-child) { flex: 1 1 auto; justify-content: center; }
