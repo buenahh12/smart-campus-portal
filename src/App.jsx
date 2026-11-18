@@ -737,8 +737,10 @@ const exitMapState = (start, floor, askRoom = false) => ({ emergency: true, star
 
 function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alreadySignedIn = false, speakAnswers = false }) {
   const [open, setOpen] = useState(false);
-  // Tapping the button opens a small menu: Emergency (way out) or Ask SiBot. "floor" asks which floor.
+  // Tap the button: chat. Press and hold it: Emergency (way out). "floor" asks which floor.
   const [menu, setMenu] = useState(null);
+  const [pressing, setPressing] = useState(false);
+  const holdTimer = useRef(0);
   const [botPos, setBotPos] = useState(readBotPos);
   const [dragAt, setDragAt] = useState(null);
   const dragRef = useRef(null);
@@ -952,18 +954,36 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
     x: Math.min(Math.max(event.clientX - drag.dx, 8), window.innerWidth - drag.w - 8),
     y: Math.min(Math.max(event.clientY - drag.dy, 8), window.innerHeight - drag.h - 8),
   });
+  const stopHold = () => {
+    window.clearTimeout(holdTimer.current);
+    setPressing(false);
+  };
   const onLauncherDown = (event) => {
     if (event.button != null && event.button !== 0) return;
     const rect = event.currentTarget.getBoundingClientRect();
     skipClickRef.current = false;
     dragRef.current = { id: event.pointerId, sx: event.clientX, sy: event.clientY, dx: event.clientX - rect.left, dy: event.clientY - rect.top, w: rect.width, h: rect.height, moved: false };
+    // Held still for 0.6 s: Emergency.
+    setPressing(true);
+    window.clearTimeout(holdTimer.current);
+    holdTimer.current = window.setTimeout(() => {
+      setPressing(false);
+      if (dragRef.current?.moved) return;
+      dragRef.current = null;
+      skipClickRef.current = true;
+      try { navigator.vibrate?.(80); } catch { /* not supported */ }
+      setOpen(false);
+      startEmergency();
+    }, 600);
   };
+  useEffect(() => () => window.clearTimeout(holdTimer.current), []);
   const onLauncherMove = (event) => {
     const drag = dragRef.current;
     if (!drag || drag.id !== event.pointerId) return;
     if (!drag.moved) {
       if (Math.hypot(event.clientX - drag.sx, event.clientY - drag.sy) < 10) return;
       drag.moved = true;
+      stopHold();
       try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* not supported */ }
       setOpen(false);
       setMenu(null);
@@ -971,6 +991,7 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
     setDragAt(placeFor(event, drag));
   };
   const onLauncherUp = (event) => {
+    stopHold();
     const drag = dragRef.current;
     dragRef.current = null;
     if (!drag || drag.id !== event.pointerId || !drag.moved) return;
@@ -985,6 +1006,7 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
     try { localStorage.setItem(BOT_POS_KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
   };
   const onLauncherCancel = () => {
+    stopHold();
     dragRef.current = null;
     setDragAt(null);
   };
@@ -993,8 +1015,8 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
       skipClickRef.current = false;
       return;
     }
-    if (open) setOpen(false);
-    else setMenu((current) => (current ? null : "main"));
+    if (menu) setMenu(null);
+    else setOpen((current) => !current);
   };
 
   // Close the menu on Escape or a tap outside it.
@@ -1042,6 +1064,7 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
             <div className="siibot-conversation" ref={conversationRef} aria-live="polite" aria-relevant="additions">
               {messages.map((message) => <div className={`siibot-message ${message.role === "user" ? "from-user" : "from-bot"}`} key={message.id}><p>{message.text}</p></div>)}
             </div>
+            <button type="button" className="siibot-emergency" onClick={() => { setOpen(false); startEmergency(); }}><Icon name="alert" size={18} /> <span><b>Emergency: nearest exit</b><small>Tip: press and hold the SiBot button</small></span></button>
             <p className="siibot-label">Ask a question or try a command</p>
             <div className="siibot-options">
               <button onClick={() => choosePrompt("What are the school hours?")}>School hours</button>
@@ -1060,16 +1083,6 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
           </section>
         </div>
       )}
-      {menu === "main" && <div className="sibot-menu" role="menu" aria-label="SiBot">
-        <button type="button" role="menuitem" className="sibot-menu-exit" onClick={startEmergency}>
-          <span className="sibot-menu-icon"><Icon name="alert" size={22} /></span>
-          <span><b>Emergency</b><small>Show the nearest exit</small></span>
-        </button>
-        <button type="button" role="menuitem" onClick={() => { setMenu(null); setOpen(true); }}>
-          <span className="sibot-menu-icon"><Icon name="chat" size={22} /></span>
-          <span><b>Ask SiBot</b><small>Questions and directions</small></span>
-        </button>
-      </div>}
       {menu === "floor" && <div className="sibot-menu sibot-floor" role="dialog" aria-labelledby="sibot-floor-title">
         <p id="sibot-floor-title"><Icon name="alert" size={18} /> <b>Which floor are you on?</b></p>
         <div className="sibot-floor-grid">
@@ -1080,7 +1093,7 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
       </div>}
       <button
         type="button"
-        className={open || menu ? "siibot-launcher active" : "siibot-launcher"}
+        className={`siibot-launcher${open || menu ? " active" : ""}${pressing ? " pressing" : ""}`}
         onClick={onLauncherClick}
         onPointerDown={onLauncherDown}
         onPointerMove={onLauncherMove}
@@ -1088,9 +1101,8 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
         onPointerCancel={onLauncherCancel}
         onContextMenu={(event) => event.preventDefault()}
         aria-expanded={Boolean(open || menu)}
-        aria-haspopup="menu"
-        aria-label={open || menu ? "Close SiBot" : "SiBot: emergency exit or ask a question. Drag to move."}
-        title="Tap for Emergency or Ask SiBot. Drag to move."
+        aria-label={open || menu ? "Close SiBot" : "Ask SiBot. Press and hold for the emergency exit. Drag to move."}
+        title="Tap: ask SiBot. Press and hold: emergency exit. Drag to move."
       >
         <Icon name={open || menu ? "close" : "bot"} size={21} /> <span>SiBot</span>
         {!open && !menu && <i className="siibot-sos" aria-hidden="true"><Icon name="alert" size={11} /></i>}

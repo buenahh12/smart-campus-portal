@@ -489,7 +489,7 @@ body .student-portal-shell .mc-welcome-skip { justify-self: center; min-height: 
 .visit-end { text-align: center; }
 .visit-end .modal-mark { margin-inline: auto; }
 
-/* SiBot button: drag to move, tap for Emergency or Ask SiBot */
+/* SiBot button: drag to move, tap to chat, press and hold for Emergency */
 .siibot-launcher { position: relative; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .siibot-wrap.dragging { transition: none; }
 .siibot-wrap.dragging .siibot-launcher { cursor: grabbing; transform: scale(1.06); box-shadow: 0 16px 34px rgba(20,33,26,.32); }
@@ -500,11 +500,6 @@ body .student-portal-shell .mc-welcome-skip { justify-self: center; min-height: 
 .sibot-menu > button { min-height: 60px; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line-strong, #cfc6b4); border-radius: 13px; color: var(--ink, #1f2a24); background: var(--surface, #fff); text-align: left; }
 .sibot-menu > button b { display: block; font-size: 16px; }
 .sibot-menu > button small { display: block; color: var(--muted, #5f6b63); font-size: 13px; }
-.sibot-menu-icon { flex: 0 0 auto; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; color: var(--forest, #2f5d46); background: var(--green-tint, #e7f0ea); }
-.sibot-menu > button.sibot-menu-exit { border-color: var(--red, #b42318); color: #fff; background: var(--red, #b42318); }
-.sibot-menu > button.sibot-menu-exit small { color: rgba(255,255,255,.88); }
-.sibot-menu > button.sibot-menu-exit .sibot-menu-icon { color: var(--red, #b42318); background: #fff; }
-.sibot-menu > button.sibot-menu-exit:hover { background: var(--red-hover, #8f1c13); }
 .sibot-floor > p { display: flex; align-items: center; gap: 6px; margin: 2px 4px 2px; color: var(--red, #b42318); font-size: 16px; }
 .sibot-floor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .sibot-floor-grid button { min-height: 54px; padding: 8px; border: 2px solid var(--red, #b42318); border-radius: 12px; color: var(--red, #b42318); background: var(--red-tint, #fdf0ee); font-size: 16px; font-weight: 700; }
@@ -515,3 +510,12 @@ body .student-portal-shell .mc-welcome-skip { justify-self: center; min-height: 
 .map-here-hint { display: flex; align-items: flex-start; gap: 8px; margin: 8px 0 0; padding: 10px 12px; border: 1px dashed var(--red, #b42318); border-radius: 8px; color: var(--ink, #1f2a24); background: var(--surface, #fff); font-size: 14px; line-height: 1.45; }
 .map-here-hint .icon { flex: 0 0 auto; margin-top: 1px; color: var(--red, #b42318); }
 @media (prefers-reduced-motion: reduce) { .sibot-menu { animation: none; } }
+.siibot-launcher::after { content: ""; position: absolute; inset: -5px; border-radius: inherit; pointer-events: none; opacity: 0; }
+.siibot-launcher.pressing::after { opacity: 1; background: conic-gradient(var(--red, #b42318) var(--hold, 0turn), transparent 0); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px)); mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px)); animation: sibot-hold .6s linear forwards; }
+@property --hold { syntax: "<angle>"; inherits: false; initial-value: 0turn; }
+@keyframes sibot-hold { to { --hold: 1turn; } }
+.siibot-emergency { width: 100%; min-height: 54px; display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 9px 12px; border: 0; border-radius: 12px; color: #fff; background: var(--red, #b42318); text-align: left; }
+.siibot-emergency:hover { background: var(--red-hover, #8f1c13); }
+.siibot-emergency b { display: block; font-size: 15px; }
+.siibot-emergency small { display: block; color: rgba(255,255,255,.85); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { .siibot-launcher.pressing::after { animation-duration: .6s; } }
