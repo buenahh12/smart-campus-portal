@@ -28,14 +28,15 @@ const PUSH_ENDPOINT = import.meta.env.VITE_PUSH_ENDPOINT || 'https://smart-campu
 
 // Phone notification to everyone who tapped "Notify me". configured is false until
 // VAPID_PRIVATE_KEY is added in Vercel (see api/push-announcement.mjs).
-export async function pushToPhones({ title, message }) {
+export async function pushToPhones({ title, message, imagePath }) {
+  const image = imagePath ? new URL(imagePath, PUSH_ENDPOINT).href : '';
   const idToken = await auth?.currentUser?.getIdToken();
   if (!idToken) throw new Error('Sign in again as the administrator to send notifications.');
   const check = await appCheckToken();
   const response = await fetch(PUSH_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}`, ...(check ? { 'X-Firebase-AppCheck': check } : {}) },
-    body: JSON.stringify({ title, message }),
+    body: JSON.stringify({ title, message, image }),
   });
   const result = await response.json().catch(() => ({}));
   if (response.status === 503 && result.configured === false) return result;

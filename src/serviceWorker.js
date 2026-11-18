@@ -78,6 +78,9 @@ self.addEventListener("push", (event) => {
   event.waitUntil(self.registration.showNotification(title, {
     body: note.body || "",
     icon: scoped("./icon-192.png"),
+    // The announcement's picture: a thumbnail on the right, and big when the notification is opened
+    // (Android). Phones that can't show pictures just leave it out.
+    ...(note.image ? { image: note.image } : {}),
     tag: note.tag || "sscai-update",
     renotify: true,
     data: { url: note.url || scoped("./#updates") },

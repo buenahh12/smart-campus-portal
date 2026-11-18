@@ -5,7 +5,7 @@
 //   VAPID_PRIVATE_KEY   private half of the site's push key pair (public half is in src/push.js)
 //
 // POST /api/push-announcement   Authorization: Bearer <Firebase ID token>
-// body: { "title": "...", "message": "..." }  ->  { configured, total, sent, failed, removed }
+// body: { "title": "...", "message": "...", "image": "<link on this site>" }  ->  { configured, total, sent, failed, removed }
 import webpush from "web-push";
 import { appCheckHeader, bearerToken, cors, isAdmin, jsonBody } from "./_admin.mjs";
 
@@ -50,7 +50,13 @@ export default async function handler(req, res) {
   const title = String(body.title || "").trim().slice(0, 120);
   const message = String(body.message || "").trim().slice(0, 400);
   if (!title) return res.status(400).json({ error: "Missing title." });
-  const payload = JSON.stringify({ title, body: message, url: `${SITE_URL}#updates`, tag: `sscai-${Date.now()}` });
+  const site = new URL(SITE_URL);
+  let image = "";
+  try {
+    const link = new URL(String(body.image || ""));
+    if (link.origin === site.origin) image = link.href;
+  } catch { /* no picture */ }
+  const payload = JSON.stringify({ title, body: message, url: `${SITE_URL}#updates`, tag: `sscai-${Date.now()}`, ...(image ? { image } : {}) });
 
   const headers = appCheckHeader(req);
   let phones;

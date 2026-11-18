@@ -322,14 +322,17 @@ export default function AdminCms({ onClose, onSignOut, onOpenAnalytics, onOpenSi
     const mail = sendEmail ? update : null;
     const phone = sendPush && update ? { title: update.push || update.subject, message: update.message } : null;
     try {
-      await saveItem(section.collection, editingId, record);
+      const savedId = await saveItem(section.collection, editingId, record);
       const saved = `${section.title(record)} was ${editingId ? "updated" : "added"}. The change is live on SSCAI NAVI.`;
       resetForm();
       // Phone notifications first (they are quick), then the emails.
       let phoneNote = "";
       if (phone) {
         try {
-          const result = await pushToPhones(phone);
+          const result = await pushToPhones({
+            ...phone,
+            imagePath: section.key === "announcements" ? `/api/notify-image?id=${encodeURIComponent(savedId || editingId || "")}` : "/campus/hallway.jpg",
+          });
           phoneNote = !result.configured
             ? " No phone notification was sent because notifications aren't set up yet (add VAPID_PRIVATE_KEY in Vercel)."
             : result.total === 0
