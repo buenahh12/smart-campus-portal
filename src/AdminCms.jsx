@@ -172,13 +172,20 @@ const SECTIONS = [
     title: (item) => item.pathway,
     meta: (item) => `${item.building} · Floor ${item.floor} · ${item.reason}${item.endDate ? ` · until ${item.endDate}` : ""}${item.mapArea ? ` · blocked in 2D, 3D and AR: ${mapAreaLabel(item.mapArea)}` : " · not on the map yet: edit it and pick the hallway"}`,
     badge: (item) => isClosureActive(item) ? ["Closed now", "bad"] : item.active && item.startDate > todayKey() ? ["Scheduled", "warn"] : ["Open", "good"],
-    // Email subscribers when a restriction is switched on.
-    emailLabel: "Email subscribers about this closure",
-    pushLabel: "Send a phone notification about this closure",
-    email: (item, previous) => item.active && !previous?.active ? {
-      subject: `Hallway closed: ${item.pathway}`,
-      message: `${item.pathway} (${item.building}, floor ${item.floor}) is closed for ${item.reason.toLowerCase()} from ${item.startDate}${item.endDate ? ` until ${item.endDate}` : ""}.${item.detour ? ` Detour: ${item.detour}.` : ""}${item.details ? `\n\n${item.details}` : ""}`,
-    } : null,
+    // Tell everyone when a restriction is switched on, and again when the hallway opens.
+    emailLabel: "Email subscribers about this closure (or when it opens again)",
+    pushLabel: "Send a phone notification about this closure (or when it opens again)",
+    email: (item, previous) => {
+      if (item.active && !previous?.active) return {
+        subject: `Hallway closed: ${item.pathway}`,
+        message: `${item.pathway} (${item.building}, floor ${item.floor}) is closed for ${item.reason.toLowerCase()} from ${item.startDate}${item.endDate ? ` until ${item.endDate}` : ""}.${item.detour ? ` Detour: ${item.detour}.` : ""} The 2D, 3D and AR directions will take you around it.${item.details ? `\n\n${item.details}` : ""}`,
+      };
+      if (!item.active && previous?.active) return {
+        subject: `Hallway open again: ${item.pathway}`,
+        message: `${item.pathway} (${item.building}, floor ${item.floor}) is open again. Directions use it as usual.`,
+      };
+      return null;
+    },
   },
   {
     key: "rooms",
@@ -197,6 +204,22 @@ const SECTIONS = [
     title: (item) => item.name,
     meta: (item) => `${item.type} · ${item.building} · Floor ${item.floor}${item.capacity ? ` · ${item.capacity} seats` : ""}`,
     badge: (item) => [item.status, item.status === "Available" ? "good" : item.status === "In use" ? "warn" : "bad"],
+    // Tell everyone when a room is closed or under maintenance, and when it is available again.
+    emailLabel: "Email subscribers if this room is closed, under maintenance, or open again",
+    pushLabel: "Send a phone notification if this room is closed, under maintenance, or open again",
+    email: (item, previous) => {
+      const shut = (status) => status === "Closed" || status === "Under maintenance";
+      const where = `${item.building}, floor ${item.floor}`;
+      if (shut(item.status) && item.status !== previous?.status) return {
+        subject: `${item.name} is ${item.status === "Closed" ? "closed" : "under maintenance"}`,
+        message: `${item.name} (${where}) is ${item.status.toLowerCase()} for now.${item.notes ? `\n\n${item.notes}` : ""}`,
+      };
+      if (item.status === "Available" && previous && shut(previous.status)) return {
+        subject: `${item.name} is open again`,
+        message: `${item.name} (${where}) is available again.`,
+      };
+      return null;
+    },
   },
   {
     key: "offices",
@@ -331,7 +354,7 @@ export default function AdminCms({ onClose, onSignOut, onOpenAnalytics, onOpenSi
         try {
           const result = await pushToPhones({
             ...phone,
-            imagePath: section.key === "announcements" ? `/api/notify-image?id=${encodeURIComponent(savedId || editingId || "")}` : "/campus/hallway.jpg",
+            imagePath: section.key === "announcements" ? `/api/notify-image?id=${encodeURIComponent(savedId || editingId || "")}` : section.key === "rooms" ? "/campus/building-front.jpg" : "/campus/hallway.jpg",
           });
           phoneNote = !result.configured
             ? " No phone notification was sent because notifications aren't set up yet (add VAPID_PRIVATE_KEY in Vercel)."
