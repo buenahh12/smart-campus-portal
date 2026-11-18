@@ -62,7 +62,7 @@ function OfflinePanel({ offlineApp }) {
   else if (offlineApp.canInstall) action = <div className="dollhouse-actions"><button type="button" onClick={offlineApp.install}><Icon name="download" size={16} /> Install app</button></div>;
   else if (offlineApp.iosInstallTip) action = <ol className="ss-offline-steps"><li>Tap <b>Share</b> <span className="ss-inline-icon"><Icon name="share" size={15} /></span> at the bottom of Safari.</li><li>Tap <b>Add to Home Screen</b>.</li></ol>;
   else if (inApp) action = <div className="dollhouse-actions"><a href={chromeIntentFor(window.location.href.split("#")[0])}>Open in Chrome to install</a></div>;
-  else action = <p className="ss-offline-hint">To add it to your home screen, open the browser menu and choose <b>Install app</b> or <b>Add to Home screen</b>. No app store, nothing big to download.</p>;
+  else action = <p className="ss-offline-hint"><b>Already installed?</b> Open SSCAI NAVI from your home screen (the school logo). If it isn&apos;t there yet, open the browser menu and choose <b>Install app</b> or <b>Add to Home screen</b>. No app store, nothing big to download.</p>;
   const status = offlineApp.savedOffline
     ? { tone: "ready", text: "Ready offline on this device" }
     : offlineApp.offlineSupported
