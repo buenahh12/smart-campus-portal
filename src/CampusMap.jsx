@@ -597,6 +597,14 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
   const [destKey, setDestKey] = useState(initialDestination);
   const [emergency, setEmergency] = useState(initialEmergency);
   const [selectedKey, setSelectedKey] = useState(initialDestination);
+  // "See photo" on a tapped room that has a photo (press and hold on the map does the same).
+  const [photoKey, setPhotoKey] = useState(null);
+  useEffect(() => {
+    if (!photoKey) return undefined;
+    const onKey = (event) => { if (event.key === "Escape") setPhotoKey(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [photoKey]);
   const [floor, setFloor] = useState(() => (initialStart && placeByKey(initialStart) ? placeByKey(initialStart).floor : null) || (initialEmergency || initialDestination ? placeByKey(readStart())?.floor : null) || initialFloor);
   // Read the directions aloud (button, or automatically with Accessibility > Read directions aloud).
   const [a11y] = useA11y();
@@ -724,7 +732,7 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
             <span><i className="key-exit" /> Exit</span>
             <span><i className="key-stairs" /> Stairs</span>
             <span><i className="key-closed" /> Closed</span>
-            <span className="map-key-hint">Tap a room for directions · drag to move · pinch or scroll to zoom</span>
+            <span className="map-key-hint">Tap a room for directions · rooms with a photo show &ldquo;See photo&rdquo; · drag to move · pinch or scroll to zoom</span>
           </div>
           {plan.note && <p className="map-note">{plan.note}</p>}
         </section>
@@ -743,8 +751,20 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
           </button>
 
           {selected && selected.key !== startKey && !emergency && <div className="map-selected">
-            <div><b>{placeTitle(selected)}</b><small>{floorLabel(selected.floor)}</small>{selected.notes && <small>{selected.notes}</small>}</div>
+            {ROOM_PHOTOS[selected.key] && <button type="button" className="map-photo-thumb" onClick={() => setPhotoKey(selected.key)} aria-label={`See a photo of ${placeTitle(selected)}`}><img src={`${import.meta.env.BASE_URL}${ROOM_PHOTOS[selected.key].file}`} alt="" /></button>}
+            <div><b>{placeTitle(selected)}</b><small>{floorLabel(selected.floor)}</small>{selected.notes && <small>{selected.notes}</small>}{ROOM_PHOTOS[selected.key] && <button type="button" className="map-photo-link" onClick={() => setPhotoKey(selected.key)}><Icon name="eye" size={14} /> See photo</button>}</div>
             <button type="button" onClick={() => { chooseStart(selected.key); setDestKey(null); setSelectedKey(null); }}>I&apos;m here</button>
+          </div>}
+          {photoKey && ROOM_PHOTOS[photoKey] && <div className="map-photo-shell" role="dialog" aria-modal="true" aria-label={`Photo of ${placeTitle(placeByKey(photoKey))}`} onClick={() => setPhotoKey(null)}>
+            <figure className="map-photo" onClick={(event) => event.stopPropagation()}>
+              <img src={`${import.meta.env.BASE_URL}${ROOM_PHOTOS[photoKey].file}`} alt={ROOM_PHOTOS[photoKey].alt} />
+              <figcaption>
+                <b>{placeTitle(placeByKey(photoKey))}</b>
+                <small>{floorLabel(placeByKey(photoKey).floor)} · {buildingOf(placeByKey(photoKey).floor)}</small>
+                <span>{placeByKey(photoKey).notes || ROOM_PHOTOS[photoKey].info}</span>
+              </figcaption>
+              <button type="button" className="map-photo-close" onClick={() => setPhotoKey(null)} aria-label="Close photo"><Icon name="close" size={18} /></button>
+            </figure>
           </div>}
 
           <div className="map-directions" aria-live="polite">
