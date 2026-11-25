@@ -5,9 +5,9 @@ import { useCampusAccess, verifyCampusAccess } from "./campusAccess";
 
 // "Students and staff: see the full map". A signed-in account verifies once with an LRN (or an
 // employee number) and birthdate, checked automatically against the school's list.
-export default function VerifyAccess({ compact = false }) {
+export default function VerifyAccess({ compact = false, initialRole = "student", bare = false }) {
   const access = useCampusAccess();
-  const [role, setRole] = useState("student");
+  const [role, setRole] = useState(initialRole);
   const [id, setId] = useState("");
   const [birthdate, setBirthdate] = useState("");
   const [agree, setAgree] = useState(false);
@@ -44,14 +44,14 @@ export default function VerifyAccess({ compact = false }) {
     }
   };
 
-  return <div className={`verify-access${compact ? " compact" : ""}`}>
-    <div className="verify-head">
+  return <div className={`verify-access${compact ? " compact" : ""}${bare ? " bare" : ""}`}>
+    {!bare && <div className="verify-head">
       <span className="verify-icon" aria-hidden="true"><Icon name="shield" size={20} /></span>
       <div>
         <b>Students and staff: unlock the full map</b>
         <small>For safety, visitors only see the offices, clinic, comfort rooms and exits. Verify once to see every classroom and lab.</small>
       </div>
-    </div>
+    </div>}
     {!signedIn ? <>
       <p className="verify-note">Sign in with your own account first (not as a guest). Then come back here to verify.</p>
       <button type="button" className="verify-button" onClick={() => window.dispatchEvent(new Event("sscai:login"))}>Sign in</button>

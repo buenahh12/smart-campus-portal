@@ -16,6 +16,9 @@ import CampusUpdates, { usePublicCollection, visibleAnnouncements } from "./Camp
 import { AnnouncementArt } from "./EventArt";
 import { CMS_COLLECTIONS, GRADE_LEVELS, MAX_SECTION_LENGTH, USER_ROLES, VISITOR_TYPES, VISIT_PURPOSES, endVisit, isClosureActive, readVisit, readVisitorType, saveVisit, saveVisitorType, recordSignIn, recordVisit, todayKey, watchSession } from "./cms";
 import { usePlanVersion } from "./usePlan";
+import Welcome, { readWho, saveWho } from "./Welcome";
+import { playIntro } from "./Intro";
+import { hasFullMap, useCampusAccess } from "./campusAccess";
 import { useOfflineApp } from "./offline";
 import { BUILDING_NAME, FLOORS, PLACES, blockedKeyOf, findPlaceKey, floorShort, placeByKey, placeTitle, sectionsOf, floorLabel as planFloorLabel } from "./floorPlans";
 import { searchPlace } from "./placeSearch";
@@ -235,8 +238,8 @@ function useReveal() {
 const ADMIN_USERNAME = (import.meta.env.VITE_ADMIN_USERNAME || "admin1").trim().toLowerCase();
 const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL || "").trim();
 
-function LoginModal({ onClose, onCreate, onSignedIn = () => {}, onAdminSignedIn = () => {}, onVisitor = () => {}, visitorType = "", onLeaveVisitor = () => {} }) {
-  const [visitorStep, setVisitorStep] = useState(false);
+function LoginModal({ onClose, onCreate, onSignedIn = () => {}, onAdminSignedIn = () => {}, onVisitor = () => {}, visitorType = "", onLeaveVisitor = () => {}, startVisitor = false }) {
+  const [visitorStep, setVisitorStep] = useState(startVisitor);
   const [visitorBusy, setVisitorBusy] = useState(false);
   const [visitorKind, setVisitorKind] = useState("");
   const [visitorName, setVisitorName] = useState("");
@@ -409,7 +412,7 @@ function LoginModal({ onClose, onCreate, onSignedIn = () => {}, onAdminSignedIn 
           </form>
         ) : visitorStep ? (
           <>
-            <p className="modal-copy">No account needed. Tell us who you are, then your name and why you came. You can still find any room, use 2D, 3D and AR, and ask SiBot.</p>
+            <p className="modal-copy">No account needed. Tell us who you are, then your name and why you came. You can find the offices, cashier, clinic, comfort rooms and exits in 2D, 3D and AR, and ask SiBot.</p>
             <div className="visitor-types" role="group" aria-label="I am a">
               {VISITOR_TYPES.map((item) => <button key={item.role} type="button" onClick={() => setVisitorKind(item.role)}>
                 <span className="visitor-type-icon" aria-hidden="true"><Icon name={item.icon} size={20} /></span>
@@ -1193,6 +1196,26 @@ export default function App() {
   const [adminView, setAdminView] = useState(null);
   const [adminLoginOpen, setAdminLoginOpen] = useState(false);
   const isAdmin = role === "admin";
+  // "Who are you?" on a new phone: null = closed, "choose", "student" or "staff".
+  const campusAccess = useCampusAccess();
+  const [welcome, setWelcome] = useState(() => (readWho() ? null : "choose"));
+  const [loginAsVisitorStep, setLoginAsVisitorStep] = useState(false);
+  const welcomeRef = useRef(welcome);
+  welcomeRef.current = welcome;
+  const finishWelcome = (who) => {
+    saveWho(who);
+    setWelcome(null);
+    setLoginOpen(false);
+    setCreateAccountOpen(false);
+    setLoginAsVisitorStep(false);
+    playIntro();
+  };
+  // Already verified (or the administrator): nothing to ask.
+  useEffect(() => {
+    if (welcome && (hasFullMap(campusAccess) || role === "admin")) finishWelcome(campusAccess.role === "staff" ? "staff" : role === "admin" ? "admin" : "student");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campusAccess.status, role]);
+  const changeWho = () => { saveWho(""); setWelcome("choose"); };
   const roleRef = useRef(role);
   roleRef.current = role;
   const openLogin = () => {
@@ -1569,7 +1592,7 @@ export default function App() {
         </div>
         <div className="ss-container ss-footer-bottom">
           <span>© 2026 Saint Simon of Cyrene Academy, Inc.</span>
-          <span className="ss-footer-links"><button type="button" className="ss-footer-feedback" onClick={() => openAccessibility()}>Accessibility</button> <button type="button" className="ss-footer-feedback" onClick={() => openFeedback()}>Send feedback</button> <a href="#privacy">Privacy Policy</a> <a href="#terms">Terms of Use</a> <a href="#top">Back to top</a></span>
+          <span className="ss-footer-links"><button type="button" className="ss-footer-feedback" onClick={() => openAccessibility()}>Accessibility</button> <button type="button" className="ss-footer-feedback" onClick={changeWho}>Change who I am</button> <button type="button" className="ss-footer-feedback" onClick={() => openFeedback()}>Send feedback</button> <a href="#privacy">Privacy Policy</a> <a href="#terms">Terms of Use</a> <a href="#top">Back to top</a></span>
         </div>
       </footer>
       {!accountOpen && !loginOpen && !mapState && !arOpen && !route3d && <SiiBot onSignIn={openLogin} onSignOut={handleSignOut} onOpenAccount={openAccount} alreadySignedIn={Boolean(signedInUser)} onNavigate={navigateTo} onOpenMap={setMapState} />}
@@ -1590,7 +1613,14 @@ export default function App() {
         <button className="visitor-button" type="button" onClick={() => { const from = visitEnded.from; setVisitEnded(null); setMapState({ emergency: true, start: from || "1:entrance", floor: from ? placeByKey(from).floor : 1 }); }}><Icon name="door" size={18} /> Show me the way out</button>
         <button className="create-account-link" type="button" onClick={() => setVisitEnded(null)}>Close</button>
       </div></div>}
-      {loginOpen && <LoginModal visitorType={visitorType} onVisitor={(type, nextVisit) => { setVisitorType(type); setVisit(nextVisit || null); setLoginOpen(false); if (nextVisit) showVisitWay(nextVisit); }} onLeaveVisitor={leaveVisitor} onClose={() => setLoginOpen(false)} onCreate={openCreateAccount} onSignedIn={(user) => { setSignedInUser(user); setLoginOpen(false); if (ADMIN_EMAIL && String(user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase()) { setRole("admin"); roleRef.current = "admin"; } openAccount(); }} onAdminSignedIn={(user) => { setLoginOpen(false); setSignedInUser(user); setRole("admin"); setAdminView("content"); }} />}
+      {welcome && !isAdmin && <Welcome step={welcome} signedIn={Boolean(signedInUser)}
+        onChoose={(who) => { if (who === "visitor") { setLoginAsVisitorStep(true); setLoginOpen(true); } else setWelcome(who); }}
+        onSignIn={() => { setLoginAsVisitorStep(false); setLoginOpen(true); }}
+        onCreate={() => setCreateAccountOpen(true)}
+        onBack={() => setWelcome("choose")}
+        onSkip={() => finishWelcome(welcome)}
+        onEmergency={() => { finishWelcome(welcome === "choose" ? "visitor" : welcome); setMapState({ emergency: true }); }} />}
+      {loginOpen && <LoginModal startVisitor={loginAsVisitorStep} visitorType={visitorType} onVisitor={(type, nextVisit) => { setVisitorType(type); setVisit(nextVisit || null); setLoginOpen(false); if (welcomeRef.current) finishWelcome("visitor"); if (nextVisit) showVisitWay(nextVisit); }} onLeaveVisitor={leaveVisitor} onClose={() => setLoginOpen(false)} onCreate={openCreateAccount} onSignedIn={(user) => { setSignedInUser(user); setLoginOpen(false); if (ADMIN_EMAIL && String(user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase()) { setRole("admin"); roleRef.current = "admin"; } if (!welcomeRef.current) openAccount(); else if (welcomeRef.current === "choose") setWelcome("student"); }} onAdminSignedIn={(user) => { setLoginOpen(false); setSignedInUser(user); setRole("admin"); setAdminView("content"); }} />}
       {accountOpen && signedInUser && !isAdmin && <MyCampus
         user={signedInUser}
         onClose={() => setAccountOpen(false)}
@@ -1611,7 +1641,7 @@ export default function App() {
         }}
         renderAssistant={(prefs) => <SiiBot onSignIn={() => {}} onSignOut={handleSignOut} onOpenAccount={() => {}} alreadySignedIn speakAnswers={prefs.speakAnswers} onNavigate={(sectionId) => { setAccountOpen(false); window.setTimeout(() => navigateTo(sectionId), 50); }} onOpenMap={(state) => { setAccountOpen(false); setMapState(state); }} />}
       />}
-      {createAccountOpen && <CreateAccountModal onClose={() => setCreateAccountOpen(false)} onCreated={(user) => { setSignedInUser(user); setCreateAccountOpen(false); setAccountOpen(true); }} />}
+      {createAccountOpen && <CreateAccountModal onClose={() => setCreateAccountOpen(false)} onCreated={(user) => { setSignedInUser(user); setCreateAccountOpen(false); if (!welcomeRef.current) setAccountOpen(true); }} />}
       {adminLoginOpen && <AdminLogin onClose={() => setAdminLoginOpen(false)} onSuccess={(user) => { setAdminLoginOpen(false); setLoginOpen(false); setSignedInUser(user); setRole("admin"); setAdminView("content"); }} />}
       {isAdmin && adminView === "analytics" && <AdminAnalytics onClose={() => setAdminView(null)} onOpenContent={() => setAdminView("content")} onOpenSignIns={() => setAdminView("signins")} onOpenFeedback={() => setAdminView("feedback")} onOpenLog={() => setAdminView("log")} />}
       {isAdmin && adminView === "feedback" && <AdminFeedback onClose={() => setAdminView(null)} onOpenContent={() => setAdminView("content")} onOpenVisits={() => setAdminView("analytics")} onOpenSignIns={() => setAdminView("signins")} onOpenLog={() => setAdminView("log")} />}

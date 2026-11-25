@@ -9,17 +9,35 @@ const SEEN_KEY = "sscai-intro-seen";
 const PLAY_MS = 2500; // then the fly-through
 const OUT_MS = 900;
 
+const motionOk = () => {
+  const still = document.documentElement.classList.contains("a11y-still") || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  return !still && !/HeadlessChrome|bot|crawl|spider/i.test(navigator.userAgent);
+};
+
+// Plays the transition now (after the welcome screen: "done entering").
+export const playIntro = () => window.dispatchEvent(new Event("sscai:intro"));
+
 function shouldPlay() {
+  // First time on this phone: the "Who are you?" screen comes first, and plays the intro after.
   try {
+    if (!localStorage.getItem("sscai-who")) return false;
     if (sessionStorage.getItem(SEEN_KEY)) return false;
     sessionStorage.setItem(SEEN_KEY, "1");
   } catch { /* private window: play it */ }
-  const still = document.documentElement.classList.contains("a11y-still") || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  return !still && !/HeadlessChrome|bot|crawl|spider/i.test(navigator.userAgent);
+  return motionOk();
 }
 
 export default function Intro() {
   const [phase, setPhase] = useState(() => (shouldPlay() ? "play" : "done"));
+
+  useEffect(() => {
+    const play = () => {
+      try { sessionStorage.setItem(SEEN_KEY, "1"); } catch { /* fine */ }
+      if (motionOk()) setPhase("play");
+    };
+    window.addEventListener("sscai:intro", play);
+    return () => window.removeEventListener("sscai:intro", play);
+  }, []);
 
   useEffect(() => {
     if (phase === "play") {
