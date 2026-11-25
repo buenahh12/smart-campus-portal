@@ -1,0 +1,167 @@
+/* Opening transition (src/Intro.jsx). Same background as the loading screen in index.html, so the
+   change from loading to intro is seamless. */
+@property --intro-hole {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+.intro {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: #f5efe2;
+  background:
+    radial-gradient(120% 80% at 20% 10%, #3f7a5a 0%, rgba(63, 122, 90, 0) 60%),
+    radial-gradient(90% 70% at 90% 100%, #c98f5c 0%, rgba(201, 143, 92, 0) 55%),
+    linear-gradient(160deg, #1f4a35 0%, #163828 55%, #0f2a1e 100%);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.intro-glow {
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(circle at 50% 42%, rgba(240, 199, 154, .28) 0%, rgba(240, 199, 154, 0) 38%);
+  opacity: 0;
+  animation: intro-fade-in 1.2s .3s ease-out forwards;
+}
+
+.intro-stage {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 24px;
+  text-align: center;
+}
+
+/* Logo, ring and flash */
+.intro-badge {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 176px;
+  height: 176px;
+  margin-bottom: 8px;
+}
+.intro-ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.intro-ring circle { fill: none; stroke-width: 3; }
+.intro-ring-track { stroke: rgba(245, 239, 226, .1); }
+.intro-ring-line {
+  stroke: #f0c79a;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  filter: drop-shadow(0 0 6px rgba(240, 199, 154, .8));
+  animation: intro-ring 1s .15s cubic-bezier(.65, 0, .35, 1) forwards;
+}
+.intro-badge img {
+  position: relative;
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 5px rgba(245, 239, 226, .14), 0 16px 50px rgba(0, 0, 0, .45);
+  opacity: 0;
+  transform: scale(.45);
+  filter: blur(14px) brightness(1.6);
+  animation: intro-logo .9s .45s cubic-bezier(.2, 1.3, .35, 1) forwards;
+}
+.intro-flash {
+  position: absolute;
+  inset: -40%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 244, 222, .95) 0%, rgba(240, 199, 154, .45) 22%, rgba(240, 199, 154, 0) 55%);
+  opacity: 0;
+  transform: scale(.3);
+  animation: intro-flash .9s .95s ease-out forwards;
+  pointer-events: none;
+}
+
+/* Title */
+.intro-title {
+  margin: 0;
+  font: 900 clamp(34px, 9vw, 64px) / 1 "Archivo", system-ui, sans-serif;
+  font-stretch: 125%;
+  letter-spacing: .06em;
+  white-space: nowrap;
+}
+.intro-title span {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(.55em) scale(.9);
+  filter: blur(6px);
+  animation: intro-letter .55s cubic-bezier(.2, .9, .3, 1.2) forwards;
+}
+.intro-line {
+  display: block;
+  width: min(260px, 60vw);
+  height: 2px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, rgba(240, 199, 154, 0), #f0c79a, rgba(240, 199, 154, 0));
+  transform: scaleX(0);
+  animation: intro-line .7s 1.75s ease-out forwards;
+}
+.intro-sub {
+  margin: 0;
+  font: 700 clamp(13px, 3.6vw, 16px) / 1.3 "Space Mono", ui-monospace, monospace;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgba(245, 239, 226, .82);
+  opacity: 0;
+  animation: intro-rise .6s 1.9s ease-out forwards;
+}
+.intro-skip {
+  position: absolute;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  font: 400 12px "Space Mono", ui-monospace, monospace;
+  letter-spacing: .1em;
+  color: rgba(245, 239, 226, .45);
+  opacity: 0;
+  animation: intro-fade-in .5s 1.2s forwards;
+}
+
+/* The transition: fly through the logo while a circle opens from its middle onto the site. */
+.intro-out {
+  pointer-events: none;
+  -webkit-mask: radial-gradient(circle at 50% calc(50% - 60px), transparent var(--intro-hole), #000 calc(var(--intro-hole) + 1px));
+  mask: radial-gradient(circle at 50% calc(50% - 60px), transparent var(--intro-hole), #000 calc(var(--intro-hole) + 1px));
+  animation: intro-iris .9s cubic-bezier(.7, 0, .3, 1) forwards;
+}
+.intro-out .intro-stage { animation: intro-fly .9s cubic-bezier(.6, 0, .4, 1) forwards; }
+.intro-out .intro-skip { display: none; }
+/* Browsers without @property: a quick fade instead of the circle. */
+@supports not (background: paint(none)) {
+  .intro-out { animation: intro-iris .9s cubic-bezier(.7, 0, .3, 1) forwards, intro-fade-out .9s .35s ease-in forwards; }
+}
+
+@keyframes intro-ring { to { stroke-dashoffset: 0; } }
+@keyframes intro-logo {
+  to { opacity: 1; transform: scale(1); filter: blur(0) brightness(1); }
+}
+@keyframes intro-flash {
+  0% { opacity: 0; transform: scale(.3); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.4); }
+}
+@keyframes intro-letter {
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+@keyframes intro-line { to { transform: scaleX(1); } }
+@keyframes intro-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes intro-fade-in { to { opacity: 1; } }
+@keyframes intro-fade-out { to { opacity: 0; } }
+@keyframes intro-iris { to { --intro-hole: 150vmax; } }
+@keyframes intro-fly {
+  to { transform: scale(4.5); opacity: 0; filter: blur(4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro { display: none; }
+}
