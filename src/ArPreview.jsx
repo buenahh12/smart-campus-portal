@@ -5,7 +5,7 @@ import { prefersStill } from "./a11y";
 const asset = (file) => `${import.meta.env.BASE_URL}${file}`;
 
 // Three moments of a real walk in the Main Academic Building, shown like a phone camera.
-const DEST = "Computer Room";
+const DEST = "Clinic";
 const DEST_SUB = "2nd floor · Main Academic Building";
 const STEPS = [
   { photo: "campus/courtyard.jpg", pos: "28% 60%", kind: "pill", label: "This way", step: "Walk past the open court to the stairs", dist: "46 m", icon: "right" },

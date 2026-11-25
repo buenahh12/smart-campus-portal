@@ -6,6 +6,7 @@ import { MAX_SAVED_ROUTES, parseRouteId } from "./savedRoutes";
 import { BUILDING_NAME, PLACES, blockedAreas, buildingOf, findRoute, classroomOf, floorLabel as planFloorLabel, placeByKey, placeTitle, sectionsOf } from "./floorPlans";
 import { searchPlace } from "./placeSearch";
 import { openFeedback } from "./Feedback";
+import VerifyAccess from "./VerifyAccess";
 import { refreshEmailConfirmed, sendConfirmationEmail, wantsEmailUpdates, wishForEmailUpdates } from "./firebase";
 
 const floorLabel = (floor) => (floor === 0 ? "Ground floor" : `Floor ${floor}`);
@@ -264,6 +265,7 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
           </div>
         </section>
         {profileError && <p className="updates-unavailable" role="alert">{profileError}</p>}
+        {!user.isAnonymous && <VerifyAccess />}
         <div className="student-dashboard-grid">
           <section className="student-card mc-find-card tone-lime">
             <div className="student-card-heading"><span className="mc-card-icon" aria-hidden="true"><Icon name="location" size={22} /></span><div><p className="kicker">FIND A PLACE</p><h2>Where do you need to go?</h2></div></div>

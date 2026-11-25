@@ -4,10 +4,12 @@ import { CMS_COLLECTIONS, deleteItem, isClosureActive, saveItem, todayKey, watch
 import { MAP_AREAS, buildingOf, mapAreaLabel } from "./floorPlans";
 import { emailSubscribers, pushToPhones } from "./notify";
 import AdminFloorPlan from "./AdminFloorPlan";
+import AdminAccess from "./AdminAccess";
 import { auth } from "./firebase";
 import { AnnouncementArt, ClosureArt, generateAiPicture, useDebounced } from "./EventArt";
 
 const FLOOR_PLAN_TAB = "floorplan";
+const ACCESS_TAB = "access";
 
 // A photo from the admin's computer, made small enough to save with the announcement: at most
 // 1280 px wide, as a JPEG under about 290 KB (pictureData in firestore.rules allows 300 KB).
@@ -425,9 +427,10 @@ export default function AdminCms({ onClose, onSignOut, onOpenAnalytics, onOpenSi
         <div className="cms-tabs" role="tablist" aria-label="Content type">
           {SECTIONS.map((item) => <button key={item.key} type="button" role="tab" aria-selected={activeKey === item.key} className={activeKey === item.key ? "active" : ""} onClick={() => switchSection(item.key)}>{item.label}<span>{data[item.key]?.length ?? "–"}</span></button>)}
           <button type="button" role="tab" aria-selected={activeKey === FLOOR_PLAN_TAB} className={activeKey === FLOOR_PLAN_TAB ? "active" : ""} onClick={() => switchSection(FLOOR_PLAN_TAB)}>2D Guide</button>
+          <button type="button" role="tab" aria-selected={activeKey === ACCESS_TAB} className={activeKey === ACCESS_TAB ? "active" : ""} onClick={() => switchSection(ACCESS_TAB)}>Student access</button>
         </div>
         {loadError && <p className="auth-error" role="alert">{loadError}</p>}
-        {activeKey === FLOOR_PLAN_TAB ? <AdminFloorPlan /> : <div className="cms-grid">
+        {activeKey === FLOOR_PLAN_TAB ? <AdminFloorPlan /> : activeKey === ACCESS_TAB ? <AdminAccess /> : <div className="cms-grid">
           <form className="cms-form" onSubmit={submit} noValidate>
             <div className="section-title-row"><div><p className="kicker">{editingId ? "EDITING" : "NEW ENTRY"}</p><h3>{editingId ? `Edit ${section.singular}` : `Add ${section.singular}`}</h3></div>{editingId && <button type="button" className="cms-link-button" onClick={() => resetForm()}>Cancel edit</button>}</div>
             {section.fields.filter((field) => field.type !== "seed" && field.type !== "hidden").map((field) => field.type === "checkbox"

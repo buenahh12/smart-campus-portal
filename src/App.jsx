@@ -1397,7 +1397,7 @@ export default function App() {
               <div className="ss-quick" data-reveal style={{ "--delay": "320ms" }}>
                 <p id="ss-quick-label">Or tap a place:</p>
                 <div className="ss-quick-grid" role="group" aria-labelledby="ss-quick-label">
-                  {QUICK_PLACES.map((item) => <button key={item.label} type="button" className={`tone-${item.tone} ${item.exit ? "is-exit" : ""}`} onClick={() => goToPlace(item)}>
+                  {QUICK_PLACES.filter((item) => item.exit || searchPlace(item.search)?.key).map((item) => <button key={item.label} type="button" className={`tone-${item.tone} ${item.exit ? "is-exit" : ""}`} onClick={() => goToPlace(item)}>
                     <span className="ss-quick-icon" aria-hidden="true"><Icon name={item.icon} size={24} /></span>
                     <span><b>{item.label}</b>{item.hint && <small>{item.hint}</small>}</span>
                   </button>)}
@@ -1439,7 +1439,7 @@ export default function App() {
               </ul>
               <p className="ss-visitors-label">Show me the way to:</p>
               <div className="ss-visitors-actions">
-                {QUICK_PLACES.filter((item) => ["Director's Office", "Guidance", "Clinic", "CR"].includes(item.label)).map((item) => <button key={item.label} type="button" className={`tone-${item.tone}`} onClick={() => goToPlace(item)}><Icon name={item.icon} size={18} /> {item.label}</button>)}
+                {QUICK_PLACES.filter((item) => ["Director's Office", "Guidance", "Clinic", "CR"].includes(item.label) && searchPlace(item.search)?.key).map((item) => <button key={item.label} type="button" className={`tone-${item.tone}`} onClick={() => goToPlace(item)}><Icon name={item.icon} size={18} /> {item.label}</button>)}
               </div>
             </aside>
           </div>

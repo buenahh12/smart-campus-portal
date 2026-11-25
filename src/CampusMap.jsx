@@ -3,6 +3,8 @@ import Icon from "./Icon";
 import { usePublicCollection } from "./CampusUpdates";
 import { CMS_COLLECTIONS, isClosureActive } from "./cms";
 import { usePlanVersion } from "./usePlan";
+import { hasFullMap, useCampusAccess } from "./campusAccess";
+import VerifyAccess from "./VerifyAccess";
 import { openFeedback } from "./Feedback";
 import { SaveRouteButton } from "./savedRoutes";
 import { rememberPlace } from "./lastPlace";
@@ -428,6 +430,7 @@ function FloorPlan2D({ plan, route, startKey, destKey, selectedKey, blocked, onP
           const key = `${floor}:${item.id}`;
           const [x, y, w, h] = item.rect;
           const closed = blocked.has(key);
+          if (item.type === "private") return <g key={item.id} className="plan-room type-private" aria-hidden="true"><rect x={x} y={y} width={w} height={h} className="plan-room-fill" /></g>;
           const classes = ["plan-room", `type-${item.type}`, item.unlabeled && "unlabeled", key === selectedKey && "selected", key === dest?.key && "destination", key === startKey && "start", closed && "closed", ROOM_PHOTOS[key] && "has-photo"].filter(Boolean).join(" ");
           return <g key={item.id} className={classes} onPointerDown={() => startHold(key)} onClick={() => pick(key)} onKeyDown={(event) => (event.key === "Enter" || event.key === " ") && onPick(key)} tabIndex={0} role="button" aria-label={`${placeTitle({ ...item, floor })}${closed ? ", closed" : ""}`}>
             <rect x={x} y={y} width={w} height={h} className="plan-room-fill" />
@@ -482,7 +485,7 @@ function FloorPlan2D({ plan, route, startKey, destKey, selectedKey, blocked, onP
             const codeSize = nameSize * 1.12;
             const total = nameLines.length * nameSize * 1.2 + (code ? codeSize * 1.5 : 0);
             if ((vertical ? w : h) < nameSize * 2) return null;
-            return <text key={item.id} className={`plan-room-label ${item.unlabeled ? "muted" : ""}`} x={cx} y={cy - total / 2 + nameSize * 0.9} transform={vertical ? `rotate(-90 ${cx} ${cy})` : undefined}>
+            return <text key={item.id} className={`plan-room-label ${item.unlabeled || item.type === "private" ? "muted" : ""}`} x={cx} y={cy - total / 2 + nameSize * 0.9} transform={vertical ? `rotate(-90 ${cx} ${cy})` : undefined}>
               {nameLines.map((line, index) => <tspan key={line + index} x={cx} dy={index === 0 ? 0 : nameSize * 1.2} fontSize={nameSize} className="plan-name">{line}</tspan>)}
               {code && <tspan x={cx} dy={codeSize * 1.45} fontSize={codeSize} className="plan-code">{code}</tspan>}
             </text>;
@@ -593,6 +596,10 @@ export const placeOptions = () => FLOORS.map(({ floor }) => ({
 export default function CampusMap({ onClose, initialFloor = 2, initialDestination = null, initialEmergency = false, initialStart = null, askRoom = false }) {
   const closures = usePublicCollection(CMS_COLLECTIONS.closures);
   const planVersion = usePlanVersion();
+  const access = useCampusAccess();
+  const fullMap = hasFullMap(access);
+  const [verifyOpen, setVerifyOpen] = useState(false);
+  useEffect(() => { if (fullMap) setVerifyOpen(false); }, [fullMap]);
   const [startKey, setStartKey] = useState(() => (initialStart && placeByKey(initialStart) ? initialStart : readStart()));
   const [destKey, setDestKey] = useState(initialDestination);
   const [emergency, setEmergency] = useState(initialEmergency);
@@ -699,6 +706,12 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
 
   return (
     <div className="map-shell" role="dialog" aria-modal="true" aria-labelledby="campus-map-title">
+      {verifyOpen && <div className="map-photo-shell" role="dialog" aria-modal="true" aria-label="Unlock the full map" onClick={() => setVerifyOpen(false)}>
+        <div className="map-verify" onClick={(event) => event.stopPropagation()}>
+          <VerifyAccess />
+          <button type="button" className="map-photo-close" onClick={() => setVerifyOpen(false)} aria-label="Close"><Icon name="close" size={18} /></button>
+        </div>
+      </div>}
       <header className="map-header">
         <div className="map-title">
           <h2 id="campus-map-title">2D Guide</h2>
@@ -732,12 +745,18 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
             <span><i className="key-exit" /> Exit</span>
             <span><i className="key-stairs" /> Stairs</span>
             <span><i className="key-closed" /> Closed</span>
+            {!fullMap && <span><i className="key-private" /> Students and staff only</span>}
             <span className="map-key-hint">Tap a room for directions · rooms with a photo show &ldquo;See photo&rdquo; · drag to move · pinch or scroll to zoom</span>
           </div>
           {plan.note && <p className="map-note">{plan.note}</p>}
         </section>
 
         <aside className="map-panel">
+          {!fullMap && <div className="map-visitor-note">
+            <Icon name="shield" size={18} />
+            <span><b>Visitor map</b><small>Offices, clinic, comfort rooms, stairs and exits. Grey rooms are for students and staff only.</small></span>
+            <button type="button" onClick={() => setVerifyOpen(true)}>Student or staff? Unlock</button>
+          </div>}
           <div className="map-route-form">
             <div className="map-route-points" aria-hidden="true"><i className="from" /><span /><i className={emergency ? "exit" : "to"} /></div>
             <label><span>From</span>{placeSelect(startKey, chooseStart, "Starting point")}</label>

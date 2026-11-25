@@ -31,7 +31,7 @@ const COLORS = {
   stairs: "#a9a8a2", // grey concrete stairs
   exit: "#e9a99f",
   deck: "#d7e0d1",
-  room: { classroom: "#fbf8f1", office: "#e2ebdb", lab: "#dfe8ef", facility: "#f3e6d4", cr: "#e7e4ee" },
+  room: { private: "#d9dcd8", classroom: "#fbf8f1", office: "#e2ebdb", lab: "#dfe8ef", facility: "#f3e6d4", cr: "#e7e4ee" },
 };
 
 const roomColor = (item) => COLORS[item.type] || COLORS.room[item.type] || COLORS.room.classroom;

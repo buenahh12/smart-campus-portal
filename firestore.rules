@@ -8,7 +8,10 @@ rules_version = '2';
 // identified by the email inside its verified token.
 //
 //   Visitors and standard users: read published campus content, add visit counts,
-//                                and turn their own email updates on or off.
+//                                and turn their own email updates on or off. The map shows them
+//                                only the visitor rooms, stairs and exits.
+//   Verified students and staff: also the full map (every room), after checking their LRN or
+//                                employee number and birthdate against the school's list.
 //   The administrator:           create, update, and delete campus content, and read
 //                                visit statistics and the email subscriber list.
 //
@@ -25,6 +28,32 @@ service cloud.firestore {
 
     function data() {
       return request.resource.data;
+    }
+
+    // ---------- Students and staff access (src/campusAccess.js) ----------
+    // Visitors see only the visitor rooms. A signed-in person (not a guest) who verifies with an
+    // LRN or employee number and birthdate on this school year's list sees the full map.
+    function signedInPerson() {
+      return request.auth != null && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+    function hexKey(key) {
+      return key.matches('^[0-9a-f]{64}$');
+    }
+    function accessPath() {
+      return /databases/$(database)/documents/campusAccess/$(request.auth.uid);
+    }
+    // Verified = has a campusAccess document whose row is still on the list (so taking someone
+    // off the list, or uploading next year's list, ends their access right away).
+    function verified() {
+      return request.auth != null && exists(accessPath())
+        && exists(/databases/$(database)/documents/studentList/$(get(accessPath()).data.key));
+    }
+    function fullMap() {
+      return isAdmin() || verified();
+    }
+    // The rooms a visitor's map may name (keep in sync with VISITOR_ROOMS in src/floorPlans.js).
+    function visitorMapRoom(id) {
+      return id in ['1-offices-1', '1-cr-1', '2-director', '2-guidance', '2-clinic', '2-cr-2-girls', '2-cr-2-boys'];
     }
 
     function text(field, required, maxLength) {
@@ -85,8 +114,9 @@ service cloud.firestore {
         && data().active is bool;
     }
 
+    // The room directory names every classroom: students, staff and the administrator only.
     match /rooms/{id} {
-      allow read: if true;
+      allow read: if fullMap();
       allow create, update: if isAdmin() && stamped() && validRoom();
       allow delete: if isAdmin();
     }
@@ -106,7 +136,8 @@ service cloud.firestore {
     // What each room on the 2D floor plan is called and used for. Document ids are
     // "<floor>-<room id>" from src/floorPlans.js; the walls and doors themselves are fixed.
     match /mapRooms/{id} {
-      allow read: if true;
+      allow get: if visitorMapRoom(id) || fullMap();
+      allow list: if fullMap();
       allow create, update: if isAdmin() && stamped()
         && id.matches('^[1-9][0-9]{0,2}-[a-z0-9-]{1,40}$')
         && data().keys().hasOnly(['name', 'code', 'type', 'notes', 'updatedAt', 'updatedBy'])
@@ -119,7 +150,7 @@ service cloud.firestore {
     // published ones; drafts stay with the administrator. The app also cleans every room and
     // ignores a floor that clashes with a built-in one (normalizeFloor in src/floorPlans.js).
     match /planFloors/{id} {
-      allow read: if resource.data.published == true || isAdmin();
+      allow read: if (resource.data.published == true && verified()) || isAdmin();
       allow create, update: if isAdmin() && stamped()
         && id.matches('^[a-z0-9-]{1,40}$')
         && data().keys().hasOnly(['floor', 'level', 'building', 'label', 'rooms', 'halls', 'links', 'published', 'updatedAt', 'updatedBy'])
@@ -294,6 +325,63 @@ service cloud.firestore {
         && data().action in ['added', 'edited', 'published', 'unpublished', 'turned on', 'turned off', 'deleted', 'reset', 'marked new', 'marked seen', 'marked done']
         && text('itemId', true, 80) && text('title', false, 120) && text('fields', false, 200)
         && data().by == request.auth.token.email && data().at == request.time;
+    }
+
+    // The school's list, one row per student or staff member. The id is a SHA-256 of the ID and
+    // birthdate, so it holds no readable LRNs. Nobody but the administrator can list it; a person
+    // can only look up one exact row, and only after counting the try (5 tries, then an hour).
+    match /studentList/{key} {
+      allow get: if isAdmin() || (signedInPerson() && hexKey(key)
+        && get(/databases/$(database)/documents/verifyTries/$(request.auth.uid)).data.count <= 5);
+      allow list, delete: if isAdmin();
+      allow create, update: if isAdmin() && hexKey(key) && stamped()
+        && data().keys().hasOnly(['name', 'role', 'schoolYear', 'updatedAt', 'updatedBy'])
+        && text('name', true, 80) && data().role in ['student', 'staff']
+        && data().schoolYear is string && data().schoolYear.matches('^[0-9]{4}-[0-9]{4}$');
+    }
+
+    match /verifyTries/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow delete: if isAdmin();
+      allow create: if signedInPerson() && request.auth.uid == uid
+        && data().keys().hasOnly(['count', 'at']) && data().count == 1 && data().at == request.time;
+      allow update: if signedInPerson() && request.auth.uid == uid
+        && data().keys().hasOnly(['count', 'at']) && data().at == request.time
+        && (data().count == resource.data.count + 1
+          || (data().count == 1 && request.time > resource.data.at + duration.value(1, 'h')));
+    }
+
+    // One LRN = one account: the first account to verify a row owns it until the admin resets it.
+    match /lrnClaims/{key} {
+      allow get: if isAdmin() || (request.auth != null && resource.data.uid == request.auth.uid);
+      allow list, delete: if isAdmin();
+      allow create: if signedInPerson() && hexKey(key)
+        && data().keys().hasOnly(['uid', 'at']) && data().uid == request.auth.uid && data().at == request.time
+        && exists(/databases/$(database)/documents/studentList/$(key));
+    }
+
+    // "This account is verified": written together with its claim, copying the row's name, role
+    // and school year, so nobody can make themselves a student or staff member.
+    match /campusAccess/{uid} {
+      allow get: if isAdmin() || (request.auth != null && request.auth.uid == uid);
+      allow list: if isAdmin();
+      allow delete: if isAdmin() || (request.auth != null && request.auth.uid == uid);
+      allow create, update: if signedInPerson() && request.auth.uid == uid
+        && data().keys().hasOnly(['key', 'name', 'role', 'schoolYear', 'at'])
+        && data().key is string && hexKey(data().key) && data().at == request.time
+        && getAfter(/databases/$(database)/documents/lrnClaims/$(data().key)).data.uid == uid
+        && data().name == get(/databases/$(database)/documents/studentList/$(data().key)).data.name
+        && data().role == get(/databases/$(database)/documents/studentList/$(data().key)).data.role
+        && data().schoolYear == get(/databases/$(database)/documents/studentList/$(data().key)).data.schoolYear;
+    }
+
+    // Names, numbers and doors of the classrooms, labs and staff rooms (not in the public website).
+    match /campusPlan/{id} {
+      allow read: if fullMap();
+      allow create, update: if isAdmin() && id == 'rooms' && stamped()
+        && data().keys().hasOnly(['rooms', 'walks', 'updatedAt', 'updatedBy'])
+        && data().rooms is map && data().rooms.size() <= 600 && data().walks is map;
+      allow delete: if isAdmin();
     }
 
     // Anything not listed above is closed by default.

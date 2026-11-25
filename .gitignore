@@ -7,3 +7,6 @@ dist
 !.env.example
 serviceAccountKey.json
 *-firebase-adminsdk-*.json
+
+# Private school data (student list, full map details): never commit
+private/

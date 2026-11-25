@@ -4,9 +4,11 @@
 // door point on the wall facing the hallway. Hallway "walk" lines are the centre
 // lines people walk along; the route finder connects every door to them.
 //
-// The 1st (ground) floor is traced from the Grade 2 (Room 109) earthquake exit plan,
-// which has no room names, so its other rooms are marked as unlabeled until the
-// ground floor plan sign is added.
+// Security: this file is part of the public website, so it only names the places a visitor
+// may go (offices, clinic, comfort rooms) plus every stairway and exit. Classrooms, labs and
+// staff rooms are walls only ("Students and staff only"). Their names, numbers and doors are in
+// the campusPlan/rooms document, which firestore.rules give only to students and staff verified
+// with their LRN or employee number (src/campusAccess.js) and to the administrator.
 
 export const BUILDING_NAME = "Main Academic Building";
 export const PLAN_WIDTH = 160;
@@ -61,6 +63,12 @@ export const floorShort = (floor) => {
 };
 
 const room = (id, name, code, type, rect, door, extra = {}) => ({ id, name, code, type, rect, door, ...extra });
+export const PRIVATE_TYPE = "private";
+export const PRIVATE_NAME = "Students and staff only";
+const PRIVATE_AISLE = "Room aisle";
+// Rooms a visitor's map shows by name (with the 2D Guide's room edits, mapRooms "<floor>-<id>").
+// Keep in sync with visitorMapRoom() in firestore.rules.
+export const VISITOR_ROOMS = ["1-offices-1", "1-cr-1", "2-director", "2-guidance", "2-clinic", "2-cr-2-girls", "2-cr-2-boys"];
 
 // Hallways shared by floors 1–3 (same structural frame).
 const frameHalls = (topFrom) => [
@@ -89,16 +97,16 @@ const BUILT_IN_FLOORS = [
       room("north-exit", "North exit", "EXIT", "exit", [124, 0, 7, 24], [127.5, 24]),
       room("offices-1", "Ground floor offices", "", "office", [0, 0, 32, 24], [28, 24], { unlabeled: true }),
       room("stair-nw-1", "North-west stairs", "", "stairs", [32, 0, 15, 24], [39.5, 24], { stair: "nw", shape: "u" }),
-      room("g-101", "Classroom", "", "classroom", [47, 0, 40, 24], [83, 24], { unlabeled: true }),
-      room("g-102", "Classroom", "", "classroom", [87, 0, 37, 24], [120, 24], { unlabeled: true }),
-      room("g-103", "Classroom", "", "classroom", [131, 0, 29, 24], [134, 24], { unlabeled: true }),
-      room("g-104", "Classroom", "", "classroom", [137, 24, 23, 24], [137, 28], { unlabeled: true }),
+      room("g-101", PRIVATE_NAME, "", PRIVATE_TYPE, [47, 0, 40, 24], null),
+      room("g-102", PRIVATE_NAME, "", PRIVATE_TYPE, [87, 0, 37, 24], null),
+      room("g-103", PRIVATE_NAME, "", PRIVATE_TYPE, [131, 0, 29, 24], null),
+      room("g-104", PRIVATE_NAME, "", PRIVATE_TYPE, [137, 24, 23, 24], null),
       room("cr-1", "C.R.", "", "cr", [137, 48, 23, 16], [137, 60]),
-      room("g-105", "Classroom", "", "classroom", [0, 66, 32, 34], [32, 70], { unlabeled: true }),
+      room("g-105", PRIVATE_NAME, "", PRIVATE_TYPE, [0, 66, 32, 34], null),
       room("stair-sw-1", "South-west stairs", "", "stairs", [32, 76, 15, 24], [39.5, 76], { stair: "sw", shape: "u" }),
-      room("room-109", "Grade 2", "Room 109", "classroom", [47, 76, 39, 24], [50, 76]),
-      room("g-110", "Classroom", "", "classroom", [86, 76, 38, 24], [120, 76], { unlabeled: true }),
-      room("g-111", "Classroom", "", "classroom", [124, 76, 36, 24], [128, 76], { unlabeled: true }),
+      room("room-109", PRIVATE_NAME, "", PRIVATE_TYPE, [47, 76, 39, 24], null),
+      room("g-110", PRIVATE_NAME, "", PRIVATE_TYPE, [86, 76, 38, 24], null),
+      room("g-111", PRIVATE_NAME, "", PRIVATE_TYPE, [124, 76, 36, 24], null),
       room("stair-e-1", "East stairs", "", "stairs", [141, 64, 19, 12], [141, 71], { stair: "e", shape: "u" }),
       room("court-1", "Open court", "", "void", [47, 31, 78, 35], null),
     ],
@@ -114,8 +122,7 @@ const BUILT_IN_FLOORS = [
       { hall: "left-hall", points: [[39.5, 27.5], [39.5, 68.5], [39.5, 71]] },
       { hall: "right-hall", points: [[131, 27.5], [131, 71]] },
       { hall: "bottom-hall", points: [[39.5, 71], [127, 71], [131, 71], [141, 71]] },
-      // Inside the Computer Room, to the C.R. and the small room in its corner.
-      { hall: "computer-aisle", name: "Computer Room", points: [[39.5, 68.5], [27.5, 68.5], [27.5, 76], [3, 76]], closable: false },
+      { hall: "computer-aisle", name: PRIVATE_AISLE, points: [[39.5, 68.5], [27.5, 68.5], [27.5, 76], [3, 76]], closable: false },
       { hall: "se-passage", points: [[127, 71], [127, 86], [143, 86]] },
     ],
     rooms: [
@@ -124,24 +131,24 @@ const BUILT_IN_FLOORS = [
       room("guidance", "Guidance Office", "", "office", [14, 0, 7, 24], [17.5, 24]),
       room("clinic", "Clinic", "", "office", [21, 0, 11, 24], [26, 24]),
       room("stair-nw-2", "North-west stairs", "", "stairs", [32, 0, 15, 24], [39.5, 24], { stair: "nw", shape: "u" }),
-      room("room-204", "Grade 3 Sapphire", "Room 204", "classroom", [47, 0, 39, 24], [50, 24], { extraDoors: [[83, 24]] }),
-      room("room-205", "Grade 5 Chrysolite", "Room 205", "classroom", [86, 0, 38, 24], [120, 24], { extraDoors: [[89, 24]] }),
-      room("room-206", "Grade 5 Chalcedony", "Room 206", "classroom", [124, 0, 36, 24], [128, 24]),
-      room("room-207", "Grade 4 Amethyst", "Room 207", "classroom", [137, 24, 23, 20], [137, 28]),
-      room("room-208", "Grade 4 Sardonyx", "Room 208", "classroom", [137, 44, 23, 21], [137, 62]),
-      room("tvl-room", "TVL Room", "", "facility", [0, 31, 32, 17], [32, 34]),
-      room("tle-room", "TLE Room", "", "facility", [0, 48, 32, 18], [32, 63]),
-      // The C.R. and the small room sit inside the top-left corner of the Computer Room, as on the posted plan.
-      room("computer-room", "Computer Room", "", "lab", [0, 66, 32, 34], [32, 68.5]),
-      room("cr-2w", "C.R.", "", "cr", [0, 66, 10, 8], [5, 74]),
-      room("cr-2w-side", "Small room", "", "classroom", [10, 66, 13, 8], [16.5, 74], { unlabeled: true }),
+      room("room-204", PRIVATE_NAME, "", PRIVATE_TYPE, [47, 0, 39, 24], null),
+      room("room-205", PRIVATE_NAME, "", PRIVATE_TYPE, [86, 0, 38, 24], null),
+      room("room-206", PRIVATE_NAME, "", PRIVATE_TYPE, [124, 0, 36, 24], null),
+      room("room-207", PRIVATE_NAME, "", PRIVATE_TYPE, [137, 24, 23, 20], null),
+      room("room-208", PRIVATE_NAME, "", PRIVATE_TYPE, [137, 44, 23, 21], null),
+      room("tvl-room", PRIVATE_NAME, "", PRIVATE_TYPE, [0, 31, 32, 17], null),
+      room("tle-room", PRIVATE_NAME, "", PRIVATE_TYPE, [0, 48, 32, 18], null),
+      // Two small rooms sit inside the top-left corner room, as on the posted plan.
+      room("computer-room", PRIVATE_NAME, "", PRIVATE_TYPE, [0, 66, 32, 34], null),
+      room("cr-2w", PRIVATE_NAME, "", PRIVATE_TYPE, [0, 66, 10, 8], null),
+      room("cr-2w-side", PRIVATE_NAME, "", PRIVATE_TYPE, [10, 66, 13, 8], null),
       room("stair-sw-2", "South-west stairs", "", "stairs", [32, 76, 15, 24], [39.5, 76], { stair: "sw", shape: "u" }),
-      room("room-211", "Grade 7 Fire Opal", "Room 211", "classroom", [47, 76, 39, 24], [50, 76], { extraDoors: [[83, 76]] }),
-      room("room-210", "Grade 6 Turquoise", "Room 210", "classroom", [86, 76, 38, 24], [120, 76], { extraDoors: [[89, 76]] }),
+      room("room-211", PRIVATE_NAME, "", PRIVATE_TYPE, [47, 76, 39, 24], null),
+      room("room-210", PRIVATE_NAME, "", PRIVATE_TYPE, [86, 76, 38, 24], null),
       room("stair-e-2", "East stairs", "", "stairs", [141, 65, 19, 11], [141, 71], { stair: "e", shape: "u" }),
       room("cr-2-girls", "C.R. Girls", "", "cr", [130, 77, 15, 8], [130, 81]),
       room("cr-2-boys", "C.R. Boys", "", "cr", [145, 77, 15, 12], [145, 86]),
-      room("room-209", "Room 209", "Room 209", "classroom", [124, 90, 36, 10], [127, 90]),
+      room("room-209", PRIVATE_NAME, "", PRIVATE_TYPE, [124, 90, 36, 10], null),
       room("void-2", "Open to below", "", "void", [47, 31, 78, 35], null),
     ],
   },
@@ -156,25 +163,25 @@ const BUILT_IN_FLOORS = [
     ],
     rooms: [
       room("stair-w-3", "West stairs (up to 4th floor)", "", "stairs", [0, 0, 11, 24], [5.5, 24], { stair: "w" }),
-      room("video-room", "Video Room", "", "facility", [11, 0, 18, 24], [16, 24]),
+      room("video-room", PRIVATE_NAME, "", PRIVATE_TYPE, [11, 0, 18, 24], null),
       room("fire-exit-3", "Fire exit (outdoor stairs)", "EXIT", "exit", [29, 0, 3, 24], [30.5, 24]),
       room("stair-nw-3", "North-west stairs", "", "stairs", [32, 0, 15, 24], [39.5, 24], { stair: "nw", shape: "u" }),
-      room("room-303", "Grade 11 STEM", "Room 303", "classroom", [47, 0, 39, 24], [83, 24], { extraDoors: [[50, 24]] }),
-      room("room-304", "Grade 9 Tiger Eye", "Room 304", "classroom", [86, 0, 38, 24], [89, 24], { extraDoors: [[120, 24]] }),
-      room("room-305", "Grade 9 Star Rose Quartz", "Room 305", "classroom", [124, 0, 36, 22], [128, 22]),
-      room("cr-3-girls", "C.R. Girls", "", "cr", [137, 22, 23, 7], [137, 25.5]),
-      room("cr-3-boys", "C.R. Boys", "", "cr", [137, 29, 23, 7], [137, 32]),
-      room("faculty-hs", "Faculty (High School)", "", "office", [137, 36, 23, 7], [137, 39]),
-      room("room-307", "Grade 6 Carnelian", "Room 307", "classroom", [137, 43, 23, 19], [137, 59], { extraDoors: [[137, 46]] }),
+      room("room-303", PRIVATE_NAME, "", PRIVATE_TYPE, [47, 0, 39, 24], null),
+      room("room-304", PRIVATE_NAME, "", PRIVATE_TYPE, [86, 0, 38, 24], null),
+      room("room-305", PRIVATE_NAME, "", PRIVATE_TYPE, [124, 0, 36, 22], null),
+      room("cr-3-girls", PRIVATE_NAME, "", PRIVATE_TYPE, [137, 22, 23, 7], null),
+      room("cr-3-boys", PRIVATE_NAME, "", PRIVATE_TYPE, [137, 29, 23, 7], null),
+      room("faculty-hs", PRIVATE_NAME, "", PRIVATE_TYPE, [137, 36, 23, 7], null),
+      room("room-307", PRIVATE_NAME, "", PRIVATE_TYPE, [137, 43, 23, 19], null),
       room("stair-e-3", "East stairs", "", "stairs", [141, 62, 19, 12], [141, 71], { stair: "e", shape: "u" }),
-      room("audio-visual", "Audio Visual Room", "", "facility", [0, 31, 32, 19], [32, 47]),
-      room("library-hs", "Library (High School)", "", "facility", [0, 50, 32, 16], [32, 63]),
-      room("room-311", "Grade 12 ATH", "Room 311", "classroom", [0, 66, 32, 34], [32, 70]),
+      room("audio-visual", PRIVATE_NAME, "", PRIVATE_TYPE, [0, 31, 32, 19], null),
+      room("library-hs", PRIVATE_NAME, "", PRIVATE_TYPE, [0, 50, 32, 16], null),
+      room("room-311", PRIVATE_NAME, "", PRIVATE_TYPE, [0, 66, 32, 34], null),
       room("stair-sw-3", "South-west stairs", "", "stairs", [32, 76, 15, 24], [39.5, 76], { stair: "sw", shape: "u" }),
-      room("room-310", "Grade 8 Moonstone", "Room 310", "classroom", [47, 76, 39, 24], [50, 76], { extraDoors: [[83, 76]] }),
-      room("room-309", "Grade 7 Crystal", "Room 309", "classroom", [86, 76, 38, 24], [89, 76], { extraDoors: [[120, 76]] }),
-      room("faculty-elem", "Faculty (Elementary)", "", "office", [124, 76, 36, 24], [127, 76]),
-      room("cr-3e", "Staff C.R.", "", "cr", [148, 76, 12, 6], [148, 79]),
+      room("room-310", PRIVATE_NAME, "", PRIVATE_TYPE, [47, 76, 39, 24], null),
+      room("room-309", PRIVATE_NAME, "", PRIVATE_TYPE, [86, 76, 38, 24], null),
+      room("faculty-elem", PRIVATE_NAME, "", PRIVATE_TYPE, [124, 76, 36, 24], null),
+      room("cr-3e", PRIVATE_NAME, "", PRIVATE_TYPE, [148, 76, 12, 6], null),
       room("void-3", "Open to below", "", "void", [47, 31, 78, 35], null),
     ],
   },
@@ -187,25 +194,25 @@ const BUILT_IN_FLOORS = [
     walks: [
       { hall: "left-hall", points: [[11.5, 4], [11.5, 25.5], [11.5, 79]] },
       { hall: "top-hall", points: [[11.5, 25.5], [128, 25.5], [145, 25.5]] },
-      { hall: "industrial", name: "Industrial Room", points: [[128, 25.5], [128, 40], [155, 64]], closable: false },
+      { hall: "industrial", name: PRIVATE_AISLE, points: [[128, 25.5], [128, 40], [155, 64]], closable: false },
     ],
     rooms: [
       room("stair-w-4", "West stairs (down to 3rd floor)", "", "stairs", [0, 0, 7, 22], [7, 4.5], { stair: "w" }),
       room("fire-exit-4", "Fire exit (outdoor stairs)", "EXIT", "exit", [7, 0, 9, 4], [11.5, 4]),
-      room("cr-4w", "C.R.", "", "cr", [0, 23.5, 7, 4.25], [7, 25.5]),
-      room("cr-4w-2", "C.R.", "", "cr", [0, 27.75, 7, 4.25], [7, 30]),
-      room("room-401", "Physics Room", "Room 401", "lab", [16, 0, 34, 21], [19, 21]),
-      room("room-402", "Biology Room", "Room 402", "lab", [50, 0, 37.5, 21], [53, 21]),
-      room("room-403", "Chemistry Room", "Room 403", "lab", [87.5, 0, 38, 21], [91, 21]),
-      room("room-404", "TVL (Bartending)", "Room 404", "facility", [125.5, 0, 34.5, 21], [129, 21]),
-      room("cr-4e", "C.R.", "", "cr", [145, 21, 7.5, 9], [145, 25.5]),
-      room("cr-4e-2", "C.R.", "", "cr", [152.5, 21, 7.5, 9], [152.5, 25.5]),
-      room("room-406", "Grade 10 Aquamarine", "Room 406", "classroom", [16, 30, 33, 20], [16, 33]),
-      room("room-407", "Grade 10 Smithsonite", "Room 407", "classroom", [16, 50, 33, 20], [16, 53]),
-      room("room-405", "Industrial Room", "Room 405", "facility", [126, 30, 34, 38], [128, 30]),
+      room("cr-4w", PRIVATE_NAME, "", PRIVATE_TYPE, [0, 23.5, 7, 4.25], null),
+      room("cr-4w-2", PRIVATE_NAME, "", PRIVATE_TYPE, [0, 27.75, 7, 4.25], null),
+      room("room-401", PRIVATE_NAME, "", PRIVATE_TYPE, [16, 0, 34, 21], null),
+      room("room-402", PRIVATE_NAME, "", PRIVATE_TYPE, [50, 0, 37.5, 21], null),
+      room("room-403", PRIVATE_NAME, "", PRIVATE_TYPE, [87.5, 0, 38, 21], null),
+      room("room-404", PRIVATE_NAME, "", PRIVATE_TYPE, [125.5, 0, 34.5, 21], null),
+      room("cr-4e", PRIVATE_NAME, "", PRIVATE_TYPE, [145, 21, 7.5, 9], null),
+      room("cr-4e-2", PRIVATE_NAME, "", PRIVATE_TYPE, [152.5, 21, 7.5, 9], null),
+      room("room-406", PRIVATE_NAME, "", PRIVATE_TYPE, [16, 30, 33, 20], null),
+      room("room-407", PRIVATE_NAME, "", PRIVATE_TYPE, [16, 50, 33, 20], null),
+      room("room-405", PRIVATE_NAME, "", PRIVATE_TYPE, [126, 30, 34, 38], null),
       room("fire-exit-4e", "Fire exit (Industrial Room)", "EXIT", "exit", [152, 64, 8, 5], [155, 64]),
-      room("room-408", "Grade 11 ATH", "Room 408", "classroom", [16, 71, 26, 28], [16, 74]),
-      room("room-409", "Files Room", "Room 409", "office", [0, 79, 16, 20], [8, 79]),
+      room("room-408", PRIVATE_NAME, "", PRIVATE_TYPE, [16, 71, 26, 28], null),
+      room("room-409", PRIVATE_NAME, "", PRIVATE_TYPE, [0, 79, 16, 20], null),
       room("void-4", "Open to below", "", "void", [49, 30, 77, 40], null),
       room("roof-deck", "Roof deck", "", "deck", [42, 70, 118, 29], null),
     ],
@@ -496,6 +503,48 @@ export function setCustomFloors(docs) {
   applyMapOverrides(lastOverrides);
 }
 
+// ---------- Students and staff only ----------
+// details = the campusPlan/rooms document { rooms: { "<floor>-<id>": { name, code, type, door } },
+// walks: { "<floor>-<hall>": name } }, or null to go back to the visitor map (signed out).
+const publicRooms = new Map();
+const publicWalks = new Map();
+let privateCount = 0;
+export const privateDetailsCount = () => privateCount;
+const cleanDoor = (door) => (Array.isArray(door) && door.length === 2 && door.every((value) => Number.isFinite(Number(value)))
+  ? [num(door[0], 0, PLAN_WIDTH), num(door[1], 0, PLAN_HEIGHT)] : null);
+export function applyPrivateDetails(details) {
+  let count = 0;
+  for (const plan of BUILT_IN_FLOORS) {
+    for (const item of plan.rooms) {
+      const key = `${plan.floor}-${item.id}`;
+      if (!publicRooms.has(key)) publicRooms.set(key, { name: item.name, code: item.code, type: item.type, door: item.door, unlabeled: item.unlabeled, extraDoors: item.extraDoors });
+      const base = publicRooms.get(key);
+      const extra = base.type === PRIVATE_TYPE ? details?.rooms?.[key] : null;
+      const door = extra && cleanDoor(extra.door);
+      if (extra && door && ROOM_TYPES.includes(extra.type)) {
+        Object.assign(item, {
+          name: String(extra.name || "Room").slice(0, 50), code: String(extra.code || "").slice(0, 20), type: extra.type, door,
+          unlabeled: Boolean(extra.unlabeled), extraDoors: Array.isArray(extra.extraDoors) ? extra.extraDoors.map(cleanDoor).filter(Boolean) : undefined,
+        });
+        count += 1;
+      } else {
+        Object.assign(item, base);
+      }
+      delete item.base; // rebuild() takes the new name and type as the default again
+    }
+    for (const walk of plan.walks) {
+      if (!walk.name) continue;
+      const key = `${plan.floor}-${walk.hall}`;
+      if (!publicWalks.has(key)) publicWalks.set(key, walk.name);
+      const name = details?.walks?.[key];
+      walk.name = typeof name === "string" && name ? name.slice(0, 50) : publicWalks.get(key);
+    }
+  }
+  privateCount = count;
+  rebuild();
+  applyMapOverrides(lastOverrides);
+}
+
 // Dijkstra from one place. blocked is a Set of "floor:areaId" strings.
 function shortestFrom(startKey, blocked) {
   const best = new Map([[startKey, 0]]);
@@ -702,7 +751,7 @@ export const classroomOf = (grade, section) => {
 
 // Route between two places, or null when closures leave no way through.
 export function findRoute(startKey, endKey, blocked = new Set()) {
-  if (!startKey || !endKey || startKey === endKey) return null;
+  if (!startKey || !endKey || startKey === endKey || !placeByKey(startKey) || !placeByKey(endKey)) return null;
   const { previous } = shortestFrom(startKey, blocked);
   const found = trace(previous, startKey, endKey);
   if (!found) return { blocked: true };
@@ -718,7 +767,8 @@ export function findRoute(startKey, endKey, blocked = new Set()) {
 export function findNearestExit(startKey, blocked = new Set()) {
   if (!startKey) return null;
   const start = placeByKey(startKey);
-  if (start?.type === "exit") return { atExit: true, start };
+  if (!start) return null;
+  if (start.type === "exit") return { atExit: true, start };
   const { best } = shortestFrom(startKey, blocked);
   const exits = PLACES.filter((item) => item.type === "exit" && item.key !== startKey && best.has(item.key));
   if (!exits.length) return placeByKey(startKey)?.type === "exit" ? null : { blocked: true };

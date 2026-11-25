@@ -560,3 +560,57 @@ body .student-portal-shell .mc-welcome-skip { justify-self: center; min-height: 
 .map-photo figcaption small { color: #6b746e; font-size: 13px; }
 .map-photo-close { position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; color: #fff; background: rgba(0,0,0,.6); }
 @keyframes map-photo-in { from { opacity: 0; } }
+
+/* Students and staff access: grey rooms on the visitor map, the verify card */
+.plan-room.type-private .plan-room-fill { fill: #e6e8e5; }
+.plan-room.type-private { cursor: default; }
+.map-key .key-private { width: 13px; height: 11px; background: #e6e8e5; border: 1px solid #9aa29c; }
+.map-visitor-note { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: start; margin-bottom: 12px; padding: 12px; border: 1px solid #d7e5dc; border-radius: 12px; background: #f3f8f4; color: #1f2a24; }
+.map-visitor-note > svg { margin-top: 2px; color: #2e7d4f; }
+.map-visitor-note b { display: block; font-size: 14px; }
+.map-visitor-note small { display: block; color: #55625a; font-size: 12.5px; line-height: 1.4; }
+.map-visitor-note button { grid-column: 1 / -1; justify-self: start; padding: 8px 14px; border: 0; border-radius: 999px; color: #fff; background: #2e7d4f; font-weight: 700; font-size: 13px; }
+.map-verify { position: relative; width: min(460px, 100%); max-height: calc(100dvh - 32px); overflow: auto; border-radius: 16px; background: #fff; }
+.map-verify .verify-access { margin: 0; border: 0; }
+.verify-access { margin: 0 0 18px; padding: 16px; border: 1px solid #d7e5dc; border-radius: 16px; background: #fbfdfb; color: #1f2a24; }
+.verify-access.verified { display: flex; gap: 12px; align-items: center; background: #eef7f1; }
+.verify-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 12px; padding-right: 36px; }
+.verify-access b { display: block; font-size: 15px; }
+.verify-access small { display: block; margin-top: 2px; color: #55625a; font-size: 13px; line-height: 1.45; }
+.verify-icon { display: grid; flex: none; place-items: center; width: 38px; height: 38px; border-radius: 50%; color: #fff; background: #2e7d4f; }
+.verify-form { display: grid; gap: 10px; }
+.verify-form > label { display: grid; gap: 4px; font-size: 13px; font-weight: 700; color: #33403a; }
+.verify-form input[type="text"], .verify-form input:not([type]), .verify-form input[type="date"] { width: 100%; min-height: 44px; padding: 8px 12px; border: 1px solid #c9d3cc; border-radius: 10px; background: #fff; color: #1f2a24; font-size: 16px; }
+.verify-roles { display: flex; gap: 8px; flex-wrap: wrap; }
+.verify-roles label { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1px solid #c9d3cc; border-radius: 999px; font-size: 14px; cursor: pointer; }
+.verify-roles label.on { border-color: #2e7d4f; background: #e4f2e8; font-weight: 700; }
+.verify-roles input { accent-color: #2e7d4f; }
+.verify-agree { display: flex !important; grid-template-columns: none; align-items: flex-start; gap: 8px; font-weight: 400 !important; font-size: 12.5px !important; color: #55625a !important; line-height: 1.45; }
+.verify-agree input { margin-top: 3px; accent-color: #2e7d4f; }
+.verify-note { margin: 0 0 10px; color: #55625a; font-size: 14px; }
+.verify-error { margin: 0; padding: 8px 10px; border-radius: 8px; background: #fdecea; color: #a1281c; font-size: 13.5px; }
+.verify-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 20px; border: 0; border-radius: 999px; color: #fff; background: #2e7d4f; font-weight: 700; font-size: 15px; cursor: pointer; }
+.verify-button:disabled, .verify-button.busy { opacity: .6; }
+/* Admin: Student access tab */
+.access-admin { display: grid; gap: 16px; max-width: 900px; }
+.access-card { padding: 18px; border: 1px solid var(--line, #e3e0d8); border-radius: 14px; background: #fff; }
+.access-card h3 { margin: 0 0 6px; font-size: 17px; }
+.access-card p { margin: 0 0 12px; color: #55625a; font-size: 14px; line-height: 1.5; }
+.access-card code { padding: 1px 5px; border-radius: 5px; background: #eef2ef; font-size: 13px; }
+.access-head { display: flex; gap: 12px; }
+.access-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 8px; }
+.access-stats div { padding: 10px; border-radius: 10px; background: #f3f8f4; text-align: center; }
+.access-stats b { display: block; font-size: 22px; }
+.access-stats small { color: #55625a; font-size: 12px; }
+.access-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-bottom: 12px; }
+.access-row label { display: grid; gap: 4px; font-size: 13px; font-weight: 700; }
+.access-row input:not([type="checkbox"]) { min-height: 40px; padding: 6px 10px; border: 1px solid #c9d3cc; border-radius: 8px; }
+.access-row .access-check { display: flex; gap: 8px; align-items: center; font-weight: 400; }
+.access-file { cursor: pointer; }
+.access-notice { margin: 0; padding: 10px 12px; border-radius: 10px; background: #e4f2e8; color: #1d4430; }
+.access-list-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.access-list-head input { min-height: 38px; padding: 6px 10px; border: 1px solid #c9d3cc; border-radius: 8px; }
+.access-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.access-list li { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid #eceae4; border-radius: 10px; }
+.access-list li > div { flex: 1; min-width: 180px; }
+.access-list small { display: block; color: #6b746e; font-size: 12.5px; }
