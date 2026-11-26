@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 // been saved in the background, and keeps the browser's own "Install app" bar from popping up:
 // installing is offered only by the Install app button in the Offline mode section.
 
-let installEvent = null;
+let installEvent = (typeof window !== 'undefined' && window.__sscaiInstall) || null; // caught early in index.html
 let waitingWorker = null;
 let savedOffline = false; // the whole site is saved on this device
 const supported = import.meta.env.PROD && typeof navigator !== 'undefined' && 'serviceWorker' in navigator;

@@ -29,6 +29,11 @@
   </style>
 </head>
 <body>
+  <script>
+    // Chrome can offer installing (beforeinstallprompt) before the app code has loaded; keep it for
+    // the Add to Home screen button (src/offline.js).
+    window.addEventListener("beforeinstallprompt", function (event) { event.preventDefault(); window.__sscaiInstall = event; });
+  </script>
   <div id="root"><div class="boot" role="status"><img src="%BASE_URL%logologooo.jpg" alt="" width="72" height="72" /><b>Saint Simon of Cyrene Academy, Inc.</b><span class="sr">Loading SSCAI NAVI…</span><i aria-hidden="true"></i><noscript>Please turn on JavaScript to use SSCAI NAVI.</noscript></div></div>
   <script type="module" src="/src/main.jsx"></script>
 </body>
