@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import {
+  auth,
   createCampusAccount,
   finishGoogleRedirect,
   inAppBrowserName,
@@ -17,6 +18,7 @@ import { AnnouncementArt } from "./EventArt";
 import { CMS_COLLECTIONS, GRADE_LEVELS, MAX_SECTION_LENGTH, USER_ROLES, VISITOR_TYPES, VISIT_PURPOSES, endVisit, isClosureActive, readVisit, readVisitorType, saveVisit, saveVisitorType, recordSignIn, recordVisit, todayKey, watchSession } from "./cms";
 import { usePlanVersion } from "./usePlan";
 import Welcome, { readWho, saveWho } from "./Welcome";
+import InstallPrompt from "./InstallPrompt";
 import { playIntro } from "./Intro";
 import { hasFullMap, useCampusAccess } from "./campusAccess";
 import { useOfflineApp } from "./offline";
@@ -1216,6 +1218,21 @@ export default function App() {
   const [loginAsVisitorStep, setLoginAsVisitorStep] = useState(false);
   const welcomeRef = useRef(welcome);
   welcomeRef.current = welcome;
+  // Opening the 2D Guide, 3D or AR needs to know who you are: signed in, the administrator, or a
+  // visitor who filled in the logbook. Otherwise "Who are you?" pops up first, and what was tapped
+  // opens right after. Emergency routes never wait.
+  const pendingOpen = useRef(null);
+  const identifiedNow = () => Boolean((auth?.currentUser && !auth.currentUser.isAnonymous) || roleRef.current === "admin" || readVisit());
+  useEffect(() => {
+    const wantsSomething = (mapState && !mapState.emergency) || route3d || arOpen;
+    if (!wantsSomething || identifiedNow()) return;
+    pendingOpen.current = { mapState, route3d, arOpen };
+    setMapState(null);
+    setRoute3d(null);
+    setArOpen(false);
+    setWelcome("choose");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapState, route3d, arOpen]);
   const finishWelcome = (who) => {
     saveWho(who);
     setWelcome(null);
@@ -1223,6 +1240,21 @@ export default function App() {
     setCreateAccountOpen(false);
     setLoginAsVisitorStep(false);
     playIntro();
+    const pending = pendingOpen.current;
+    pendingOpen.current = null;
+    if (pending) {
+      // After the intro has started, open what they tapped.
+      setTimeout(() => {
+        if (pending.mapState) setMapState(pending.mapState);
+        if (pending.route3d) setRoute3d(pending.route3d);
+        if (pending.arOpen) setArOpen(true);
+      }, 50);
+    }
+  };
+  // "Not now": a signed-in person goes on with the visitor map; anyone else fills in the logbook.
+  const skipWelcome = () => {
+    if (auth?.currentUser && !auth.currentUser.isAnonymous) finishWelcome(welcome);
+    else { setLoginAsVisitorStep(true); setLoginOpen(true); }
   };
   // Already verified (or the administrator): nothing to ask.
   useEffect(() => {
@@ -1611,6 +1643,7 @@ export default function App() {
           <span className="ss-footer-links"><button type="button" className="ss-footer-feedback" onClick={() => openAccessibility()}>Accessibility</button> <button type="button" className="ss-footer-feedback" onClick={changeWho}>Change who I am</button> <button type="button" className="ss-footer-feedback" onClick={() => openFeedback()}>Send feedback</button> <a href="#privacy">Privacy Policy</a> <a href="#terms">Terms of Use</a> <a href="#top">Back to top</a></span>
         </div>
       </footer>
+      <InstallPrompt ready={!welcome && !loginOpen && !createAccountOpen && !mapState && !arOpen && !route3d && !isAdmin} />
       {!accountOpen && !loginOpen && !mapState && !arOpen && !route3d && <SiiBot onSignIn={openLogin} onSignOut={handleSignOut} onOpenAccount={openAccount} alreadySignedIn={Boolean(signedInUser)} onNavigate={navigateTo} onOpenMap={setMapState} />}
       <AccessibilityPanel />
       <AppStatus online={offlineApp.online} updateReady={offlineApp.updateReady} onUpdate={offlineApp.applyUpdate} />
@@ -1634,7 +1667,8 @@ export default function App() {
         onSignIn={() => { setLoginAsVisitorStep(false); setLoginOpen(true); }}
         onCreate={() => setCreateAccountOpen(true)}
         onBack={() => setWelcome("choose")}
-        onSkip={() => finishWelcome(welcome)}
+        onSkip={skipWelcome}
+        onClose={readWho() ? () => { pendingOpen.current = null; setWelcome(null); } : null}
         onEmergency={() => { finishWelcome(welcome === "choose" ? "visitor" : welcome); setMapState({ emergency: true }); }} />}
       {loginOpen && <LoginModal startVisitor={loginAsVisitorStep} visitorType={visitorType} onVisitor={(type, nextVisit) => { setVisitorType(type); setVisit(nextVisit || null); setLoginOpen(false); if (welcomeRef.current) finishWelcome("visitor"); if (nextVisit) showVisitWay(nextVisit); }} onLeaveVisitor={leaveVisitor} onClose={() => setLoginOpen(false)} onCreate={openCreateAccount} onSignedIn={(user) => { setSignedInUser(user); setLoginOpen(false); if (ADMIN_EMAIL && String(user?.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase()) { setRole("admin"); roleRef.current = "admin"; } if (!welcomeRef.current) openAccount(); else if (welcomeRef.current === "choose") setWelcome("student"); }} onAdminSignedIn={(user) => { setLoginOpen(false); setSignedInUser(user); setRole("admin"); setAdminView("content"); }} />}
       {accountOpen && signedInUser && !isAdmin && <MyCampus

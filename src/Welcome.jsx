@@ -24,11 +24,12 @@ const CHOICES = [
   { id: "staff", icon: "building", title: "Teacher or staff", text: "Sign in and verify with your employee number.", tone: "staff" },
 ];
 
-export default function Welcome({ step, signedIn, onChoose, onSignIn, onCreate, onBack, onSkip, onEmergency }) {
+export default function Welcome({ step, signedIn, onChoose, onSignIn, onCreate, onBack, onSkip, onEmergency, onClose = null }) {
   const role = step === "staff" ? "staff" : "student";
   const parent = step === "parent";
   return <div className="welcome" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
     <div className="welcome-card">
+      {onClose && <button type="button" className="welcome-close" onClick={onClose} aria-label="Close"><Icon name="close" size={20} /></button>}
       <img className="welcome-logo" src={`${import.meta.env.BASE_URL}logologooo.jpg`} alt="" width="64" height="64" />
       {step === "choose" ? <>
         <p className="welcome-kicker">WELCOME TO SSCAI NAVI</p>
@@ -53,7 +54,7 @@ export default function Welcome({ step, signedIn, onChoose, onSignIn, onCreate, 
           </div>}
         <div className="welcome-foot">
           <button type="button" className="welcome-link" onClick={onBack}><Icon name="arrowLeft" size={15} /> Back</button>
-          <button type="button" className="welcome-link" onClick={onSkip}>Not now, use the visitor map</button>
+          <button type="button" className="welcome-link" onClick={onSkip}>{signedIn ? "Not now, use the visitor map" : "Not now, continue as a visitor"}</button>
         </div>
       </>}
       <button type="button" className="welcome-emergency" onClick={onEmergency}><Icon name="alert" size={16} /> Emergency? Nearest exit</button>
