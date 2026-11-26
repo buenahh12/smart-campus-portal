@@ -766,7 +766,7 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
 
           <button type="button" className={`map-exit-button ${emergency ? "active" : ""}`} onClick={toggleEmergency}>
             <svg viewBox="0 0 24 24" aria-hidden="true">{STEP_ICONS.exit}</svg>
-            {emergency ? "Showing the nearest exit — cancel" : "Nearest exit"}
+            {emergency ? "Showing the nearest emergency exit — cancel" : "Emergency: nearest exit"}
           </button>
 
           {selected && selected.key !== startKey && !emergency && <div className="map-selected">

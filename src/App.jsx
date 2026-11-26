@@ -157,7 +157,7 @@ const QUICK_PLACES = [
   { label: "Computer Room", hint: "Computer class", icon: "monitor", search: "computer", tone: "sky" },
   { label: "Director's Office", hint: "School head", icon: "building", search: "director", tone: "orange" },
   { label: "Faculty", hint: "Teachers' room", icon: "info", search: "faculty", tone: "lime" },
-  { label: "Way out", hint: "Nearest exit", icon: "door", exit: true, tone: "red" },
+  { label: "Way out", hint: "To the main gate", icon: "door", gate: true, tone: "red" },
 ];
 // School location. Google Maps finds the school by name, so no exact coordinates are hard-coded.
 const SCHOOL_MAP_QUERY = "Saint Simon of Cyrene Academy, Carsadang Bago II, Imus, Cavite";
@@ -739,6 +739,8 @@ const readBotPos = () => {
 
 // The 2D Guide in "nearest exit" mode, starting from the last place the person chose or reached.
 const exitMapState = (start, floor, askRoom = false) => ({ emergency: true, start, floor, askRoom });
+// Everyday "way out": the main entrance and gate (fire exits are for emergencies only).
+const GATE = "1:entrance";
 
 function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alreadySignedIn = false, speakAnswers = false }) {
   const [open, setOpen] = useState(false);
@@ -880,7 +882,11 @@ function SiiBot({ onSignIn, onSignOut, onOpenAccount, onNavigate, onOpenMap, alr
     } else if (hasAny(["ar live", "ar view", "augmented reality", "camera guide", "live view"])) {
       answer = "AR Live View is in Explore the Platform. Open it for a visual walkthrough with directions and room distance.";
       onNavigate("features");
-    } else if (hasAny(["emergency", "fire exit", "nearest exit", "safest route", "evacuate", "safety route", "earthquake", "way out"])) {
+    } else if (hasAny(["way out", "exit the school", "leave the school", "go home", "uuwi", "palabas", "lalabas", "main gate", "gate"]) && !hasAny(["emergency", "fire", "earthquake", "evacuate", "lindol", "sunog"])) {
+      answer = "I’m showing the way to the main entrance and gate on the 2D Guide. In an emergency, press and hold my button for the nearest exit instead.";
+      const last = lastPlace();
+      onOpenMap?.(last?.fresh && last.key !== GATE ? { start: last.key, destination: GATE, floor: last.place.floor } : { destination: GATE, floor: 1 });
+    } else if (hasAny(["emergency", "fire exit", "nearest exit", "safest route", "evacuate", "safety route", "earthquake", "fire", "lindol", "sunog"])) {
       answer = "I’m showing the nearest exit on the 2D Guide. In a real emergency, stay calm and follow your teacher and school staff first.";
       const last = lastPlace();
       onOpenMap?.(last?.fresh ? exitMapState(last.key, last.place.floor) : { emergency: true });
@@ -1251,6 +1257,7 @@ export default function App() {
 
   // One tap from a place button: open the floor plan with the route there.
   const goToPlace = (item) => {
+    if (item.gate) { setMapState({ destination: GATE, floor: 1 }); return; }
     const found = item.exit ? { exit: true } : searchPlace(item.search, savedStart());
     if (found?.exit) setMapState({ emergency: true });
     else if (found?.key) setMapState({ destination: found.key, floor: placeByKey(found.key).floor });
@@ -1420,7 +1427,7 @@ export default function App() {
               <div className="ss-quick" data-reveal style={{ "--delay": "320ms" }}>
                 <p id="ss-quick-label">Or tap a place:</p>
                 <div className="ss-quick-grid" role="group" aria-labelledby="ss-quick-label">
-                  {QUICK_PLACES.filter((item) => item.exit || searchPlace(item.search)?.key).map((item) => <button key={item.label} type="button" className={`tone-${item.tone} ${item.exit ? "is-exit" : ""}`} onClick={() => goToPlace(item)}>
+                  {QUICK_PLACES.filter((item) => item.exit || item.gate || searchPlace(item.search)?.key).map((item) => <button key={item.label} type="button" className={`tone-${item.tone} ${item.exit ? "is-exit" : ""}`} onClick={() => goToPlace(item)}>
                     <span className="ss-quick-icon" aria-hidden="true"><Icon name={item.icon} size={24} /></span>
                     <span><b>{item.label}</b>{item.hint && <small>{item.hint}</small>}</span>
                   </button>)}
@@ -1458,7 +1465,8 @@ export default function App() {
               <ul>
                 <li><b>Come in</b> through the main entrance of the Main Academic Building, on N.I.A. Road.</li>
                 <li><b>Offices are open</b> Monday to Friday, 7:00 AM to 5:00 PM.</li>
-                <li><b>In an emergency,</b> tap <b>Way out</b> and follow the line to the nearest exit.</li>
+                <li><b>Leaving?</b> Tap <b>Way out</b> for the way to the main gate.</li>
+                <li><b>In an emergency,</b> press and hold the SiBot button (or tap <b>Show the nearest exit</b>) and follow the red line.</li>
               </ul>
               <p className="ss-visitors-label">Show me the way to:</p>
               <div className="ss-visitors-actions">
@@ -1610,7 +1618,7 @@ export default function App() {
         <div className="modal-mark"><Icon name="check" size={26} /></div>
         <h2 id="visit-end-title">Thank you for visiting{visitEnded.name ? `, ${visitEnded.name.split(" ")[0]}` : ""}!</h2>
         <p className="modal-copy">Your visit has ended. Need the way out?</p>
-        <button className="visitor-button" type="button" onClick={() => { const from = visitEnded.from; setVisitEnded(null); setMapState({ emergency: true, start: from || "1:entrance", floor: from ? placeByKey(from).floor : 1 }); }}><Icon name="door" size={18} /> Show me the way out</button>
+        <button className="visitor-button" type="button" onClick={() => { const from = visitEnded.from; setVisitEnded(null); setMapState(from && from !== GATE && placeByKey(from) ? { start: from, destination: GATE, floor: placeByKey(from).floor } : { destination: GATE, floor: 1 }); }}><Icon name="door" size={18} /> Show me the way to the gate</button>
         <button className="create-account-link" type="button" onClick={() => setVisitEnded(null)}>Close</button>
       </div></div>}
       {welcome && !isAdmin && <Welcome step={welcome} signedIn={Boolean(signedInUser)}
