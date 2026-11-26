@@ -676,3 +676,11 @@ body .student-portal-shell .mc-welcome-skip { justify-self: center; min-height: 
 .install-pop-later { min-height: 42px; padding: 8px 16px; border: 1px solid #c9d3cc; border-radius: 999px; color: #33403a; background: #fff; font-size: 14px; cursor: pointer; }
 @keyframes install-pop-in { from { opacity: 0; transform: translate(-50%, 24px); } }
 @media (prefers-reduced-motion: reduce) { .install-pop { animation: none; } }
+
+/* Offline mode: always-visible Add to Home screen button */
+.ss-offline-add { display: grid; gap: 10px; justify-items: stretch; }
+.ss-add-home { display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 54px; padding: 12px 20px; border: 0; border-radius: 999px; color: #1f2a24; background: #f0c79a; font-weight: 800; font-size: 16px; letter-spacing: .02em; text-transform: uppercase; cursor: pointer; box-shadow: 0 8px 22px rgba(0,0,0,.18); }
+.ss-add-home:hover, .ss-add-home:focus-visible { filter: brightness(1.05); }
+.ss-offline-note { color: rgba(245,239,226,.75); font-size: 13px; text-align: center; }
+.ss-offline-steps-box { display: grid; gap: 8px; }
+.ss-offline-steps-box p { margin: 0; }

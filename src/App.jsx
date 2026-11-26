@@ -63,13 +63,24 @@ function AppStatus({ online, updateReady, onUpdate }) {
 // saves itself for offline use when opened once.)
 function OfflinePanel({ offlineApp }) {
   const inApp = /Android/i.test(navigator.userAgent) ? inAppBrowserName() : "";
-  // Install on the home screen (a PWA: no app store, nothing big to download). Only here, never a pop-up.
-  let action;
-  if (offlineApp.installed) action = <p className="ss-offline-done"><Icon name="addHome" size={16} /> On your home screen. Tap the SSCAI NAVI icon to open it, even offline.</p>;
-  else if (offlineApp.canInstall) action = <div className="dollhouse-actions"><button type="button" onClick={offlineApp.install}><Icon name="addHome" size={16} /> Add to Home screen</button></div>;
-  else if (offlineApp.iosInstallTip) action = <ol className="ss-offline-steps"><li>Tap <b>Share</b> <span className="ss-inline-icon"><Icon name="share" size={15} /></span> at the bottom of Safari.</li><li>Tap <b>Add to Home Screen</b>.</li></ol>;
-  else if (inApp) action = <div className="dollhouse-actions"><a href={chromeIntentFor(window.location.href.split("#")[0])}>Open in Chrome to add it</a></div>;
-  else action = <p className="ss-offline-hint"><b>Already added?</b> Open SSCAI NAVI from your home screen (the school logo). If it isn&apos;t there yet, open the browser menu (&#8942;) and choose <b>Add to Home screen</b>. It&apos;s just a shortcut icon: no app store, nothing to download.</p>;
+  const [stepsOpen, setStepsOpen] = useState(false);
+  // Always a big Add to Home screen button. Where the browser allows it (Android Chrome, computers)
+  // it opens the browser's Install window; otherwise it shows the steps for this phone.
+  const isIphone = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const addNow = () => {
+    if (offlineApp.canInstall) offlineApp.install();
+    else setStepsOpen((open) => !open);
+  };
+  let steps;
+  if (isIphone) steps = <ol className="ss-offline-steps"><li>Open this page in <b>Safari</b>.</li><li>Tap <b>Share</b> <span className="ss-inline-icon"><Icon name="share" size={15} /></span> at the bottom.</li><li>Scroll down and tap <b>Add to Home Screen</b>, then <b>Add</b>.</li></ol>;
+  else if (inApp) steps = <div className="ss-offline-steps-box"><p>{inApp} can&apos;t add apps. Open this page in Chrome first:</p><a className="ss-btn ss-btn-primary" href={chromeIntentFor(window.location.href.split("#")[0])}>Open in Chrome</a></div>;
+  else steps = <ol className="ss-offline-steps"><li>Tap the browser menu <b>&#8942;</b> (top right in Chrome).</li><li>Tap <b>Add to Home screen</b> or <b>Install app</b>.</li><li>Tap <b>Install</b> or <b>Add</b>. The school logo appears on your home screen.</li></ol>;
+  const action = <div className="ss-offline-add">
+    {offlineApp.installed && <p className="ss-offline-done"><Icon name="addHome" size={16} /> Already on this phone&apos;s home screen. Tap the SSCAI NAVI icon to open it, even offline.</p>}
+    {!offlineApp.installed && <button type="button" className="ss-add-home" onClick={addNow} aria-expanded={offlineApp.canInstall ? undefined : stepsOpen}><Icon name="addHome" size={20} /> Add to Home screen</button>}
+    {!offlineApp.installed && stepsOpen && steps}
+    {!offlineApp.installed && !stepsOpen && <small className="ss-offline-note">A shortcut with the school logo. No app store, nothing big to download.</small>}
+  </div>;
   const status = offlineApp.savedOffline
     ? { tone: "ready", text: "Ready offline on this device" }
     : offlineApp.offlineSupported
