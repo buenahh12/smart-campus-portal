@@ -1,5 +1,6 @@
 import Icon from "./Icon";
 import VerifyAccess from "./VerifyAccess";
+import ParentRequest from "./ParentRequest";
 
 // First screen on a new phone: "Who are you?" Visitors go in at once (with the guard-style
 // logbook); students and staff sign in and verify their LRN or employee number for the full map.
@@ -17,13 +18,15 @@ export const saveWho = (value) => {
 };
 
 const CHOICES = [
-  { id: "visitor", icon: "location", title: "Visitor or parent", text: "Find the office, cashier, clinic or the way out. No account needed.", tone: "visitor" },
+  { id: "visitor", icon: "location", title: "Visitor or enrollee", text: "Find the office, cashier, clinic or the way out. Just your name and contact number.", tone: "visitor" },
+  { id: "parent", icon: "heart", title: "Parent or guardian", text: "Send a photo of your valid ID. Once the school approves it, you see every room.", tone: "parent" },
   { id: "student", icon: "book", title: "Student", text: "Sign in and verify with your LRN to see every room.", tone: "student" },
   { id: "staff", icon: "building", title: "Teacher or staff", text: "Sign in and verify with your employee number.", tone: "staff" },
 ];
 
 export default function Welcome({ step, signedIn, onChoose, onSignIn, onCreate, onBack, onSkip, onEmergency }) {
   const role = step === "staff" ? "staff" : "student";
+  const parent = step === "parent";
   return <div className="welcome" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
     <div className="welcome-card">
       <img className="welcome-logo" src={`${import.meta.env.BASE_URL}logologooo.jpg`} alt="" width="64" height="64" />
@@ -39,12 +42,12 @@ export default function Welcome({ step, signedIn, onChoose, onSignIn, onCreate, 
           </button>)}
         </div>
       </> : <>
-        <p className="welcome-kicker">{role === "staff" ? "TEACHER OR STAFF" : "STUDENT"}</p>
-        <h1 id="welcome-title">{signedIn ? "Verify it's you" : "Sign in first"}</h1>
+        <p className="welcome-kicker">{parent ? "PARENT OR GUARDIAN" : role === "staff" ? "TEACHER OR STAFF" : "STUDENT"}</p>
+        <h1 id="welcome-title">{!signedIn ? "Sign in first" : parent ? "Show your valid ID" : "Verify it's you"}</h1>
         {signedIn
-          ? <VerifyAccess initialRole={role} bare />
+          ? parent ? <div className="welcome-panel"><ParentRequest onContinue={onSkip} /></div> : <VerifyAccess initialRole={role} bare />
           : <div className="welcome-signin">
-            <p className="welcome-lead">Use your own account (Google or email). Then enter your {role === "staff" ? "employee number" : "LRN"} once to unlock the full map.</p>
+            <p className="welcome-lead">Use your own account (Google or email). {parent ? "Then send a photo of your valid ID for the school to approve." : `Then enter your ${role === "staff" ? "employee number" : "LRN"} once to unlock the full map.`}</p>
             <button type="button" className="verify-button" onClick={onSignIn}>Sign in</button>
             <button type="button" className="welcome-link" onClick={onCreate}>Create a new account</button>
           </div>}

@@ -104,12 +104,30 @@ export function startCampusAccess() {
         return;
       }
     } catch { /* offline: carry on as a normal account */ }
-    stopAccess = onSnapshot(doc(db, "campusAccess", user.uid), (snapshot) => {
-      if (!snapshot.exists()) { becomeVisitor(); return; }
-      const data = snapshot.data();
-      set({ name: data.name || "", role: data.role || "student", schoolYear: data.schoolYear || "" });
-      watchPlan("verified");
-    }, becomeVisitor);
+    // Verified by LRN / employee number (campusAccess) or a parent approved by the school
+    // (parentAccess, until the end of the school year). Either one opens the full map.
+    let student = null;
+    let parent = null;
+    const heard = { student: false, parent: false };
+    const decide = () => {
+      if (!heard.student || !heard.parent) return; // wait for both answers: no flash of the visitor map
+      if (student) set({ name: student.name || "", role: student.role || "student", schoolYear: student.schoolYear || "" });
+      else if (parent) set({ name: parent.name || "", role: "parent", schoolYear: "" });
+      if (student || parent) watchPlan("verified");
+      else becomeVisitor();
+    };
+    const stopStudent = onSnapshot(doc(db, "campusAccess", user.uid), (snapshot) => {
+      student = snapshot.exists() ? snapshot.data() : null;
+      heard.student = true;
+      decide();
+    }, () => { student = null; heard.student = true; decide(); });
+    const stopParent = onSnapshot(doc(db, "parentAccess", user.uid), (snapshot) => {
+      const data = snapshot.exists() ? snapshot.data() : null;
+      parent = data && (data.until?.toMillis?.() || 0) > Date.now() ? data : null;
+      heard.parent = true;
+      decide();
+    }, () => { parent = null; heard.parent = true; decide(); });
+    stopAccess = () => { stopStudent(); stopParent(); };
   });
 }
 

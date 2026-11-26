@@ -368,6 +368,8 @@ export async function recordSignIn(user, role) {
       email: user.email || '',
       name: (visit?.name || profile.name || user.displayName || '').slice(0, 80),
       ...(visit?.purpose ? { purpose: visit.purpose.slice(0, 60) } : {}),
+      ...(visit?.contact ? { contact: String(visit.contact).slice(0, 20) } : {}),
+      ...(visit?.address ? { address: String(visit.address).slice(0, 150) } : {}),
       role: user.isAnonymous ? readVisitorType() || 'Visitor' : profile.role || '',
       method: user.isAnonymous ? 'anonymous' : user.providerData[0]?.providerId || 'password',
       ...describeDevice(),

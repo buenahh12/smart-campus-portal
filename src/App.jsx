@@ -245,6 +245,8 @@ function LoginModal({ onClose, onCreate, onSignedIn = () => {}, onAdminSignedIn 
   const [visitorName, setVisitorName] = useState("");
   const [visitorPurpose, setVisitorPurpose] = useState("");
   const [visitorOther, setVisitorOther] = useState("");
+  const [visitorContact, setVisitorContact] = useState("");
+  const [visitorAddress, setVisitorAddress] = useState("");
   const [visitorError, setVisitorError] = useState("");
   // A visitor (no account) says who they are, their name and why they came, like the guard's
   // logbook. All of it is saved before Firebase signs them in, so the visitor log row (written as
@@ -257,10 +259,14 @@ function LoginModal({ onClose, onCreate, onSignedIn = () => {}, onAdminSignedIn 
     const other = visitorOther.trim().replace(/\s+/g, " ");
     const purpose = VISIT_PURPOSES.find((item) => item.id === visitorPurpose);
     if (name.length < 2) return setVisitorError("Please type your name.");
+    const contact = visitorContact.trim().replace(/\s+/g, " ");
+    if (!/^[0-9+()\-\s]{7,20}$/.test(contact)) return setVisitorError("Please type your contact number, e.g. 0917 123 4567.");
     if (!purpose) return setVisitorError("Please choose why you're visiting.");
     if (purpose.id === "other" && other.length < 2) return setVisitorError("Please type why you're visiting.");
     const visit = {
       name: name.slice(0, 80),
+      contact: contact.slice(0, 20),
+      address: visitorAddress.trim().replace(/\s+/g, " ").slice(0, 150),
       purpose: (purpose.id === "other" ? `Other: ${other}` : purpose.label).slice(0, 60),
       find: purpose.id === "other" ? [other] : purpose.find,
     };
@@ -395,8 +401,10 @@ function LoginModal({ onClose, onCreate, onSignedIn = () => {}, onAdminSignedIn 
         <h2 id="login-title">{visitorStep ? (visitorKind ? "About your visit" : "Who are you?") : resetMode ? "Reset your password" : "Sign in to SSCAI NAVI"}</h2>
         {visitorStep && visitorKind ? (
           <form className="visit-form" onSubmit={startVisit} noValidate>
-            <p className="modal-copy">Like the guard&apos;s logbook: your name and why you came. Then we show you the way.</p>
+            <p className="modal-copy">Like the guard&apos;s logbook: your name, how to reach you and why you came. Then we show you the way.</p>
             <label>Your name<input value={visitorName} onChange={(event) => setVisitorName(event.target.value)} placeholder="Full name" autoComplete="name" maxLength={80} required /></label>
+            <label>Contact number<input value={visitorContact} onChange={(event) => setVisitorContact(event.target.value)} placeholder="e.g. 0917 123 4567" inputMode="tel" autoComplete="tel" maxLength={20} required /></label>
+            <label>Address <small className="visit-optional">(optional, recommended for safety)</small><input value={visitorAddress} onChange={(event) => setVisitorAddress(event.target.value)} placeholder="Barangay, city" autoComplete="street-address" maxLength={150} /></label>
             <fieldset className="visit-purposes">
               <legend>Why are you visiting?</legend>
               {VISIT_PURPOSES.map((item) => <label key={item.id} className={visitorPurpose === item.id ? "chosen" : ""}>
@@ -407,7 +415,7 @@ function LoginModal({ onClose, onCreate, onSignedIn = () => {}, onAdminSignedIn 
             {visitorPurpose === "other" && <label>What&apos;s your visit for?<input value={visitorOther} onChange={(event) => setVisitorOther(event.target.value)} placeholder="e.g. Deliver documents to the library" maxLength={50} /></label>}
             {visitorError && <p className="auth-error" role="alert">{visitorError}</p>}
             <button className="visitor-button" type="submit" disabled={visitorBusy}>{visitorBusy ? "Getting things ready…" : "Start my visit"}</button>
-            <p className="auth-security-note"><Icon name="info" size={15} /> Your name, purpose and the time you came and left go to the school&apos;s visitor log, which only the school administrator can see. No email or account needed.</p>
+            <p className="auth-security-note"><Icon name="info" size={15} /> Your name, contact number, address (if given), purpose and the time you came and left go to the school&apos;s visitor log, which only the school administrator can see. No email or account needed.</p>
             <button className="create-account-link" type="button" onClick={() => { setVisitorKind(""); setVisitorError(""); }}>Back</button>
           </form>
         ) : visitorStep ? (
@@ -1218,7 +1226,7 @@ export default function App() {
   };
   // Already verified (or the administrator): nothing to ask.
   useEffect(() => {
-    if (welcome && (hasFullMap(campusAccess) || role === "admin")) finishWelcome(campusAccess.role === "staff" ? "staff" : role === "admin" ? "admin" : "student");
+    if (welcome && (hasFullMap(campusAccess) || role === "admin")) finishWelcome(role === "admin" ? "admin" : campusAccess.role === "staff" || campusAccess.role === "parent" ? campusAccess.role : "student");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campusAccess.status, role]);
   const changeWho = () => { saveWho(""); setWelcome("choose"); };

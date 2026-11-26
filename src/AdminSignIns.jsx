@@ -27,7 +27,7 @@ function periodRange(period) {
 const methodLabel = (method) => SIGN_IN_METHODS[method] || method || "Unknown";
 const whenText = (row) => row.at?.toDate ? row.at.toDate().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "Just now";
 const timeOnly = (stamp) => stamp?.toDate ? stamp.toDate().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "";
-const visitText = (row) => row.purpose ? `${row.purpose}${row.endedAt ? ` · left ${timeOnly(row.endedAt)}` : ""}` : "";
+const visitText = (row) => row.purpose ? `${row.purpose}${row.contact ? ` · ${row.contact}` : ""}${row.address ? ` · ${row.address}` : ""}${row.endedAt ? ` · left ${timeOnly(row.endedAt)}` : ""}` : "";
 const who = (row) => row.name || (row.method === "anonymous" ? "Visitor" : "No name");
 
 function countBy(rows, pick) {
@@ -110,8 +110,8 @@ export default function AdminSignIns({ onClose, onOpenContent, onOpenVisits }) {
   const periodLabel = PERIODS.find(([key]) => key === period)[1];
 
   const exportCsv = () => {
-    const header = ["Date and time", "Name", "Email", "Role", "Purpose of visit", "Time out", "Sign-in method", "Device", "System", "Browser", "Screen"];
-    const lines = filtered.map((row) => [whenText(row), who(row), row.email, row.role, row.purpose || "", timeOnly(row.endedAt), methodLabel(row.method), row.device, row.os, row.browser, row.screen]);
+    const header = ["Date and time", "Name", "Email", "Role", "Purpose of visit", "Contact number", "Address", "Time out", "Sign-in method", "Device", "System", "Browser", "Screen"];
+    const lines = filtered.map((row) => [whenText(row), who(row), row.email, row.role, row.purpose || "", row.contact || "", row.address || "", timeOnly(row.endedAt), methodLabel(row.method), row.device, row.os, row.browser, row.screen]);
     const csv = [header, ...lines].map((line) => line.map((cell) => `"${String(cell ?? "").replaceAll('"', '""')}"`).join(",")).join("\n");
     const link = document.createElement("a");
     link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));

@@ -7,6 +7,8 @@ import { BUILDING_NAME, PLACES, blockedAreas, buildingOf, findRoute, classroomOf
 import { searchPlace } from "./placeSearch";
 import { openFeedback } from "./Feedback";
 import VerifyAccess from "./VerifyAccess";
+import ParentRequest from "./ParentRequest";
+import { readWho } from "./Welcome";
 import { refreshEmailConfirmed, sendConfirmationEmail, wantsEmailUpdates, wishForEmailUpdates } from "./firebase";
 
 const floorLabel = (floor) => (floor === 0 ? "Ground floor" : `Floor ${floor}`);
@@ -265,7 +267,7 @@ export default function MyCampus({ user, onClose, onSignOut, onShowMap, onShow3D
           </div>
         </section>
         {profileError && <p className="updates-unavailable" role="alert">{profileError}</p>}
-        {!user.isAnonymous && <VerifyAccess />}
+        {!user.isAnonymous && (readWho() === "parent" ? <section className="verify-access"><div className="verify-head"><span className="verify-icon" aria-hidden="true"><Icon name="heart" size={20} /></span><div><b>Parent or guardian: full map</b><small>Send a photo of your valid ID. Once the school approves it, you see every room until the end of the school year.</small></div></div><ParentRequest /></section> : <VerifyAccess />)}
         <div className="student-dashboard-grid">
           <section className="student-card mc-find-card tone-lime">
             <div className="student-card-heading"><span className="mc-card-icon" aria-hidden="true"><Icon name="location" size={22} /></span><div><p className="kicker">FIND A PLACE</p><h2>Where do you need to go?</h2></div></div>

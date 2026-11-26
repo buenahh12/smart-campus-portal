@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { deleteDoc, doc, onSnapshot, serverTimestamp, setDoc, writeBatch } from "firebase/firestore";
+import { Timestamp, collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc, updateDoc, writeBatch } from "firebase/firestore";
 import Icon from "./Icon";
 import { auth, db } from "./firebase";
 import { accessKey, cleanBirthdate, cleanId, claimsRef, studentListRef, useCampusAccess, validId } from "./campusAccess";
@@ -136,6 +136,7 @@ export default function AdminAccess() {
   };
 
   return <div className="access-admin">
+    <ParentRequests />
     <section className="access-card">
       <div className="access-head"><span className="verify-icon" aria-hidden="true"><Icon name="shield" size={20} /></span><div>
         <h3>Who can see the full map</h3>
@@ -177,4 +178,75 @@ export default function AdminAccess() {
       <label className="verify-button access-file"><Icon name="download" size={16} /> Choose the map file<input type="file" accept=".json,application/json" onChange={uploadMap} hidden /></label>
     </section>
   </div>;
+}
+
+// End of this school year (31 May), when a parent's approval runs out.
+const schoolYearEnd = () => {
+  const now = new Date();
+  const year = now.getMonth() >= 5 ? now.getFullYear() + 1 : now.getFullYear();
+  return new Date(year, 4, 31, 23, 59, 59);
+};
+
+// Parents who sent a valid ID. Approve = full map until the end of the school year. Either way the
+// ID photo is deleted at once; only the name, child and result stay.
+function ParentRequests() {
+  const [requests, setRequests] = useState([]);
+  const [approved, setApproved] = useState([]);
+  const [open, setOpen] = useState(null);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  useEffect(() => {
+    if (!db) return undefined;
+    const stopRequests = onSnapshot(collection(db, "parentRequests"), (snapshot) => setRequests(snapshot.docs.map((item) => ({ uid: item.id, ...item.data() }))), () => setError("Parent requests could not be loaded. Deploy the new firestore.rules."));
+    const stopApproved = onSnapshot(collection(db, "parentAccess"), (snapshot) => setApproved(snapshot.docs.map((item) => ({ uid: item.id, ...item.data() }))), () => {});
+    return () => { stopRequests(); stopApproved(); };
+  }, []);
+  const waiting = requests.filter((item) => item.status === "pending").sort((a, b) => (a.at?.toMillis?.() || 0) - (b.at?.toMillis?.() || 0));
+
+  const decide = async (item, approve) => {
+    let reason = "";
+    if (!approve) {
+      reason = (window.prompt(`Why can't ${item.name} be approved? (They will see this.)`, "The ID photo is not clear") || "").trim().slice(0, 120);
+      if (!reason) return;
+    }
+    setError(""); setNotice("");
+    try {
+      if (approve) {
+        await setDoc(doc(db, "parentAccess", item.uid), { name: item.name, childName: item.childName, until: Timestamp.fromDate(schoolYearEnd()), approvedAt: serverTimestamp(), approvedBy: auth.currentUser?.email || "" });
+      }
+      await updateDoc(doc(db, "parentRequests", item.uid), { status: approve ? "approved" : "rejected", reason, idPhoto: "", decidedAt: serverTimestamp() });
+      setOpen(null);
+      setNotice(approve ? `${item.name} is approved until 31 May. The ID photo was deleted.` : `${item.name} was not approved. The ID photo was deleted.`);
+    } catch (failure) {
+      setError(failure.message);
+    }
+  };
+  const removeParent = async (item) => {
+    if (!window.confirm(`Remove full-map access for ${item.name}?`)) return;
+    try { await deleteDoc(doc(db, "parentAccess", item.uid)); } catch (failure) { setError(failure.message); }
+  };
+
+  return <section className="access-card">
+    <h3>Parent requests {waiting.length > 0 && <span className="access-badge">{waiting.length} waiting</span>}</h3>
+    <p>Parents send a photo of a valid ID and their child&apos;s name. Check it against your records. Approved parents see the full map until 31 May. The ID photo is deleted as soon as you decide.</p>
+    {(notice || error) && <p className={error ? "auth-error" : "access-notice"} role={error ? "alert" : "status"}>{error || notice}</p>}
+    {waiting.length ? <ul className="access-list">
+      {waiting.map((item) => <li key={item.uid} className="parent-request">
+        <div><b>{item.name}</b><small>Parent of {item.childName} · {item.childGrade} · {item.contact}</small></div>
+        <button type="button" className="cms-link-button" onClick={() => setOpen(open === item.uid ? null : item.uid)}>{open === item.uid ? "Hide ID" : "See ID"}</button>
+        <button type="button" className="verify-button" onClick={() => decide(item, true)}>Approve</button>
+        <button type="button" className="cms-link-button bp-danger" onClick={() => decide(item, false)}>Reject</button>
+        {open === item.uid && item.idPhoto && <img className="parent-id" src={item.idPhoto} alt={`ID of ${item.name}`} />}
+      </li>)}
+    </ul> : <p className="updates-empty">No requests waiting.</p>}
+    {approved.length > 0 && <>
+      <h4 className="access-sub">Approved parents ({approved.length})</h4>
+      <ul className="access-list">
+        {approved.map((item) => <li key={item.uid}>
+          <div><b>{item.name}</b><small>Parent of {item.childName} · until {item.until?.toDate?.().toLocaleDateString() || "—"}</small></div>
+          <button type="button" className="cms-link-button bp-danger" onClick={() => removeParent(item)}>Remove</button>
+        </li>)}
+      </ul>
+    </>}
+  </section>;
 }

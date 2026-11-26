@@ -48,8 +48,14 @@ service cloud.firestore {
       return request.auth != null && exists(accessPath())
         && exists(/databases/$(database)/documents/studentList/$(get(accessPath()).data.key));
     }
+    // A parent approved by the administrator (valid ID checked), until the end of the school year.
+    function approvedParent() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/parentAccess/$(request.auth.uid))
+        && get(/databases/$(database)/documents/parentAccess/$(request.auth.uid)).data.until > request.time;
+    }
     function fullMap() {
-      return isAdmin() || verified();
+      return isAdmin() || verified() || approvedParent();
     }
     // The rooms a visitor's map may name (keep in sync with VISITOR_ROOMS in src/floorPlans.js).
     function visitorMapRoom(id) {
@@ -150,7 +156,7 @@ service cloud.firestore {
     // published ones; drafts stay with the administrator. The app also cleans every room and
     // ignores a floor that clashes with a built-in one (normalizeFloor in src/floorPlans.js).
     match /planFloors/{id} {
-      allow read: if (resource.data.published == true && verified()) || isAdmin();
+      allow read: if resource.data.published == true && fullMap();
       allow create, update: if isAdmin() && stamped()
         && id.matches('^[a-z0-9-]{1,40}$')
         && data().keys().hasOnly(['floor', 'level', 'building', 'label', 'rooms', 'halls', 'links', 'published', 'updatedAt', 'updatedBy'])
@@ -261,9 +267,11 @@ service cloud.firestore {
     match /signIns/{id} {
       allow read, delete: if isAdmin();
       allow create: if request.auth != null
-        && data().keys().hasOnly(['uid', 'email', 'name', 'role', 'method', 'device', 'os', 'browser', 'screen', 'at', 'purpose'])
+        && data().keys().hasOnly(['uid', 'email', 'name', 'role', 'method', 'device', 'os', 'browser', 'screen', 'at', 'purpose', 'contact', 'address'])
         && data().uid == request.auth.uid
         && (!('purpose' in data()) || (data().method == 'anonymous' && text('purpose', true, 60)))
+        && (!('contact' in data()) || (data().method == 'anonymous' && text('contact', true, 20)))
+        && (!('address' in data()) || (data().method == 'anonymous' && text('address', true, 150)))
         && data().email == request.auth.token.get('email', '')
         && text('name', false, 80)
         && data().role in ['', 'Student', 'Faculty / Staff', 'Parent / Guardian', 'Visitor', 'Enrollee / Applicant', 'School personnel', 'Other visitor']
@@ -373,6 +381,34 @@ service cloud.firestore {
         && data().name == get(/databases/$(database)/documents/studentList/$(data().key)).data.name
         && data().role == get(/databases/$(database)/documents/studentList/$(data().key)).data.role
         && data().schoolYear == get(/databases/$(database)/documents/studentList/$(data().key)).data.schoolYear;
+    }
+
+    // A parent's request: their name, contact, child and a photo of a valid ID (a small JPEG).
+    // Only the parent and the administrator can see it. The admin's decision empties the photo.
+    match /parentRequests/{uid} {
+      allow get: if isAdmin() || (request.auth != null && request.auth.uid == uid);
+      allow list: if isAdmin();
+      allow delete: if isAdmin() || (request.auth != null && request.auth.uid == uid);
+      allow create, update: if signedInPerson() && request.auth.uid == uid
+        && data().keys().hasOnly(['name', 'contact', 'childName', 'childGrade', 'idPhoto', 'status', 'reason', 'at'])
+        && text('name', true, 80) && text('contact', true, 40) && text('childName', true, 80) && text('childGrade', true, 40)
+        && data().idPhoto is string && data().idPhoto.size() <= 400000
+        && data().idPhoto.matches('data:image/jpeg;base64,[A-Za-z0-9+/=]+')
+        && data().status == 'pending' && data().reason == '' && data().at == request.time;
+      allow update: if isAdmin()
+        && data().diff(resource.data).affectedKeys().hasOnly(['status', 'reason', 'idPhoto', 'decidedAt'])
+        && data().status in ['approved', 'rejected'] && data().idPhoto == ''
+        && text('reason', false, 120) && data().decidedAt == request.time;
+    }
+
+    // Approved parents: written only by the administrator.
+    match /parentAccess/{uid} {
+      allow get: if isAdmin() || (request.auth != null && request.auth.uid == uid);
+      allow list, delete: if isAdmin();
+      allow create, update: if isAdmin()
+        && data().keys().hasOnly(['name', 'childName', 'until', 'approvedAt', 'approvedBy'])
+        && text('name', true, 80) && text('childName', true, 80)
+        && data().until is timestamp && data().approvedAt == request.time && data().approvedBy is string;
     }
 
     // Names, numbers and doors of the classrooms, labs and staff rooms (not in the public website).
