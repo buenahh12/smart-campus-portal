@@ -9,7 +9,7 @@ import { openFeedback } from "./Feedback";
 import { SaveRouteButton } from "./savedRoutes";
 import { rememberPlace } from "./lastPlace";
 import { useA11y } from "./a11y";
-import { savedVoiceLang, speak, stepText, stopSpeaking, voiceSupported } from "./voiceGuide";
+import { savedVoiceLang, speak, stopSpeaking, voiceSupported } from "./voiceGuide";
 import {
   BUILDING_NAME,
   FLOORS,
@@ -621,9 +621,9 @@ export default function CampusMap({ onClose, initialFloor = 2, initialDestinatio
     const lines = [
       current === route && emergency ? "Nearest exit." : "",
       `${current.minutes} minute${current.minutes === 1 ? "" : "s"}, ${current.meters} metres.`,
-      ...current.steps.map((step) => stepText(step.text, lang)),
+      ...current.steps.map((step) => step.text),
     ].filter(Boolean);
-    speak(lines.join(". ").replace(/\.\./g, "."), lang);
+    speak(lines, lang);
   };
   // Only a floor was picked in an emergency, so the start is that floor's stairs until they tap their room.
   const [guessedStart, setGuessedStart] = useState(askRoom);

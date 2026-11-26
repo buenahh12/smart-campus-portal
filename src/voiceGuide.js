@@ -1,11 +1,14 @@
-// Voice guide for the 3D directions: reads each step aloud in English or Tagalog.
+// Voice guide for the 2D, 3D and AR directions: reads each step aloud in English or Tagalog, in
+// the team's own recorded voices (public/voices/en-01.mp3 … tl-30.mp3). A direction without a
+// recording (a distance, a room name…) is read by the phone's voice instead.
 // The steps come from floorPlans.js describe() in a small set of English sentence shapes, so
 // Tagalog is made by matching those shapes. Room names stay as they are on the signs.
 
 const VOICE_KEY = "sscai-voice-guide";
 export const VOICE_LANGS = { off: "Off", en: "English", tl: "Tagalog" };
 
-export const voiceSupported = () => typeof window !== "undefined" && "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
+const ttsSupported = () => typeof window !== "undefined" && "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
+export const voiceSupported = () => typeof window !== "undefined" && (typeof Audio !== "undefined" || ttsSupported());
 
 export function savedVoiceLang() {
   try {
@@ -87,6 +90,71 @@ export function toTagalog(text) {
 
 export const stepText = (text, lang) => (lang === "tl" ? toTagalog(text) : text);
 
+
+// ---------- Recorded clips ----------
+// One English direction -> the numbers of the clips that say it (see the recording script), or
+// null when a part has no recording. Distances and room names are left out on purpose: the screen
+// shows them.
+const LINE_RULES = [
+  [/^stand in the doorway/i, ["25"]],
+  [/^you are off the route/i, ["22"]],
+  [/^wrong way/i, ["23"]],
+  [/^point your phone/i, ["26"]],
+  [/^nearest exit\.?$/i, ["28"]],
+  [/^this hallway is closed/i, ["27"]],
+];
+const UP = { "2nd floor": "12", "3rd floor": "13", "4th floor": "14" };
+const DOWN = { "3rd floor": "15", "2nd floor": "16", "ground floor": "17", "1st floor": "17" };
+const PART_RULES = [
+  [/^start at /i, () => ["01"]],
+  [/^follow the arrows to /i, () => ["01"]],
+  [/^leave /i, () => ["10"]],
+  [/^take the .+ up to the (.+)$/i, (m) => (UP[m[1].toLowerCase()] ? [UP[m[1].toLowerCase()]] : null)],
+  [/^take the .+ down to the (.+)$/i, (m) => (DOWN[m[1].toLowerCase()] ? [DOWN[m[1].toLowerCase()]] : null)],
+  [/^go out through /i, () => ["29"]],
+  [/^(arrive at|you have arrived at) /i, () => ["21"]],
+  [/^you will arrive at /i, () => ["19"]],
+  [/^you are already there$/i, () => ["24"]],
+  [/^step off the stairs and turn left$/i, () => ["11", "03"]],
+  [/^step off the stairs and turn right$/i, () => ["11", "04"]],
+  [/^step off the stairs( and turn around and walk)?$/i, (m) => (m[1] ? ["11", "05"] : ["11"])],
+  [/^step out of the stairway$/i, () => ["11"]],
+  [/^step out into the hallway$/i, () => ["10"]],
+  [/^turn left down the hallway$/i, () => ["06"]],
+  [/^turn right down the hallway$/i, () => ["07"]],
+  [/^turn around(?: and walk)?(?: .*)?$/i, () => ["05"]],
+  [/^turn left(?: .*)?$/i, () => ["03"]],
+  [/^turn right(?: .*)?$/i, () => ["04"]],
+  [/^walk down the hallway$/i, () => ["08"]],
+  [/^go ahead a few steps$/i, () => ["09"]],
+  [/^walk through /i, () => ["18"]],
+  [/^(keep going|walk)(?: straight| past .+| about \d+ m| to .+)?$/i, () => ["02"]],
+  [/^following the arrows on the steps$/i, () => []],
+];
+export function clipsFor(text) {
+  const line = String(text || "").trim();
+  for (const [pattern, ids] of LINE_RULES) if (pattern.test(line)) return ids;
+  const ids = [];
+  const sentences = line.split(/(?<=[a-z0-9)]\.)\s+/);
+  for (const sentence of sentences) {
+    for (const piece of sentence.replace(/\.$/, "").split(/, then |, (?=following)/i)) {
+      const part = piece.trim();
+      if (!part) continue;
+      const rule = PART_RULES.find(([pattern]) => pattern.test(part));
+      const found = rule && rule[1](part.match(rule[0]));
+      if (!found) return null;
+      ids.push(...found);
+    }
+  }
+  return ids.length ? ids : null;
+}
+
+// A queue of things to say, one after another: recorded clips, or the phone's voice.
+let queue = [];
+let current = null;
+let token = 0;
+const clipUrl = (lang, id) => `${import.meta.env.BASE_URL}voices/${lang}-${id}.mp3`;
+
 // The best installed voice for the language: Filipino first for Tagalog (most phones have one),
 // otherwise any voice reads it; English prefers a Philippine English voice.
 function pickVoice(lang) {
@@ -99,27 +167,72 @@ function pickVoice(lang) {
   return null;
 }
 
-export function speak(text, lang) {
-  if (!voiceSupported() || lang === "off" || !text) return;
-  const synth = window.speechSynthesis;
-  synth.cancel(); // the newest step wins: never read out an old one late
-  const utterance = new SpeechSynthesisUtterance(text);
-  const voice = pickVoice(lang);
-  if (voice) utterance.voice = voice;
-  utterance.lang = voice?.lang || (lang === "tl" ? "fil-PH" : "en-US");
-  utterance.rate = 0.95;
-  synth.speak(utterance);
+function next(myToken) {
+  if (myToken !== token) return;
+  const item = queue.shift();
+  if (!item) { current = null; return; }
+  const done = () => next(myToken);
+  if (item.clip) {
+    const audio = new Audio(item.clip);
+    current = audio;
+    audio.onended = done;
+    audio.onerror = () => { queue.unshift({ text: item.fallback, lang: item.lang }); done(); };
+    audio.play().catch(() => { queue.unshift({ text: item.fallback, lang: item.lang }); done(); });
+  } else if (item.text && ttsSupported()) {
+    const utterance = new SpeechSynthesisUtterance(item.lang === "tl" ? toTagalog(item.text) : item.text);
+    const voice = pickVoice(item.lang);
+    if (voice) utterance.voice = voice;
+    utterance.lang = voice?.lang || (item.lang === "tl" ? "fil-PH" : "en-US");
+    utterance.rate = 0.95;
+    utterance.onend = done;
+    utterance.onerror = done;
+    current = utterance;
+    window.speechSynthesis.speak(utterance);
+  } else {
+    done();
+  }
 }
 
+// Says English directions (one line or several) in "en" or "tl": the newest call wins, so an old
+// step is never read out late.
+export function speak(lines, lang) {
+  if (lang === "off" || !lines) return;
+  stopSpeaking();
+  const list = (Array.isArray(lines) ? lines : [lines]).map((line) => String(line || "").trim()).filter(Boolean);
+  queue = [];
+  for (const line of list) {
+    const ids = clipsFor(line);
+    if (ids) {
+      if (ids.length === 0) continue;
+      ids.forEach((id, index) => queue.push({ clip: clipUrl(lang, id), lang, fallback: index === 0 ? line : "" }));
+    } else {
+      queue.push({ text: line, lang });
+    }
+  }
+  token += 1;
+  next(token);
+}
+
+// Phones only allow sound after a tap: call this from the tap that turns the voice guide on.
 export function unlockVoice() {
-  if (!voiceSupported()) return;
-  const silent = new SpeechSynthesisUtterance(" ");
-  silent.volume = 0;
-  window.speechSynthesis.speak(silent);
+  try {
+    const audio = new Audio(clipUrl("en", "02"));
+    audio.volume = 0;
+    audio.play().then(() => audio.pause()).catch(() => {});
+  } catch { /* no audio */ }
+  if (ttsSupported()) {
+    const silent = new SpeechSynthesisUtterance(" ");
+    silent.volume = 0;
+    window.speechSynthesis.speak(silent);
+  }
 }
 
 export function stopSpeaking() {
-  if (voiceSupported()) window.speechSynthesis.cancel();
+  token += 1;
+  queue = [];
+  if (current instanceof Audio) { current.onended = null; current.onerror = null; current.pause(); }
+  current = null;
+  if (ttsSupported()) window.speechSynthesis.cancel();
 }
 
 // Where along the route (0 to 1) each step begins, from the metres of the steps before it.

@@ -53,7 +53,7 @@ export default function Route3DView({ start, end, onClose, onOpenMap }) {
     if (index > spoken.current) {
       spoken.current = index;
       setCurrent(index);
-      speak(stepText(showing.steps[index].text, voice), voice);
+      speak(showing.steps[index].text, voice);
     }
   }, [showing, starts, voice]);
   const chooseVoice = (value) => {

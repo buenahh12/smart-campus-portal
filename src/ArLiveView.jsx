@@ -832,7 +832,7 @@ export default function ArLiveView({ onClose, initialDestination = "", initialSt
           : `Follow the arrows to ${destinationText}.`)
       : message || "";
   useEffect(() => {
-    if (voiceLine) speak(stepText(voiceLine, voice), voice);
+    if (voiceLine) speak(voiceLine, voice);
   }, [voiceLine, voice]);
   useEffect(() => () => stopSpeaking(), []);
   const cycleVoice = () => {
